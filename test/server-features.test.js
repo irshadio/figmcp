@@ -1,0 +1,79 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import test from 'node:test';
+import WebSocket from 'ws';
+import { fakePlugin, nextPort, pairing, startClient, texts, tmpDir } from './helpers.js';
+
+test('the plugin must present the pairing code', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client } = await startClient(dir, port);
+  await new Promise((r) => setTimeout(r, 300));
+  const closeCode = await new Promise((resolve) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/?code=WRONG-CODE`);
+    ws.on('close', (code) => resolve(code));
+    ws.on('error', () => {});
+  });
+  assert.equal(closeCode, 4401);
+  const who = JSON.parse(texts(await client.callTool({ name: 'whoami', arguments: {} })));
+  assert.equal(who.plugin.startsWith('not connected'), true);
+  assert.match(who.pairingCode, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  assert.equal(who.pairingCode, pairing(dir));
+
+  const plugin = fakePlugin(port, { code: pairing(dir).toLowerCase().replace('-', '') });
+  assert.equal(await plugin.ready(), true, 'the code is accepted without case or dash');
+  plugin.stop();
+});
+
+test('code connect maps a component set and names it in the design context', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  await plugin.ready();
+
+  const before = await client.callTool({ name: 'get_code_connect_map', arguments: { nodeId: '10:1' } });
+  assert.match(texts(before), /"component": "Button\/Primary"/);
+
+  const added = await client.callTool({ name: 'add_code_connect_map', arguments: {
+    nodeId: '10:3', componentName: 'AppPrimaryButton', source: 'lib/widgets/app_primary_button.dart', label: 'Flutter',
+  } });
+  const saved = JSON.parse(texts(added));
+  assert.equal(saved.saved.key, 'name:Button/Primary');
+  assert.equal(fs.readFileSync(path.join(dir, '.figma-local', '.gitignore'), 'utf8'), '*\n');
+
+  const ctx = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true } }));
+  assert.match(ctx, /^\/\/ AppPrimaryButton: lib\/widgets\/app_primary_button.dart \(Flutter\)/);
+  assert.match(ctx, /<AppPrimaryButton className="relative shrink-0 w-full h-\[40px\]"/);
+  const raw = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true, disableCodeConnect: true } }));
+  assert.doesNotMatch(raw, /<AppPrimaryButton/);
+
+  const map = JSON.parse(texts(await client.callTool({ name: 'get_code_connect_map', arguments: { nodeId: '10:1' } })).split('\n\n')[0]);
+  assert.equal(map['10:3'].codeConnectName, 'AppPrimaryButton');
+
+  const removed = JSON.parse(texts(await client.callTool({ name: 'remove_code_connect_map', arguments: { nodeId: '10:3' } })));
+  assert.equal(removed.removed, 1);
+  plugin.stop();
+});
+
+test('save_design_export writes a full export with code connect annotations', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  await plugin.ready();
+  await client.callTool({ name: 'add_code_connect_map', arguments: {
+    nodeId: '10:3', componentName: 'AppPrimaryButton', source: 'lib/app_primary_button.dart',
+  } });
+  const target = path.join(dir, 'out', 'screen.json');
+  const res = JSON.parse(texts(await client.callTool({ name: 'save_design_export', arguments: { path: target } })));
+  assert.equal(res.path, target);
+  const written = JSON.parse(fs.readFileSync(target, 'utf8'));
+  assert.equal(written.frames[0].tree.id, '10:1');
+  assert.equal(written.frames[0].tree.children[1].codeConnect.componentName, 'AppPrimaryButton');
+  assert.ok(written.frames[0].previewPng2x);
+  const bad = await client.callTool({ name: 'save_design_export', arguments: { path: 'relative.json' } });
+  assert.equal(bad.isError, true);
+  plugin.stop();
+});

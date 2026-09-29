@@ -1,0 +1,169 @@
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 12px Inter, system-ui, sans-serif; margin: 14px;
+    color: var(--figma-color-text, #111);
+    background: var(--figma-color-bg, #fff);
+  }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #f24822; }
+  .dot.on { background: #14ae5c; }
+  .muted { color: var(--figma-color-text-secondary, #666); }
+  #status { min-height: 32px; white-space: pre-wrap; margin: 8px 0; }
+  button {
+    padding: 7px 12px; border-radius: 6px; border: 0; cursor: pointer;
+    background: var(--figma-color-bg-brand, #0d99ff);
+    color: var(--figma-color-text-onbrand, #fff);
+  }
+  button:disabled { opacity: .4; cursor: default; }
+  input {
+    width: 110px; padding: 6px 8px; border-radius: 6px; font: inherit;
+    border: 1px solid var(--figma-color-border, #ccc); text-transform: uppercase;
+    background: transparent; color: inherit;
+  }
+  #pair { display: none; margin-bottom: 8px; }
+</style>
+<div class="row"><span id="dot" class="dot"></span><b id="state">Connecting…</b></div>
+<div class="muted" id="where"></div>
+<div id="status" class="muted">Keep this window open while the MCP server reads the file.</div>
+<div id="pair" class="row">
+  <input id="code" placeholder="XXXX-XXXX" maxlength="9" autocomplete="off">
+  <button id="save">Pair</button>
+</div>
+<button id="send" disabled>Save selection as snapshot</button>
+<script>
+  const PORT = 3947;
+  const PAIRING_REJECTED = 4401;
+  const PAIRING_LOCKED = 4429;
+  let socket = null;
+  let retry = 500;
+  let failures = 0;
+  let code = null;
+  let waitingForCode = false;
+
+  const dot = document.getElementById('dot');
+  const state = document.getElementById('state');
+  const where = document.getElementById('where');
+  const status = document.getElementById('status');
+  const send = document.getElementById('send');
+  const pair = document.getElementById('pair');
+  const input = document.getElementById('code');
+
+  function setConnected(on) {
+    dot.className = on ? 'dot on' : 'dot';
+    state.textContent = on ? 'Connected to MCP server' : 'Waiting for MCP server';
+    send.disabled = !on;
+  }
+
+  function showInfo(info) {
+    const sel = info.selection.length === 0 ? 'nothing selected'
+      : info.selection.length === 1
+        ? 'selected: ' + info.selection[0].name + ' (' + info.selection[0].id + ')'
+        : info.selection.length + ' nodes selected';
+    where.textContent = info.fileName + ' / ' + info.currentPage.name + ' — ' + sel;
+  }
+
+  function sendJson(obj) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(obj));
+    }
+  }
+
+  function askForCode(text) {
+    waitingForCode = true;
+    pair.style.display = 'flex';
+    state.textContent = 'Pairing needed';
+    status.textContent = text;
+    input.focus();
+  }
+
+  function connect() {
+    if (waitingForCode) return;
+    try {
+      socket = new WebSocket('ws://localhost:' + PORT + '/?code=' + encodeURIComponent(code || ''));
+    } catch (e) {
+      schedule();
+      return;
+    }
+    socket.onopen = function () {
+      retry = 500;
+      failures = 0;
+      pair.style.display = 'none';
+      status.textContent = 'Keep this window open while the MCP server reads the file.';
+      setConnected(true);
+      parent.postMessage({ pluginMessage: { type: 'hello' } }, '*');
+    };
+    socket.onmessage = function (event) {
+      let msg;
+      try { msg = JSON.parse(event.data); } catch (e) { return; }
+      if (msg.type === 'request') {
+        parent.postMessage({ pluginMessage: msg }, '*');
+      } else if (msg.type === 'saved') {
+        status.textContent = 'Snapshot saved: ' + msg.name;
+      }
+    };
+    socket.onclose = function (event) {
+      setConnected(false);
+      if (event.code === PAIRING_REJECTED) {
+        askForCode(code
+          ? 'The pairing code was not accepted. Ask the agent to run whoami and enter the code it shows.'
+          : 'Enter the pairing code. Ask the agent to run whoami to see it.');
+        return;
+      }
+      if (event.code === PAIRING_LOCKED) {
+        status.textContent = 'Too many wrong codes. Trying again in a minute.';
+        setTimeout(connect, 60000);
+        return;
+      }
+      failures++;
+      if (failures === 5) {
+        status.textContent = 'No MCP server on port ' + PORT + '. Start an ' +
+          'agent session with the server; if one is running, ask it to run ' +
+          'whoami.';
+      }
+      schedule();
+    };
+    socket.onerror = function () { /* onclose follows */ };
+  }
+
+  function schedule() {
+    setTimeout(connect, retry);
+    retry = Math.min(retry * 2, 4000);
+  }
+
+  document.getElementById('save').onclick = function () {
+    code = input.value.trim().toUpperCase();
+    parent.postMessage({ pluginMessage: { type: 'savePairing', code: code } }, '*');
+    waitingForCode = false;
+    pair.style.display = 'none';
+    status.textContent = 'Pairing…';
+    connect();
+  };
+  input.onkeydown = function (e) {
+    if (e.key === 'Enter') document.getElementById('save').click();
+  };
+
+  send.onclick = function () {
+    status.textContent = 'Reading selection…';
+    parent.postMessage({ pluginMessage: { type: 'snapshot' } }, '*');
+  };
+
+  onmessage = function (event) {
+    const msg = event.data.pluginMessage;
+    if (!msg) return;
+    if (msg.type === 'pairing' && code === null) {
+      code = msg.code || '';
+      connect();
+    }
+    if (msg.type === 'response') sendJson(msg);
+    if (msg.type === 'selection') {
+      showInfo(msg.info);
+      sendJson({ type: 'info', info: msg.info });
+    }
+    if (msg.type === 'snapshot') {
+      status.textContent = 'Sending snapshot…';
+      sendJson({ type: 'snapshot', data: msg.data });
+    }
+    if (msg.type === 'status') status.textContent = msg.text;
+  };
+</script>

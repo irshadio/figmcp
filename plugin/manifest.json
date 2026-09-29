@@ -1,0 +1,16 @@
+{
+  "name": "Figma Local MCP",
+  "id": "figma-local-mcp-bridge",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma", "dev"],
+  "capabilities": ["inspect"],
+  "documentAccess": "dynamic-page",
+  "permissions": ["currentuser"],
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "devAllowedDomains": ["ws://localhost:3947", "http://localhost:3947"],
+    "reasoning": "Streams the open file to an MCP server on this machine only."
+  }
+}

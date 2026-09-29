@@ -1,0 +1,28 @@
+{
+  "name": "figma-local-mcp",
+  "version": "1.1.0",
+  "description": "Local MCP server for Figma: a development plugin streams the open file over a localhost WebSocket, so design reads never touch the Figma API.",
+  "type": "module",
+  "bin": {
+    "figma-local-mcp": "bin/figma-local-mcp.js"
+  },
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/figma-local-mcp.js",
+    "test": "node --test test/",
+    "visual-check": "node tools/visual-check.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "pngjs": "^7.0.0",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.12.0"
+  }
+}
