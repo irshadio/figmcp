@@ -170,3 +170,18 @@ test('names with quotes stay valid JSX', () => {
   const out = code(frame([{ id: '1:2', name: 'Say "hi"', type: 'FRAME', x: 0, y: 0, width: 10, height: 10 }]));
   assert.match(out, /data-name=\{"Say \\"hi\\""\}/);
 });
+
+test('runs share their common styles on the paragraph', () => {
+  const run = (characters, color) => ({ characters, fontSize: 14, fontName: { family: 'Inter', style: 'Semi Bold' },
+    lineHeight: { unit: 'PIXELS', value: 22 }, fills: [solid(color)] });
+  const out = code(frame([{ id: '1:2', name: 'T', type: 'TEXT', x: 0, y: 0, width: 128, height: 22, characters: 'Ton x1',
+    textAutoResize: 'WIDTH_AND_HEIGHT', segments: [run('Ton ', black), run('x1', { r: 1, g: 0, b: 0, a: 1 })] }]));
+  assert.match(out, /<p className="[^"]*font-\['Inter:Semi_Bold',sans-serif\] text-\[14px\] leading-\[22px\]/);
+  assert.match(out, /<span className="text-\[#000000\]">\{"Ton "\}<\/span><span className="text-\[#ff0000\]">x1<\/span>/);
+});
+
+test('an SVG larger than its layer keeps its own size and offset', () => {
+  const out = code(frame([{ id: '1:2', name: 'Ring', type: 'ELLIPSE', x: 10, y: 10, width: 20, height: 20,
+    svg: '<svg/>', svgBounds: { x: 9, y: 9, width: 22, height: 22 } }]));
+  assert.match(out, /<img alt="" className="absolute max-w-none left-\[-1px\] top-\[-1px\] w-\[22px\] h-\[22px\]"/);
+});

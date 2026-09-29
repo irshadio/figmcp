@@ -153,7 +153,7 @@ async function boundNames(ctx, node, bound) {
 }
 
 function onlyShapes(node) {
-  if (SHAPES.has(node.type)) return true;
+  if (SHAPES.has(node.type)) return !hasImageFill(node);
   if (node.type === 'TEXT') return false;
   if (!('children' in node)) return false;
   return node.children.length > 0 && node.children.every(onlyShapes);
@@ -366,6 +366,15 @@ async function serialize(node, origin, ctx, depth) {
         out.svg = await timed(ctx, 'svg', function () {
           return node.exportAsync({ format: 'SVG_STRING' });
         });
+        // The SVG canvas is the render bounds (strokes and effects
+        // included), which can be larger than the layer's box.
+        const rb = 'absoluteRenderBounds' in node ? node.absoluteRenderBounds : null;
+        if (rb && box) {
+          out.svgBounds = {
+            x: round(rb.x - origin.x), y: round(rb.y - origin.y),
+            width: round(rb.width), height: round(rb.height),
+          };
+        }
         if (ctx.timings && Date.now() - start > 200) {
           ctx.slow.push({ id: node.id, name: node.name, type: node.type, ms: Date.now() - start });
         }

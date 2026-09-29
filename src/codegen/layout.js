@@ -92,7 +92,9 @@ export function positionClasses(node, parent, opts = {}) {
     if (parent.itemReverseZIndex && typeof opts.index === 'number') {
       out.push(`z-[${(opts.count || 0) - opts.index}]`);
     }
-    if (hugsWidth) out.push('whitespace-nowrap');
+    // Figma rounds a hugging text box up to a whole pixel; the box keeps that
+    // width and still grows with longer text.
+    if (hugsWidth) out.push('whitespace-nowrap', `min-w-[${px(node.width)}]`);
     out.push(...minMax(node));
     return out;
   }
@@ -145,7 +147,7 @@ export function positionClasses(node, parent, opts = {}) {
       out.push(`top-[${px(y)}]`);
       if (!hugsHeight) out.push(h);
   }
-  if (hugsWidth) out.push('whitespace-nowrap');
+  if (hugsWidth) out.push('whitespace-nowrap', `min-w-[${px(node.width)}]`);
   out.push(...minMax(node));
   return out;
 }

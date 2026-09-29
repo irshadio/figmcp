@@ -167,13 +167,17 @@ class Writer {
 
   text(node, pos, depth) {
     const pieces = paragraphs(node);
-    const single = segmentsOf(node).length === 1;
-    const shared = single ? fontClasses(segmentsOf(node)[0], node) : [];
+    const segs = segmentsOf(node);
+    const single = segs.length === 1;
+    // Styles every run shares go on the paragraph: its own line box (the
+    // strut) must carry the runs' line height, font and size.
+    const perRun = segs.map((seg) => fontClasses(seg, node));
+    const shared = perRun[0].filter((c) => perRun.every((classes) => classes.includes(c)));
     const block = [...textBlockClasses(node), ...this.boxClasses(node, {}, false).classes];
     const valign = verticalAlign(node);
     const spacing = node.paragraphSpacing || 0;
     const run = (piece) => {
-      const cls = single ? '' : fontClasses(piece.seg, node).join(' ');
+      const cls = single ? '' : fontClasses(piece.seg, node).filter((c) => !shared.includes(c)).join(' ');
       let inner = jsxText(piece.text);
       if (piece.seg.hyperlink && piece.seg.hyperlink.type === 'URL') {
         inner = `<a href=${jsxAttr(piece.seg.hyperlink.value)}>${inner}</a>`;
@@ -217,10 +221,18 @@ class Writer {
     this.lines.push(`${this.pad(depth)}<${name} className="${cls}"${this.attrs(node)}${props.length ? ` ${props.join(' ')}` : ''} />`);
   }
 
-  image(depth, node, pos, url, fallback, extra) {
+  image(depth, node, pos, url, fallback, extra, bounds) {
     const id = this.assetConst(url, node.name, fallback);
     this.open(depth, 'div', pos, node, null, false, extra);
-    this.lines.push(`${this.pad(depth + 1)}<img alt="" className="block max-w-none size-full" src={${id}} />`);
+    const dx = bounds ? bounds.x - node.x : 0;
+    const dy = bounds ? bounds.y - node.y : 0;
+    const exact = !bounds || (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01 &&
+      Math.abs(bounds.width - node.width) < 0.01 && Math.abs(bounds.height - node.height) < 0.01);
+    // An SVG drawn beyond the layer's box (outside strokes, shadows) keeps
+    // its own size and offset.
+    const cls = exact ? 'block max-w-none size-full'
+      : `absolute max-w-none left-[${px(dx)}] top-[${px(dy)}] w-[${px(bounds.width)}] h-[${px(bounds.height)}]`;
+    this.lines.push(`${this.pad(depth + 1)}<img alt="" className="${cls}" src={${id}} />`);
     this.close(depth, 'div');
   }
 
@@ -253,7 +265,7 @@ class Writer {
     }
     if (drawnAsSvg(node)) {
       // The SVG already carries the node's own paints, effects and opacity.
-      this.image(depth, node, pos, this.assets.svg(node.svg), 'Vector');
+      this.image(depth, node, pos, this.assets.svg(node.svg), 'Vector', {}, node.svgBounds);
       return;
     }
     if (node.render && this.assets.render) {
