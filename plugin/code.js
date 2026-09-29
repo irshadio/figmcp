@@ -70,6 +70,7 @@ async function timed(ctx, label, fn) {
 function newContext(options) {
   return {
     timings: options.profile ? {} : null,
+    slow: [],
     imageHashes: new Set(),
     svg: options.svg !== false,
     meta: options.meta === true,
@@ -357,13 +358,17 @@ async function serialize(node, origin, ctx, depth) {
     });
     if (interactions) out.reactions = interactions;
 
-    const visible = node.visible !== false;
+    const visible = node.visible !== false && !ctx.hidden;
     const vectorLike = isIcon(node) || needsSvg(node);
     if (ctx.svg && visible && vectorLike && !hasImageFill(node)) {
       try {
+        const start = Date.now();
         out.svg = await timed(ctx, 'svg', function () {
           return node.exportAsync({ format: 'SVG_STRING' });
         });
+        if (ctx.timings && Date.now() - start > 200) {
+          ctx.slow.push({ id: node.id, name: node.name, type: node.type, ms: Date.now() - start });
+        }
       } catch (e) { /* not exportable */ }
       if (isIcon(node)) return out;
     }
@@ -386,6 +391,8 @@ async function serialize(node, origin, ctx, depth) {
       return out;
     }
     out.children = [];
+    const wasHidden = ctx.hidden;
+    if (node.visible === false) ctx.hidden = true;
     for (const child of node.children) {
       try {
         out.children.push(await serialize(child, origin, ctx, depth + 1));
@@ -395,6 +402,7 @@ async function serialize(node, origin, ctx, depth) {
         });
       }
     }
+    ctx.hidden = wasHidden;
   }
   return out;
 }
@@ -451,7 +459,10 @@ async function node(params) {
   if (params.images) {
     result.images = await timed(ctx, 'images', function () { return imageBytes(ctx.imageHashes); });
   }
-  if (ctx.timings) result.timings = ctx.timings;
+  if (ctx.timings) {
+    result.timings = ctx.timings;
+    result.slow = ctx.slow;
+  }
   return result;
 }
 
