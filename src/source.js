@@ -57,7 +57,7 @@ export class DesignSource {
 
   /** { tree, images: {hash: base64}, source, exportedAt }. */
   async node(id, { images = false, svg = true, maxDepth } = {}) {
-    const result = await this.live('node', { id, svg, images, maxDepth });
+    const result = await this.live('node', { id, svg, images, maxDepth }, 180000);
     if (result && (!svg || maxDepth !== undefined)) {
       return { tree: result.tree, images: result.images || {}, source: 'live' };
     }

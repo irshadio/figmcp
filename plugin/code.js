@@ -71,6 +71,7 @@ function newContext(options) {
   return {
     timings: options.profile ? {} : null,
     slow: [],
+    pending: [],
     imageHashes: new Set(),
     svg: options.svg !== false,
     meta: options.meta === true,
@@ -360,37 +361,38 @@ async function serialize(node, origin, ctx, depth) {
 
     const visible = node.visible !== false && !ctx.hidden;
     const vectorLike = isIcon(node) || needsSvg(node);
-    if (ctx.svg && visible && vectorLike && !hasImageFill(node)) {
-      try {
-        const start = Date.now();
-        out.svg = await timed(ctx, 'svg', function () {
-          return node.exportAsync({ format: 'SVG_STRING' });
-        });
-        // The SVG canvas is the render bounds (strokes and effects
-        // included), which can be larger than the layer's box.
-        const rb = 'absoluteRenderBounds' in node ? node.absoluteRenderBounds : null;
-        if (rb && box) {
-          out.svgBounds = {
-            x: round(rb.x - origin.x), y: round(rb.y - origin.y),
-            width: round(rb.width), height: round(rb.height),
-          };
-        }
+    const exportsSvg = ctx.svg && visible && vectorLike && !hasImageFill(node);
+    if (exportsSvg) {
+      // The SVG canvas is the render bounds (strokes and effects included),
+      // which can be larger than the layer's box.
+      const rb = 'absoluteRenderBounds' in node ? node.absoluteRenderBounds : null;
+      if (rb && box) {
+        out.svgBounds = {
+          x: round(rb.x - origin.x), y: round(rb.y - origin.y),
+          width: round(rb.width), height: round(rb.height),
+        };
+      }
+      // Exports wait for Figma to draw; started together they share the
+      // wait (see settle()).
+      const start = Date.now();
+      ctx.pending.push(node.exportAsync({ format: 'SVG_STRING' }).then(function (svg) {
+        out.svg = svg;
         if (ctx.timings && Date.now() - start > 200) {
           ctx.slow.push({ id: node.id, name: node.name, type: node.type, ms: Date.now() - start });
         }
-      } catch (e) { /* not exportable */ }
+      }, function () { delete out.svgBounds; }));
       if (isIcon(node)) return out;
     }
     // Masked groups and rotated containers cannot be rebuilt exactly from
     // boxes: ship their render and stop.
     const rotatedContainer = isRotated(node) && 'children' in node &&
       node.children.length > 0;
-    if (ctx.svg && visible && !out.svg && (hasMaskChild(node) || rotatedContainer)) {
-      try {
-        out.render = await timed(ctx, 'renders', function () { return renderPng(node); });
-        out.rasterized = hasMaskChild(node) ? 'mask' : 'rotation';
-        return out;
-      } catch (e) { /* fall back to the children */ }
+    if (ctx.svg && visible && !exportsSvg && (hasMaskChild(node) || rotatedContainer)) {
+      out.rasterized = hasMaskChild(node) ? 'mask' : 'rotation';
+      ctx.pending.push(renderPng(node).then(function (render) {
+        out.render = render;
+      }, function () { delete out.rasterized; }));
+      return out;
     }
   }
 
@@ -414,6 +416,13 @@ async function serialize(node, origin, ctx, depth) {
     ctx.hidden = wasHidden;
   }
   return out;
+}
+
+// Waits for the exports serialize() started.
+async function settle(ctx) {
+  const start = Date.now();
+  await Promise.all(ctx.pending);
+  if (ctx.timings) ctx.timings.exports = Date.now() - start;
 }
 
 async function findNode(id) {
@@ -459,6 +468,7 @@ async function node(params) {
   const target = await findNode(params.id);
   const ctx = newContext(params);
   const tree = await serialize(target, originOf(target), ctx, 0);
+  await settle(ctx);
   const result = {
     fileName: figma.root.name,
     page: pageOf(target),
@@ -655,6 +665,7 @@ async function snapshot(params) {
   const ctx = newContext({ svg: true });
   for (const n of nodes) {
     const tree = await serialize(n, originOf(n), ctx, 0);
+    await settle(ctx);
     let preview = null;
     try {
       preview = figma.base64Encode(await n.exportAsync({
