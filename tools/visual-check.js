@@ -5,18 +5,19 @@
 // render (pixels).
 //
 // Usage: node tools/visual-check.js <nodeId|selection> --fonts <dir> [--fonts <dir>]
-//          [--out <dir>] [--export <design export.json>] [--chrome <path>]
+//          [--out <dir>] [--export <design export.json>] [--snapshot <frame id>]
+//          [--chrome <path>]
 // Reads live through the running MCP server (the plugin must be connected),
-// or from a design export JSON with --export.
+// from a design export JSON with --export, or a saved snapshot with
+// --snapshot.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { PNG } from 'pngjs';
 import puppeteer from 'puppeteer-core';
-import { Bridge } from '../src/bridge.js';
 import { toReactTailwind } from '../src/codegen/react.js';
 import { imageExt } from '../src/store.js';
 import { imageSize } from '../src/png.js';
+import { compareBoxes, expectedBoxes, loadDesign, pixelDiff } from './compare.js';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const SCRIPTS = [
@@ -29,9 +30,6 @@ const WEIGHTS = {
   Thin: 100, ExtraLight: 200, Light: 300, Regular: 400, Medium: 500,
   SemiBold: 600, Bold: 700, ExtraBold: 800, Black: 900,
 };
-const BOX_TOLERANCE = 0.5;
-const TEXT_TOLERANCE = 1;
-const PIXEL_THRESHOLD = 48;
 
 function args(argv) {
   const out = { fonts: [], target: null };
@@ -40,6 +38,7 @@ function args(argv) {
     if (a === '--fonts') out.fonts.push(argv[++i]);
     else if (a === '--out') out.out = argv[++i];
     else if (a === '--export') out.export = argv[++i];
+    else if (a === '--snapshot') out.snapshot = argv[++i];
     else if (a === '--chrome') out.chrome = argv[++i];
     else out.target = a;
   }
@@ -64,30 +63,6 @@ function fontFaces(dirs) {
     }
   }
   return { css: faces.join('\n'), families };
-}
-
-async function loadDesign(opts) {
-  if (opts.export) {
-    const data = JSON.parse(fs.readFileSync(opts.export, 'utf8'));
-    const frame = data.frames[0];
-    return { tree: frame.tree, images: data.images || {}, render: Buffer.from(frame.previewPng2x, 'base64') };
-  }
-  const bridge = new Bridge({ port: Number(process.env.FIGMA_LOCAL_MCP_PORT || 3947) });
-  await bridge.start();
-  try {
-    let id = opts.target;
-    if (!id || id === 'selection') {
-      const info = await bridge.call('info', {}, 10000);
-      if (!info.selection.length) throw new Error('Nothing is selected in Figma');
-      id = info.selection[0].id;
-    }
-    id = id.replace(/-/g, ':');
-    const node = await bridge.call('node', { id, svg: true, images: true }, 180000);
-    const shot = await bridge.call('export', { id, format: 'PNG', scale: 2, absoluteBounds: true }, 180000);
-    return { tree: node.tree, images: node.images || {}, render: Buffer.from(shot.base64, 'base64') };
-  } finally {
-    bridge.close();
-  }
 }
 
 function writeAssets(dir, images) {
@@ -126,60 +101,6 @@ try {
   new Function(Babel.transform(src, { presets: ['react'] }).code)();
 } catch (e) { window.__error = String(e && e.stack || e); }
 </script></body></html>`;
-}
-
-function families(n, out = new Set()) {
-  if (n.visible === false) return out;
-  for (const s of n.segments || []) if (s.fontName && s.fontName.family) out.add(s.fontName.family);
-  (n.children || []).forEach((c) => families(c, out));
-  return out;
-}
-
-/** Every node the code draws, with its box relative to the root. */
-function expectedBoxes(tree) {
-  const out = [];
-  const walk = (n, depth) => {
-    if (n.visible === false || n.isMask) return;
-    out.push({ id: n.id, name: n.name, type: n.type, x: n.x - tree.x, y: n.y - tree.y, width: n.width, height: n.height, depth,
-      text: n.type === 'TEXT', families: [...families(n)] });
-    if (n.svg || n.render) return;
-    (n.children || []).forEach((c) => walk(c, depth + 1));
-  };
-  walk(tree, 0);
-  return out;
-}
-
-function pixelDiff(a, b) {
-  const pa = PNG.sync.read(a);
-  const pb = PNG.sync.read(b);
-  const w = Math.min(pa.width, pb.width);
-  const h = Math.min(pa.height, pb.height);
-  const diff = new PNG({ width: w, height: h });
-  let bad = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * pa.width + x) * 4;
-      const j = (y * pb.width + x) * 4;
-      const o = (y * w + x) * 4;
-      // Compare over white, as both renders are shown on white.
-      const over = (d, k) => Math.round((d[k] * d[k + 3] + 255 * (255 - d[k + 3])) / 255);
-      let delta = 0;
-      for (let c = 0; c < 3; c++) delta = Math.max(delta, Math.abs(over(pa.data, i + c) - over(pb.data, j + c)));
-      const grey = over(pa.data, i);
-      if (delta > PIXEL_THRESHOLD) {
-        bad++;
-        diff.data.set([255, 0, 0, 255], o);
-      } else {
-        diff.data.set([grey, grey, grey, 70], o);
-      }
-    }
-  }
-  return {
-    sizes: { design: [pa.width, pa.height], rendered: [pb.width, pb.height] },
-    differingPixels: bad,
-    differingPercent: Math.round((bad / (w * h)) * 10000) / 100,
-    image: PNG.sync.write(diff),
-  };
 }
 
 async function main() {
@@ -226,38 +147,18 @@ async function main() {
     const rendered = await rootEl.screenshot({ omitBackground: true });
     fs.writeFileSync(path.join(out, 'rendered.png'), rendered);
 
-    const mismatches = [];
-    const fontMismatches = [];
-    const missing = [];
-    const unbundled = new Set();
-    for (const box of expectedBoxes(design.tree)) {
-      const got = rects[box.id];
-      if (!got) {
-        missing.push({ id: box.id, name: box.name, type: box.type });
-        continue;
-      }
-      const missingFonts = box.families.filter((f) => !fonts.families.has(f));
-      missingFonts.forEach((f) => unbundled.add(f));
-      const tol = box.text ? TEXT_TOLERANCE : BOX_TOLERANCE;
-      const d = ['x', 'y', 'width', 'height'].map((k) => Math.round((got[k] - box[k]) * 100) / 100);
-      if (d.some((v) => Math.abs(v) > tol)) {
-        (missingFonts.length ? fontMismatches : mismatches).push({
-          id: box.id, name: box.name, type: box.type,
-          expected: [box.x, box.y, box.width, box.height].map((v) => Math.round(v * 100) / 100),
-          actual: [got.x, got.y, got.width, got.height].map((v) => Math.round(v * 100) / 100),
-          delta: d, ...(missingFonts.length ? { cause: `text in ${missingFonts.join(', ')}, which is not bundled` } : {}),
-        });
-      }
-    }
+    const boxes = expectedBoxes(design.tree);
+    const cmp = compareBoxes(boxes, rects, fonts.families, design.tree);
     const pixels = pixelDiff(design.render, rendered);
     fs.writeFileSync(path.join(out, 'diff.png'), pixels.image);
     report = {
       node: { id: design.tree.id, name: design.tree.name, width, height },
-      checkedBoxes: expectedBoxes(design.tree).length,
-      geometryMismatches: mismatches,
-      mismatchesFromUnbundledFonts: fontMismatches,
-      missingElements: missing,
-      fontsNotBundled: [...unbundled],
+      checkedBoxes: boxes.length,
+      geometryMismatches: cmp.mismatches,
+      textRoundingMismatches: cmp.roundingMismatches,
+      mismatchesFromUnbundledFonts: cmp.fontMismatches,
+      missingElements: cmp.missing,
+      fontsNotBundled: cmp.unbundled,
       rasterized,
       pixels: { ...pixels.sizes, differingPixels: pixels.differingPixels, differingPercent: pixels.differingPercent },
       files: { out, page: htmlFile, code: path.join(out, 'design.jsx'), design: path.join(out, 'design.png'),

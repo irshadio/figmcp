@@ -50,7 +50,7 @@ export function pairing(dir) {
 }
 
 /** A stand-in for the plugin UI: answers requests from fixture data. */
-export function fakePlugin(port, { origin, code } = {}) {
+export function fakePlugin(port, { origin, code, truncated = false } = {}) {
   let ws;
   let stopped = false;
   const calls = [];
@@ -77,7 +77,8 @@ export function fakePlugin(port, { origin, code } = {}) {
           });
         case 'node':
         case 'pageMeta':
-          return reply({ fileName: 'Sample', page: { id: '0:1', name: 'Page 1' }, tree: findNode(tree, p.id), images: data.images });
+          return reply({ fileName: 'Sample', page: { id: '0:1', name: 'Page 1' }, tree: findNode(tree, p.id), images: data.images,
+            ...(truncated && msg.method === 'node' ? { truncated: true } : {}) });
         case 'export':
           return reply({ format: 'png', base64: data.frames[0].previewPng2x, width: 200, height: 120, scale: 2 });
         case 'snapshot':

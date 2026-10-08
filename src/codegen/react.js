@@ -1,30 +1,17 @@
 // Reference React + Tailwind code for a node tree. Positions in the tree are
 // relative to the root; auto-layout frames become flex boxes, grids become
 // CSS grids and everything else is placed by its constraints.
-import { containerClasses, positionClasses, radiusClasses } from './layout.js';
+import { linearTransform, rotationOf } from './geometry.js';
+import { containerClasses, inFlow, positionClasses, radiusClasses } from './layout.js';
+import { drawnAsSvg, isTurned, straightLine, visibleChildren } from './nodes.js';
 import {
   backgroundClasses, blendClass, effectClasses, fillLayers, imagePlacement,
-  strokeOverlays,
+  needsFillLayers, paintValue, strokeLayers,
 } from './paint.js';
-import { fontClasses, jsxText, paragraphs, segmentsOf, textBlockClasses, verticalAlign } from './text.js';
+import {
+  autoLineRatios, fontClasses, jsxText, paragraphs, segmentsOf, textBlockClasses, verticalAlign,
+} from './text.js';
 import { camel, num, pascal, px, tw, withVar } from './util.js';
-
-const VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'LINE', 'POLYGON']);
-
-function drawnAsSvg(node) {
-  if (!node.svg) return false;
-  if ((node.fills || []).some((p) => p && p.visible !== false && p.type === 'IMAGE')) return false;
-  return VECTOR_TYPES.has(node.type) || node.type === 'ELLIPSE' || node.type === 'RECTANGLE' ||
-    (node.children || []).length === 0 || ['GROUP', 'FRAME', 'INSTANCE', 'COMPONENT'].includes(node.type);
-}
-
-function isRotated(node) {
-  return Math.abs(node.rotation || 0) > 0.01 && typeof node.rawWidth === 'number';
-}
-
-function visibleChildren(node) {
-  return (node.children || []).filter((c) => c.visible !== false && !c.isMask);
-}
 
 function propName(key) {
   return camel(String(key).replace(/#.*$/, ''), 'prop');
@@ -67,15 +54,24 @@ function styleProp(style) {
   return ` style={${JSON.stringify(style).replace(/"(\w+)":/g, '$1: ')}}`;
 }
 
+function transformClass(node) {
+  const m = linearTransform(node);
+  const deg = rotationOf(m);
+  if (deg !== null) return `rotate-[${num(deg)}deg]`;
+  return `[transform:matrix(${[m.a, m.b, m.c, m.d, 0, 0].map(num).join(',')})]`;
+}
+
 class Writer {
-  constructor(assets, connect) {
+  constructor(assets, connect, ratios) {
     this.assets = assets;
     this.connect = connect;
+    this.ratios = ratios;
     this.lines = [];
     this.consts = new Map();
     this.names = new Set();
     this.connected = new Map();
     this.rasterized = [];
+    this.warnings = [];
   }
 
   pad(depth) {
@@ -128,7 +124,7 @@ class Writer {
   boxClasses(node, style, withFills) {
     const out = [];
     const layers = withFills ? fillLayers(node) : [];
-    const stacked = layers.some((l) => l.kind === 'image');
+    const stacked = needsFillLayers(layers);
     if (!stacked) out.push(...backgroundClasses(layers, style));
     out.push(...radiusClasses(node));
     if (typeof node.opacity === 'number' && node.opacity < 1) {
@@ -136,8 +132,9 @@ class Writer {
     }
     if (node.clipsContent) out.push('overflow-clip');
     out.push(blendClass(node.blendMode));
-    out.push(...effectClasses(node, layers.length > 0));
-    return { classes: out.filter(Boolean), layers: stacked ? layers : [] };
+    const effects = effectClasses(node, { hasFill: layers.length > 0, stacked });
+    out.push(...effects.classes);
+    return { classes: out.filter(Boolean), layers: stacked ? layers : [], inner: effects.inner };
   }
 
   fillLayer(depth, node, layer) {
@@ -151,7 +148,7 @@ class Writer {
     if (!url) return;
     const id = this.assetConst(url, node.name, 'Image');
     const size = this.assets.imageSize ? this.assets.imageSize(layer.paint.imageHash) : null;
-    const place = imagePlacement(layer.paint, size);
+    const place = imagePlacement(layer.paint, size, { width: node.width, height: node.height });
     if (place.tile) {
       this.lines.push(`${this.pad(depth)}<div aria-hidden="true" className="${place.classes.join(' ')} pointer-events-none ${radius}" style={{ backgroundImage: \`url(\${${id}})\`, backgroundSize: ${JSON.stringify(place.tile.backgroundSize)} }} />`);
       return;
@@ -166,41 +163,75 @@ class Writer {
   }
 
   text(node, pos, depth) {
-    const pieces = paragraphs(node);
+    const paras = paragraphs(node);
     const segs = segmentsOf(node);
     const single = segs.length === 1;
     // Styles every run shares go on the paragraph: its own line box (the
     // strut) must carry the runs' line height, font and size.
-    const perRun = segs.map((seg) => fontClasses(seg, node));
+    const perRun = segs.map((seg) => fontClasses(seg, node, this.ratios));
     const shared = perRun[0].filter((c) => perRun.every((classes) => classes.includes(c)));
     const block = [...textBlockClasses(node), ...this.boxClasses(node, {}, false).classes];
     const valign = verticalAlign(node);
     const spacing = node.paragraphSpacing || 0;
+    const characters = segs.map((s) => s.characters || '').join('');
+    const multi = paras.length > 1 || paras.some((p) => p.pieces.some((x) => x.br));
+    const spaced = /\s{2}|^\s|\s$|\t/.test(characters.replace(/[\n\u2028]/g, 'x'));
+    const hug = node.textAutoResize === 'WIDTH_AND_HEIGHT';
+    // A hugging text never wraps; line breaks and runs of spaces are kept.
+    let ws = null;
+    if (!block.includes('truncate')) {
+      if (hug) ws = multi || spaced ? 'whitespace-pre' : 'whitespace-nowrap';
+      else if (multi || spaced) ws = 'whitespace-pre-wrap';
+    }
     const run = (piece) => {
-      const cls = single ? '' : fontClasses(piece.seg, node).filter((c) => !shared.includes(c)).join(' ');
+      if (piece.br) return '{"\\n"}';
+      const cls = single ? '' : fontClasses(piece.seg, node, this.ratios).filter((c) => !shared.includes(c)).join(' ');
       let inner = jsxText(piece.text);
       if (piece.seg.hyperlink && piece.seg.hyperlink.type === 'URL') {
         inner = `<a href=${jsxAttr(piece.seg.hyperlink.value)}>${inner}</a>`;
       }
       return cls ? `<span className="${cls}">${inner}</span>` : inner;
     };
-    const line = (p) => (p.length ? p.map(run).join('') : '<br aria-hidden="true" />');
+    const content = (p) => (p.pieces.length ? p.pieces.map(run).join('') : '<br aria-hidden="true" />');
+    const gap = (i) => (spacing && i < paras.length - 1 ? ` className="mb-[${px(spacing)}]"` : '');
 
-    if (!valign && !(spacing && pieces.length > 1)) {
-      const multi = pieces.length > 1;
-      this.open(depth, 'p', [...pos, ...shared, ...block, multi ? 'whitespace-pre-wrap' : null], node);
-      pieces.forEach((p, i) => {
-        this.lines.push(`${this.pad(depth + 1)}${line(p)}${i < pieces.length - 1 ? '{"\\n"}' : ''}`);
-      });
-      this.close(depth, 'p');
+    if (paras.some((p) => p.list)) {
+      this.open(depth, 'div', [...pos, ws, ...shared, ...block], node);
+      for (let i = 0; i < paras.length;) {
+        const list = paras[i].list;
+        if (!list) {
+          this.lines.push(`${this.pad(depth + 1)}<p${gap(i)}>${content(paras[i])}</p>`);
+          i++;
+          continue;
+        }
+        const tag = list === 'ORDERED' ? 'ol' : 'ul';
+        const indent = num(1.5 * (paras[i].indentation || 1));
+        this.lines.push(`${this.pad(depth + 1)}<${tag} className="${list === 'ORDERED' ? 'list-decimal' : 'list-disc'} list-outside ps-[${indent}em]">`);
+        for (; i < paras.length && paras[i].list === list; i++) {
+          this.lines.push(`${this.pad(depth + 2)}<li${gap(i)}>${content(paras[i])}</li>`);
+        }
+        this.lines.push(`${this.pad(depth + 1)}</${tag}>`);
+      }
+      this.close(depth, 'div');
       return;
     }
-    this.open(depth, 'div', [...pos, 'flex', 'flex-col', valign || 'justify-start', ...shared, ...block], node);
-    pieces.forEach((p, i) => {
-      const mb = spacing && i < pieces.length - 1 ? ` className="mb-[${px(spacing)}]"` : '';
-      this.lines.push(`${this.pad(depth + 1)}<p${mb}>${line(p)}</p>`);
+    if (valign || (spacing && paras.length > 1)) {
+      this.open(depth, 'div', [...pos, 'flex', 'flex-col', valign || 'justify-start', ws, ...shared, ...block], node);
+      paras.forEach((p, i) => this.lines.push(`${this.pad(depth + 1)}<p${gap(i)}>${content(p)}</p>`));
+      this.close(depth, 'div');
+      return;
+    }
+    // One paragraph box: paragraphs are joined by newlines. A trailing
+    // newline would not make a line of its own, so an empty last paragraph
+    // gets one more.
+    this.open(depth, 'p', [...pos, ws, ...shared, ...block], node);
+    const n = paras.length;
+    paras.forEach((p, i) => {
+      const body = p.pieces.map(run).join('');
+      const end = i < n - 1 || (!p.pieces.length && n > 1) ? '{"\\n"}' : '';
+      if (body || end) this.lines.push(`${this.pad(depth + 1)}${body}${end}`);
     });
-    this.close(depth, 'div');
+    this.close(depth, 'p');
   }
 
   component(node, pos, depth, mapping) {
@@ -228,7 +259,7 @@ class Writer {
     const dy = bounds ? bounds.y - node.y : 0;
     const exact = !bounds || (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01 &&
       Math.abs(bounds.width - node.width) < 0.01 && Math.abs(bounds.height - node.height) < 0.01);
-    // An SVG drawn beyond the layer's box (outside strokes, shadows) keeps
+    // An image drawn beyond the layer's box (outside strokes, shadows) keeps
     // its own size and offset.
     const cls = exact ? 'block max-w-none size-full'
       : `absolute max-w-none left-[${px(dx)}] top-[${px(dy)}] w-[${px(bounds.width)}] h-[${px(bounds.height)}]`;
@@ -236,16 +267,55 @@ class Writer {
     this.close(depth, 'div');
   }
 
+  line(depth, node, pos, line) {
+    const w = line.weight;
+    const value = paintValue(line.paint, line.horizontal ? node.width : w, line.horizontal ? w : node.height, line.varName);
+    const ext = line.cap === 'NONE' ? 0 : w / 2;
+    const edge = (side) => (ext ? `${side}-[${px(-ext)}]` : `${side}-0`);
+    const bar = ['absolute',
+      ...(line.horizontal ? [edge('left'), edge('right'), `top-[${px(-w / 2)}]`, `h-[${px(w)}]`]
+        : [edge('top'), edge('bottom'), `left-[${px(-w / 2)}]`, `w-[${px(w)}]`]),
+      `bg-[${tw(value)}]`, line.cap === 'ROUND' ? 'rounded-full' : null].filter(Boolean);
+    const opacity = typeof node.opacity === 'number' && node.opacity < 1 ? `opacity-[${num(node.opacity)}]` : null;
+    this.open(depth, 'div', [...pos, opacity], node);
+    this.lines.push(`${this.pad(depth + 1)}<div aria-hidden="true" className="${bar.join(' ')}" />`);
+    this.close(depth, 'div');
+  }
+
   node(node, parent, depth, opts = {}) {
-    if (node.visible === false || node.isMask) return;
-    if (isRotated(node) && !node.svg && !node.render && !opts.inner) {
-      // The bounding box holds a box of the unrotated size, turned in place.
+    if (!node || node.visible === false || node.isMask) return;
+    const lines = this.lines.length;
+    const consts = this.consts.size;
+    try {
+      this.draw(node, parent, depth, opts);
+    } catch (e) {
+      // One unreadable layer must not cost the whole frame: drop what it
+      // wrote and leave a box of its size in its place.
+      this.lines.length = lines;
+      for (const [url, id] of [...this.consts].slice(consts)) {
+        this.consts.delete(url);
+        this.names.delete(id);
+      }
+      const reason = String(e && e.message ? e.message : e);
+      this.warnings.push({ id: node.id, name: node.name, error: reason });
+      let pos = [];
+      try {
+        if (typeof node.width === 'number') pos = opts.inner || positionClasses(node, parent, { ...opts, fixedSize: true });
+      } catch { /* no geometry to keep */ }
+      this.open(depth, 'div', pos, node, null, true, { 'data-error': reason });
+    }
+  }
+
+  draw(node, parent, depth, opts) {
+    if (node.error) throw new Error(`the plugin could not read this layer (${node.error})`);
+    const line = straightLine(node);
+    if (isTurned(node) && !node.svg && !node.render && !opts.inner && !line) {
+      // The bounding box holds a box of the unturned size, turned in place.
       const pos = positionClasses(node, parent, { ...opts, fixedSize: true });
       this.lines.push(`${this.pad(depth)}<div className="${[...pos, 'flex', 'items-center', 'justify-center'].join(' ')}">`);
       this.node(node, parent, depth + 1, {
         ...opts,
-        inner: ['relative', 'flex-none', `w-[${px(node.rawWidth)}]`, `h-[${px(node.rawHeight)}]`,
-          `rotate-[${num(-node.rotation)}deg]`],
+        inner: ['relative', 'flex-none', `w-[${px(node.rawWidth)}]`, `h-[${px(node.rawHeight)}]`, transformClass(node)],
       });
       this.close(depth, 'div');
       return;
@@ -263,6 +333,10 @@ class Writer {
       this.text(node, pos, depth);
       return;
     }
+    if (line) {
+      this.line(depth, node, pos, line);
+      return;
+    }
     if (drawnAsSvg(node)) {
       // The SVG already carries the node's own paints, effects and opacity.
       this.image(depth, node, pos, this.assets.svg(node.svg), 'Vector', {}, node.svgBounds);
@@ -271,25 +345,31 @@ class Writer {
     if (node.render && this.assets.render) {
       this.rasterized.push({ id: node.id, name: node.name, reason: node.rasterized });
       this.image(depth, node, pos, this.assets.render(node.render), 'Render',
-        { 'data-rasterized': node.rasterized || 'render' });
+        { 'data-rasterized': node.rasterized || 'render' }, node.renderBounds);
       return;
     }
 
     const style = {};
     const box = this.boxClasses(node, style, true);
-    const classes = [...pos, ...containerClasses(node), ...box.classes];
+    const strokes = strokeLayers(node, { clip: Boolean(node.clipsContent), radius: (grow) => radiusClasses(node, grow) });
+    const classes = [...pos, ...containerClasses(node), ...box.classes, ...strokes.classes];
     const children = visibleChildren(node);
-    const strokes = strokeOverlays(node, radiusClasses(node));
-    if (!children.length && !box.layers.length && !strokes.length) {
+    if (!children.length && !box.layers.length && !box.inner && !strokes.overlays.length) {
       this.open(depth, 'div', classes, node, style, true);
       return;
     }
     this.open(depth, 'div', classes, node, style);
     for (const layer of box.layers) this.fillLayer(depth + 1, node, layer);
-    children.forEach((child, index) => {
-      this.node(child, node, depth + 1, { index, count: children.length });
+    if (box.inner) {
+      this.lines.push(`${this.pad(depth + 1)}<div aria-hidden="true" className="absolute inset-0 pointer-events-none rounded-[inherit] ${box.inner}" />`);
+    }
+    const flowCount = children.filter((c) => inFlow(c, node)).length;
+    let flow = 0;
+    children.forEach((child) => {
+      const index = inFlow(child, node) ? flow++ : undefined;
+      this.node(child, node, depth + 1, { index, count: flowCount });
     });
-    for (const s of strokes) {
+    for (const s of strokes.overlays) {
       const st = Object.keys(s.style).length ? styleProp(s.style) : '';
       this.lines.push(`${this.pad(depth + 1)}<div aria-hidden="true" className="${s.classes.join(' ')}"${st} />`);
     }
@@ -298,8 +378,9 @@ class Writer {
 }
 
 /**
- * Returns { code, assets, connected, rasterized }: assets maps each constant
- * used in the code to its URL; connected lists the mapped components used.
+ * Returns { code, assets, connected, rasterized, warnings }: assets maps
+ * each constant used in the code to its URL; connected lists the mapped
+ * components used; warnings lists the layers drawn as placeholders.
  *
  * [assets] resolves embedded data to URLs:
  *   { svg(text), image(hash), imageSize?(hash), render?({ base64 }) }.
@@ -307,7 +388,7 @@ class Writer {
  * instance, or null.
  */
 export function toReactTailwind(root, assets, { connect = null } = {}) {
-  const writer = new Writer(assets, connect);
+  const writer = new Writer(assets, connect, autoLineRatios(root));
   writer.node({ ...root, x: root.x ?? 0, y: root.y ?? 0 }, null, 2);
   const header = [...writer.connected.values()].map((m) =>
     `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`);
@@ -330,13 +411,14 @@ export function toReactTailwind(root, assets, { connect = null } = {}) {
     assets: map,
     connected: [...writer.connected.values()],
     rasterized: writer.rasterized,
+    warnings: writer.warnings,
   };
 }
 
 export function countNodes(tree) {
   let n = 0;
   const walk = (node) => {
-    if (node.visible === false) return;
+    if (!node || node.visible === false) return;
     n++;
     (node.children || []).forEach(walk);
   };

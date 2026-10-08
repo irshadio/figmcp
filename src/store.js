@@ -146,12 +146,8 @@ function refresh() {
   if (index && next === indexStamp) return;
   index = new Map();
   for (const { name } of files) {
-    let data;
-    try {
-      data = load(name);
-    } catch {
-      continue;
-    }
+    const data = tryLoad(name);
+    if (!validSnapshot(data)) continue;
     data.frames.forEach((frame, frameIndex) => {
       const walk = (n) => {
         if (!index.has(n.id)) index.set(n.id, []);
@@ -178,11 +174,22 @@ function findIn(tree, id) {
  * the node, its frame, the whole export (for images and the preview) and
  * when it was saved.
  */
+// A snapshot that was removed or damaged since it was indexed reads as null.
+function tryLoad(name) {
+  try {
+    return load(name);
+  } catch {
+    return null;
+  }
+}
+
 export function findSnapshotNode(id, { preview = false } = {}) {
   refresh();
-  const hits = index.get(id) || [];
-  const hit = hits.find((h) => !preview ||
-    load(h.name).frames[h.frameIndex].previewPng2x);
+  const hits = (index.get(id) || []).filter((h) => {
+    const data = tryLoad(h.name);
+    return data && data.frames[h.frameIndex] && (!preview || data.frames[h.frameIndex].previewPng2x);
+  });
+  const hit = hits[0];
   if (!hit) return null;
   const data = load(hit.name);
   const frame = data.frames[hit.frameIndex];
@@ -197,14 +204,15 @@ export function findSnapshotNode(id, { preview = false } = {}) {
 
 export function snapshotSummary() {
   refresh();
-  return listSnapshots().map(({ name }) => {
-    const data = load(name);
-    return {
+  return listSnapshots().flatMap(({ name }) => {
+    const data = tryLoad(name);
+    if (!validSnapshot(data)) return [];
+    return [{
       snapshot: name,
       exportedAt: data.exportedAt || null,
       fileName: data.fileName || null,
       page: data.page || null,
       frames: data.frames.map((f) => ({ id: f.id, name: f.name })),
-    };
+    }];
   });
 }

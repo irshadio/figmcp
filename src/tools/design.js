@@ -3,16 +3,86 @@
 import path from 'node:path';
 import { z } from 'zod';
 import { listMappings, lookup } from '../connect.js';
+import { toFlutter } from '../codegen/flutter/index.js';
 import { toMetadataXml } from '../codegen/metadata.js';
 import { countNodes, toReactTailwind } from '../codegen/react.js';
+import { systemUi } from '../codegen/system-ui.js';
+import { detectFramework, flutterAssetDirs, FRAMEWORKS } from '../project.js';
 import { ASSETS, imageExt, saveAsset, snapshotSummary } from '../store.js';
 import {
-  assetEntry, fileKeySchema, guard, image, nodeIdSchema, resolver, selectionBlock,
+  assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, resolver, selectionBlock,
   sourceNote, text,
 } from './common.js';
 
 const CODE_NODE_LIMIT = 800;
+// A read stops here, so a huge page cannot hold the plugin for minutes.
+const READ_NODE_LIMIT = 2500;
+const FORCED_NODE_LIMIT = 30000;
 const ASSET_CAP = 20;
+
+const FLUTTER_GUIDANCE =
+  'IMPORTANT: the code above is reference Flutter code generated from the ' +
+  'design. Adapt it to the project (its widgets, theme, text styles, ' +
+  'navigation and state) instead of pasting it. Every value is exact, in ' +
+  'logical pixels at the design size: sizes, spacing, radii, colours, fonts ' +
+  'and line heights (height with TextLeadingDistribution.even reproduces ' +
+  'Figma\'s line boxes). DesignTokens holds each design variable used, with ' +
+  'its Figma name: use the project\'s token of that name. Auto-layout frames ' +
+  'are Rows, Columns and Wraps; other frames are Stacks whose Positioned ' +
+  'children follow the Figma constraints. A phone-sized frame is drawn as a ' +
+  'screen: it fills the screen, keeps the shortest height its layers fit ' +
+  'on a shorter screen and scrolls, and keeps the layers Figma fixes when ' +
+  'scrolling on top; sections that span the width stretch and fixed-width ' +
+  'text columns may shrink. Other fixed sizes stay as designed, so check ' +
+  'narrow phones. Copy the listed ' +
+  'assets into the project (SvgPicture needs flutter_svg; spacing on Row and ' +
+  'Column needs Flutter 3.27 or later) and declare the fonts. Layers listed ' +
+  'as system UI belong to the phone, not the app: leave them out and keep ' +
+  'their room with SafeArea. Compare the result with the screenshot.';
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+/** The Flutter response blocks after the code: assets, fonts, system UI, notes. */
+function flutterDetails(result, tree) {
+  const out = [];
+  const entries = Object.entries(result.assets);
+  if (entries.length) {
+    const dirs = [...new Set(entries.map(([asset]) => path.posix.dirname(asset)))];
+    const copy = [`mkdir -p ${dirs.map(shellQuote).join(' ')}`,
+      ...entries.map(([asset, file]) => `cp ${shellQuote(file)} ${shellQuote(asset)}`)].join('\n');
+    out.push(text('Assets used in the code (asset path -> file on disk). Copy them into the ' +
+      `project root and declare the folders under flutter: assets: in pubspec.yaml:\n${JSON.stringify(result.assets, null, 2)}\n\n${copy}`));
+  }
+  const fonts = Object.entries(result.fonts);
+  if (fonts.length) {
+    out.push(text(`Fonts used (declare each family and weight under flutter: fonts: in pubspec.yaml):\n${
+      fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
+  }
+  if (result.screen) {
+    out.push(text(`${result.className} is drawn as a phone screen: it fills the screen` +
+      `${result.scrolls ? ' and scrolls (the design is taller than a phone)' : ', and scrolls on a phone too short for its layers'}.`));
+  }
+  const chrome = systemUi(tree);
+  if (chrome.length) {
+    out.push(text(`System UI in the design (drawn by the phone, not the app):\n${
+      chrome.map((c) => `- ${c.id} "${c.name}": ${c.kind}, ${c.box[2]}x${c.box[3]} at (${c.box[0]}, ${c.box[1]})`).join('\n')}`));
+  }
+  if (result.connected.length) {
+    out.push(text('Mapped components used (Code Connect). Their exact look is in the design: call ' +
+      'get_design_context with disableCodeConnect: true on the instance id when the ' +
+      `component's defaults may differ:\n${JSON.stringify(result.connected, null, 2)}`));
+  }
+  if (result.rasterized.length) {
+    out.push(text(`Layers shipped as 2x images (masks, rotated groups):\n${JSON.stringify(result.rasterized, null, 2)}`));
+  }
+  if (result.warnings.length) {
+    out.push(text(`Approximations (the design has more than this code draws):\n${
+      result.warnings.map((w) => `- ${w.id} "${w.name}": ${w.message}`).join('\n')}`));
+  }
+  return out;
+}
 
 const GUIDANCE =
   'IMPORTANT: the code above is reference React + Tailwind generated from the ' +
@@ -30,52 +100,85 @@ export function registerDesignTools(server, bridge, source) {
   server.registerTool('get_design_context', {
     description:
       'Get design context for a Figma node — the primary tool for design-to-code ' +
-      'workflows. Returns reference React + Tailwind code (design variables as ' +
-      'var(--name,value), mapped components as their code component), the asset ' +
-      'URLs it uses, a screenshot and the variables in the node. The code must ' +
-      'be adapted to the target project. Use the nodeId parameter to specify a ' +
-      'node id; from a URL like https://figma.com/design/:fileKey/:fileName?node-id=1-2 ' +
-      'the node id is 1:2. With no nodeId the current selection in Figma is used. ' +
-      'Large nodes return metadata instead of code unless forceCode is set.',
+      'workflows. Returns reference code (Flutter widgets for Flutter projects, ' +
+      'React + Tailwind otherwise), the assets it uses, a screenshot and the ' +
+      'variables in the node. The code must be adapted to the target project. ' +
+      'Use the nodeId parameter to specify a node id; from a URL like ' +
+      'https://figma.com/design/:fileKey/:fileName?node-id=1-2 the node id is 1:2. ' +
+      'With no nodeId the current selection in Figma is used. Large nodes return ' +
+      'metadata instead of code unless forceCode is set.',
     inputSchema: {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
-      clientLanguages: z.string().optional().describe('Comma separated languages of the client (logging only).'),
-      clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client (logging only).'),
+      framework: z.enum(FRAMEWORKS).optional().describe(
+        'Code to generate: flutter or react. Default: from clientFrameworks / clientLanguages, ' +
+        'else FIGMA_LOCAL_MCP_FRAMEWORK, else flutter when the project has a pubspec.yaml, else react.'),
+      clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" (picks the framework).'),
+      clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" (picks the framework).'),
+      screen: z.boolean().optional().describe(
+        'Flutter: draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
+      assetsDir: z.string().optional().describe(
+        'Flutter: folder of the asset paths in the code (default: the svg/png/images folders of the project\'s pubspec.yaml, else assets/figma).'),
       excludeScreenshot: z.boolean().optional().describe('Leave the screenshot out of the response.'),
       forceCode: z.boolean().optional().describe('Always return code, even for very large nodes.'),
       disableCodeConnect: z.boolean().optional().describe('Draw mapped components from their layers instead of naming the code component.'),
       skillNames: z.string().optional().describe('Accepted for compatibility (logging only).'),
     },
-  }, guard(async ({ nodeId, excludeScreenshot, forceCode, disableCodeConnect }) => {
+  }, guard(async (args) => {
+    const { nodeId, excludeScreenshot, forceCode, disableCodeConnect, assetsDir, screen } = args;
     const { id } = await source.resolveId(nodeId);
-    const node = await source.node(id, { images: true });
+    const node = await source.node(id, { images: true, maxNodes: forceCode ? FORCED_NODE_LIMIT : READ_NODE_LIMIT });
     const count = countNodes(node.tree);
-    if (count > CODE_NODE_LIMIT && !forceCode) {
+    if (node.truncated || (count > CODE_NODE_LIMIT && !forceCode)) {
+      const outline = node.truncated ? (await source.outline(id)).tree : node.tree;
       return [
-        text(`The node has ${count} layers, too many for code in one response. ` +
-          'Here is its metadata instead; call get_design_context on the child ' +
-          'node ids you need, or pass forceCode: true.'),
-        text(toMetadataXml(node.tree)),
+        text(`The node has ${node.truncated ? 'more than ' : ''}${node.truncated ? countNodes(outline) : count} layers, ` +
+          'too many for code in one response. Here is its metadata instead; call ' +
+          'get_design_context on the child node ids you need, or pass forceCode: true.'),
+        text(toMetadataXml(outline)),
         sourceNote(node),
       ];
     }
+    const framework = detectFramework(args);
     const mappings = disableCodeConnect ? [] : listMappings();
     const connect = mappings.length ? (n) => lookup(n, mappings) : null;
-    const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });
-    const out = [text(result.code)];
-    if (Object.keys(result.assets).length) {
-      const map = {};
-      for (const [name, url] of Object.entries(result.assets)) {
-        map[name] = { url, path: path.join(ASSETS, url.split('/').pop()) };
+    let out;
+    try {
+      if (framework === 'flutter') {
+        const dirs = assetsDir ? { svg: assetsDir.replace(/\/+$/, ''), image: assetsDir.replace(/\/+$/, '') } : flutterAssetDirs();
+        const result = toFlutter(node.tree, fileResolver(node.images), { connect, assetDirs: dirs, screen });
+        out = [text(result.code), ...flutterDetails(result, node.tree)];
+      } else {
+        const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });
+        out = [text(result.code)];
+        if (Object.keys(result.assets).length) {
+          const map = {};
+          for (const [name, url] of Object.entries(result.assets)) {
+            map[name] = { url, path: path.join(ASSETS, url.split('/').pop()) };
+          }
+          out.push(text('Assets used in the code (served by the local MCP server; ' +
+            `the same files are on disk at each path):\n${JSON.stringify(map, null, 2)}`));
+        }
+        if (result.connected.length) {
+          out.push(text('Mapped components used (Code Connect). Their exact look is in ' +
+            'the design: call get_design_context with disableCodeConnect: true on the ' +
+            `instance id when the component's defaults may differ:\n${JSON.stringify(result.connected, null, 2)}`));
+        }
+        if (result.warnings.length) {
+          out.push(text(`Layers drawn as placeholders:\n${result.warnings.map((w) => `- ${w.id} "${w.name}": ${w.error}`).join('\n')}`));
+        }
       }
-      out.push(text('Assets used in the code (served by the local MCP server; ' +
-        `the same files are on disk at each path):\n${JSON.stringify(map, null, 2)}`));
+    } catch (e) {
+      // The generators isolate each layer; this is a last resort so a read
+      // still gives the structure.
+      out = [
+        text(`Code generation failed (${e.message}). Here is the node's metadata instead.`),
+        text(toMetadataXml(node.tree)),
+      ];
     }
-    if (result.connected.length) {
-      out.push(text('Mapped components used (Code Connect). Their exact look is in ' +
-        'the design: call get_design_context with disableCodeConnect: true on the ' +
-        `instance id when the component's defaults may differ:\n${JSON.stringify(result.connected, null, 2)}`));
+    if (node.failures && node.failures.length) {
+      out.push(text(`The plugin could not read some layers; they are left out:\n${
+        node.failures.map((f) => `- ${f.id} "${f.name}": ${f.error}`).join('\n')}`));
     }
     try {
       const vars = await source.variables(id);
@@ -83,7 +186,7 @@ export function registerDesignTools(server, bridge, source) {
         out.push(text(`These variables and styles are used in the design:\n${JSON.stringify(vars.defs, null, 2)}`));
       }
     } catch { /* variables are optional context */ }
-    out.push(text(GUIDANCE));
+    out.push(text(framework === 'flutter' ? FLUTTER_GUIDANCE : GUIDANCE));
     if (!excludeScreenshot) {
       try {
         const shot = await source.screenshot(id, { maxDimension: 1024 });

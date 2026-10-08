@@ -11,6 +11,7 @@ const SHAPES = new Set([
   'RECTANGLE',
 ]);
 const ICON_MAX = 256;
+const EXPORT_TIMEOUT = 20000;
 const PROPS = [
   'opacity', 'blendMode', 'rotation', 'clipsContent', 'isMask',
   'strokeWeight', 'strokeAlign', 'strokeCap', 'strokeJoin', 'dashPattern',
@@ -26,16 +27,37 @@ const PROPS = [
   'layoutSizingHorizontal', 'layoutSizingVertical', 'layoutAlign',
   'layoutGrow', 'layoutPositioning', 'constraints',
   'minWidth', 'maxWidth', 'minHeight', 'maxHeight',
-  'gridRowCount', 'gridColumnCount', 'gridRowGap', 'gridColumnGap',
-  'gridRowAnchorIndex', 'gridColumnAnchorIndex', 'gridRowSpan',
-  'gridColumnSpan', 'gridRowSizes', 'gridColumnSizes',
+  'overflowDirection', 'numberOfFixedChildren',
   'maxLines', 'textTruncation', 'paragraphSpacing', 'paragraphIndent',
-  'leadingTrim', 'arcData',
+  'listSpacing', 'leadingTrim', 'arcData',
 ];
+const GRID_PROPS = [
+  'gridRowCount', 'gridColumnCount', 'gridRowGap', 'gridColumnGap',
+  'gridRowSizes', 'gridColumnSizes',
+];
+const GRID_CHILD_PROPS = [
+  'gridRowAnchorIndex', 'gridColumnAnchorIndex', 'gridRowSpan',
+  'gridColumnSpan', 'gridChildHorizontalAlign', 'gridChildVerticalAlign',
+];
+// Values equal to Figma's defaults carry nothing; every other value is kept,
+// zeros included (opacity 0, a 0 wrap gap, grid anchor 0, stroke weight 0).
+const DEFAULTS = {
+  opacity: 1, blendMode: 'PASS_THROUGH', rotation: 0, clipsContent: false,
+  isMask: false, strokesIncludedInLayout: false, cornerSmoothing: 0,
+  layoutMode: 'NONE', layoutWrap: 'NO_WRAP', itemReverseZIndex: false,
+  counterAxisAlignContent: 'AUTO', layoutAlign: 'INHERIT', layoutGrow: 0,
+  layoutPositioning: 'AUTO', overflowDirection: 'NONE',
+  numberOfFixedChildren: 0, textTruncation: 'DISABLED', leadingTrim: 'NONE',
+  paragraphSpacing: 0, paragraphIndent: 0, listSpacing: 0,
+};
 const SEGMENT_FIELDS = [
   'fontName', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing',
   'textCase', 'textDecoration', 'fills', 'hyperlink', 'boundVariables',
   'textStyleId',
+];
+const SEGMENT_EXTRA_FIELDS = [
+  'listOptions', 'indentation', 'textDecorationStyle',
+  'textDecorationOffset', 'textDecorationThickness', 'textDecorationColor',
 ];
 
 function clean(value) {
@@ -46,6 +68,27 @@ function clean(value) {
 
 function round(n) {
   return Math.round(n * 100) / 100;
+}
+
+function round4(n) {
+  return Math.round(n * 10000) / 10000;
+}
+
+// Rejects when [promise] takes longer than [ms], so one stuck export cannot
+// hold a whole read.
+function withTimeout(promise, ms) {
+  return new Promise(function (resolve, reject) {
+    const timer = setTimeout(function () {
+      reject(new Error('Timed out after ' + ms + ' ms'));
+    }, ms);
+    promise.then(function (v) {
+      clearTimeout(timer);
+      resolve(v);
+    }, function (e) {
+      clearTimeout(timer);
+      reject(e);
+    });
+  });
 }
 
 function safe(read) {
@@ -76,6 +119,11 @@ function newContext(options) {
     svg: options.svg !== false,
     meta: options.meta === true,
     maxDepth: options.maxDepth,
+    maxNodes: typeof options.maxNodes === 'number' ? options.maxNodes : Infinity,
+    exportTimeout: options.exportTimeout || EXPORT_TIMEOUT,
+    count: 0,
+    truncated: false,
+    failures: [],
     variables: new Map(),
     styles: new Map(),
     nodeNames: new Map(),
@@ -160,15 +208,24 @@ function onlyShapes(node) {
   return node.children.length > 0 && node.children.every(onlyShapes);
 }
 
+function hasVector(node) {
+  if (node.visible === false) return false;
+  if (needsSvg(node)) return true;
+  return 'children' in node && node.children.some(hasVector);
+}
+
 function hasImageFill(node) {
   return Array.isArray(node.fills) &&
     node.fills.some(function (p) { return p.type === 'IMAGE'; });
 }
 
+// Small groups of shapes with at least one real vector (an icon). Groups of
+// plain rectangles and ellipses (dots, bars, toggles) stay boxes, so they
+// keep their variables and resize with the layout.
 function isIcon(node) {
   if (!('children' in node) || node.children.length === 0) return false;
   if (node.width > ICON_MAX || node.height > ICON_MAX) return false;
-  return onlyShapes(node);
+  return onlyShapes(node) && hasVector(node);
 }
 
 function nonSolidStroke(node) {
@@ -204,17 +261,51 @@ function isRotated(node) {
   return 'rotation' in node && Math.abs(node.rotation) > 0.01;
 }
 
+// The 2x2 part of the node's transform, when it rotates, skews or mirrors
+// the layer: [[a, c], [b, d]] maps the layer's own axes to its parent's.
+function linearTransform(node) {
+  const t = safe(function () { return node.relativeTransform; });
+  if (!t) return null;
+  const m = [[t[0][0], t[0][1]], [t[1][0], t[1][1]]];
+  const identity = Math.abs(m[0][0] - 1) < 1e-4 && Math.abs(m[1][1] - 1) < 1e-4 &&
+    Math.abs(m[0][1]) < 1e-4 && Math.abs(m[1][0]) < 1e-4;
+  return identity ? null : m.map(function (row) { return row.map(round4); });
+}
+
+function isMirrored(transform) {
+  return !!transform && transform[0][0] * transform[1][1] - transform[0][1] * transform[1][0] < 0;
+}
+
 function originOf(node) {
   const box = 'absoluteBoundingBox' in node ? node.absoluteBoundingBox : null;
   return box ? { x: box.x, y: box.y } : { x: 0, y: 0 };
 }
 
+function renderBoundsOf(node, origin) {
+  const rb = 'absoluteRenderBounds' in node ? node.absoluteRenderBounds : null;
+  if (!rb) return null;
+  return {
+    x: round(rb.x - origin.x), y: round(rb.y - origin.y),
+    width: round(rb.width), height: round(rb.height),
+  };
+}
+
+// A 2x render of the layer with its shadows and blurs (the render bounds).
 async function renderPng(node) {
   const bytes = await node.exportAsync({
     format: 'PNG', constraint: { type: 'SCALE', value: 2 },
-    useAbsoluteBounds: true,
   });
   return { format: 'png', scale: 2, base64: figma.base64Encode(bytes) };
+}
+
+// Older Figma versions reject fields they do not know, which would drop all
+// text styling; retry with the base fields.
+function styledSegments(node) {
+  try {
+    return node.getStyledTextSegments(SEGMENT_FIELDS.concat(SEGMENT_EXTRA_FIELDS));
+  } catch (e) {
+    return node.getStyledTextSegments(SEGMENT_FIELDS);
+  }
 }
 
 async function textDetails(ctx, node, out) {
@@ -223,7 +314,7 @@ async function textDetails(ctx, node, out) {
   out.textAlignVertical = node.textAlignVertical;
   out.textAutoResize = node.textAutoResize;
   try {
-    const segments = node.getStyledTextSegments(SEGMENT_FIELDS);
+    const segments = styledSegments(node);
     out.segments = [];
     for (const raw of segments) {
       const seg = clean(raw);
@@ -234,6 +325,8 @@ async function textDetails(ctx, node, out) {
       delete seg.boundVariables;
       delete seg.textStyleId;
       if (!seg.hyperlink) delete seg.hyperlink;
+      if (seg.listOptions && seg.listOptions.type === 'NONE') delete seg.listOptions;
+      if (!seg.indentation) delete seg.indentation;
       out.segments.push(seg);
     }
   } catch (e) {
@@ -289,7 +382,33 @@ async function reactions(ctx, node) {
   return out.length ? out : null;
 }
 
+function copyProps(node, out, keys) {
+  for (const key of keys) {
+    if (!(key in node)) continue;
+    const v = safe(function () { return clean(node[key]); });
+    if (v === undefined || v === null || v === DEFAULTS[key]) continue;
+    if (Array.isArray(v) && v.length === 0) continue;
+    out[key] = v;
+  }
+}
+
+// Starts an export and records its result on [out] when it settles; a
+// failure or timeout only drops that asset.
+function track(ctx, node, promise, onDone, onFail) {
+  const start = Date.now();
+  ctx.pending.push(withTimeout(promise, ctx.exportTimeout).then(function (value) {
+    onDone(value);
+    if (ctx.timings && Date.now() - start > 200) {
+      ctx.slow.push({ id: node.id, name: node.name, type: node.type, ms: Date.now() - start });
+    }
+  }, function (e) {
+    onFail();
+    ctx.failures.push({ id: node.id, name: node.name, error: String(e && e.message ? e.message : e) });
+  }));
+}
+
 async function serialize(node, origin, ctx, depth) {
+  ctx.count++;
   const out = { id: node.id, name: node.name, type: node.type };
   if ('visible' in node) out.visible = node.visible;
   const box = 'absoluteBoundingBox' in node ? node.absoluteBoundingBox : null;
@@ -301,15 +420,12 @@ async function serialize(node, origin, ctx, depth) {
   }
 
   if (!ctx.meta) {
-    for (const key of PROPS) {
-      if (!(key in node)) continue;
-      const v = safe(function () { return clean(node[key]); });
-      if (v !== undefined && v !== null && v !== 0 && v !== 'NONE' &&
-          v !== 'DISABLED' && !(Array.isArray(v) && v.length === 0)) {
-        out[key] = v;
-      }
-    }
-    if (isRotated(node)) {
+    copyProps(node, out, PROPS);
+    if (node.layoutMode === 'GRID') copyProps(node, out, GRID_PROPS);
+    if (node.parent && node.parent.layoutMode === 'GRID') copyProps(node, out, GRID_CHILD_PROPS);
+    const transform = linearTransform(node);
+    if (transform) {
+      out.transform = transform;
       out.rawWidth = round(node.width);
       out.rawHeight = round(node.height);
     }
@@ -361,43 +477,43 @@ async function serialize(node, origin, ctx, depth) {
 
     const visible = node.visible !== false && !ctx.hidden;
     const vectorLike = isIcon(node) || needsSvg(node);
-    const exportsSvg = ctx.svg && visible && vectorLike && !hasImageFill(node);
+    const imageFilled = hasImageFill(node);
+    const exportsSvg = ctx.svg && visible && vectorLike && !imageFilled;
     if (exportsSvg) {
       // The SVG canvas is the render bounds (strokes and effects included),
-      // which can be larger than the layer's box.
-      const rb = 'absoluteRenderBounds' in node ? node.absoluteRenderBounds : null;
-      if (rb && box) {
-        out.svgBounds = {
-          x: round(rb.x - origin.x), y: round(rb.y - origin.y),
-          width: round(rb.width), height: round(rb.height),
-        };
-      }
-      // Exports wait for Figma to draw; started together they share the
-      // wait (see settle()).
-      const start = Date.now();
-      ctx.pending.push(node.exportAsync({ format: 'SVG_STRING' }).then(function (svg) {
+      // which can be larger than the layer's box. Exports wait for Figma to
+      // draw; started together they share the wait (see settle()).
+      const bounds = box ? renderBoundsOf(node, origin) : null;
+      if (bounds) out.svgBounds = bounds;
+      track(ctx, node, node.exportAsync({ format: 'SVG_STRING' }), function (svg) {
         out.svg = svg;
-        if (ctx.timings && Date.now() - start > 200) {
-          ctx.slow.push({ id: node.id, name: node.name, type: node.type, ms: Date.now() - start });
-        }
-      }, function () { delete out.svgBounds; }));
+      }, function () { delete out.svgBounds; });
       if (isIcon(node)) return out;
     }
-    // Masked groups and rotated containers cannot be rebuilt exactly from
-    // boxes: ship their render and stop.
-    const rotatedContainer = isRotated(node) && 'children' in node &&
-      node.children.length > 0;
-    if (ctx.svg && visible && !exportsSvg && (hasMaskChild(node) || rotatedContainer)) {
-      out.rasterized = hasMaskChild(node) ? 'mask' : 'rotation';
-      ctx.pending.push(renderPng(node).then(function (render) {
+    // Masked groups, rotated or mirrored containers and image-filled vectors
+    // cannot be rebuilt exactly from boxes: ship their render and stop.
+    const container = 'children' in node && node.children.length > 0;
+    const turnedContainer = container && (isRotated(node) || isMirrored(transform));
+    const reason = hasMaskChild(node) ? 'mask'
+      : turnedContainer ? 'rotation'
+        : VECTORS.has(node.type) && imageFilled ? 'image-vector' : null;
+    if (ctx.svg && visible && !exportsSvg && reason) {
+      out.rasterized = reason;
+      const bounds = box ? renderBoundsOf(node, origin) : null;
+      if (bounds) out.renderBounds = bounds;
+      track(ctx, node, renderPng(node), function (render) {
         out.render = render;
-      }, function () { delete out.rasterized; }));
+      }, function () {
+        delete out.rasterized;
+        delete out.renderBounds;
+      });
       return out;
     }
   }
 
   if ('children' in node) {
-    if (ctx.maxDepth !== undefined && depth >= ctx.maxDepth) {
+    if ((ctx.maxDepth !== undefined && depth >= ctx.maxDepth) || ctx.count >= ctx.maxNodes) {
+      if (ctx.count >= ctx.maxNodes && node.children.length) ctx.truncated = true;
       out.childCount = node.children.length;
       return out;
     }
@@ -408,9 +524,18 @@ async function serialize(node, origin, ctx, depth) {
       try {
         out.children.push(await serialize(child, origin, ctx, depth + 1));
       } catch (e) {
-        out.children.push({
+        const failed = {
           id: child.id, name: child.name, type: child.type, error: String(e),
-        });
+        };
+        const b = safe(function () { return child.absoluteBoundingBox; });
+        if (b) {
+          failed.x = round(b.x - origin.x);
+          failed.y = round(b.y - origin.y);
+          failed.width = round(b.width);
+          failed.height = round(b.height);
+        }
+        ctx.failures.push({ id: child.id, name: child.name, error: String(e) });
+        out.children.push(failed);
       }
     }
     ctx.hidden = wasHidden;
@@ -441,8 +566,12 @@ function pageOf(node) {
 async function imageBytes(hashes) {
   const images = {};
   for (const hash of hashes) {
-    const image = figma.getImageByHash(hash);
-    if (image) images[hash] = figma.base64Encode(await image.getBytesAsync());
+    try {
+      const image = figma.getImageByHash(hash);
+      if (image) {
+        images[hash] = figma.base64Encode(await withTimeout(image.getBytesAsync(), EXPORT_TIMEOUT));
+      }
+    } catch (e) { /* an unreadable image only loses that fill */ }
   }
   return images;
 }
@@ -475,6 +604,8 @@ async function node(params) {
     tree: tree,
     imageHashes: Array.from(ctx.imageHashes),
   };
+  if (ctx.truncated) result.truncated = true;
+  if (ctx.failures.length) result.failures = ctx.failures;
   if (params.images) {
     result.images = await timed(ctx, 'images', function () { return imageBytes(ctx.imageHashes); });
   }

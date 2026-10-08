@@ -55,11 +55,18 @@ export class DesignSource {
     return hit;
   }
 
-  /** { tree, images: {hash: base64}, source, exportedAt }. */
-  async node(id, { images = false, svg = true, maxDepth } = {}) {
-    const result = await this.live('node', { id, svg, images, maxDepth }, 180000);
-    if (result && (!svg || maxDepth !== undefined)) {
-      return { tree: result.tree, images: result.images || {}, source: 'live' };
+  /**
+   * { tree, images: {hash: base64}, source, exportedAt, truncated, failures }.
+   * A live read stops after [maxNodes] layers (truncated: true).
+   */
+  async node(id, { images = false, svg = true, maxDepth, maxNodes } = {}) {
+    const result = await this.live('node', { id, svg, images, maxDepth, maxNodes }, 180000);
+    const extra = result ? {
+      ...(result.truncated ? { truncated: true } : {}),
+      ...(result.failures && result.failures.length ? { failures: result.failures } : {}),
+    } : {};
+    if (result && (!svg || maxDepth !== undefined || result.truncated)) {
+      return { tree: result.tree, images: result.images || {}, source: 'live', ...extra };
     }
     if (result) {
       try {
@@ -71,7 +78,7 @@ export class DesignSource {
           images: result.images || {},
         }, { live: true });
       } catch { /* caching is best effort */ }
-      return { tree: result.tree, images: result.images || {}, source: 'live' };
+      return { tree: result.tree, images: result.images || {}, source: 'live', ...extra };
     }
     const hit = this.snapshot(id);
     return {

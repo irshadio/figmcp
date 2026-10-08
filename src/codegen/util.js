@@ -30,40 +30,6 @@ export function visiblePaints(list) {
   return Array.isArray(list) ? list.filter((p) => p && p.visible !== false) : [];
 }
 
-/** CSS angle for a linear gradient from its transform matrix. */
-function gradientAngle(transform) {
-  if (!Array.isArray(transform)) return 180;
-  const [[a], [b]] = transform;
-  const deg = (Math.atan2(b, a) * 180) / Math.PI;
-  return Math.round((deg + 90 + 360) % 360);
-}
-
-function stops(paint) {
-  const opacity = paint.opacity ?? 1;
-  return (paint.gradientStops || [])
-    .map((s) => `${css(s.color, opacity)} ${num(s.position * 100)}%`)
-    .join(',');
-}
-
-/** A CSS background layer for a paint, or null when it has none. */
-export function paintCss(paint) {
-  const opacity = paint.opacity ?? 1;
-  switch (paint.type) {
-    case 'SOLID':
-      return css(paint.color, opacity);
-    case 'GRADIENT_LINEAR':
-      return `linear-gradient(${gradientAngle(paint.gradientTransform)}deg,${stops(paint)})`;
-    case 'GRADIENT_RADIAL':
-      return `radial-gradient(circle,${stops(paint)})`;
-    case 'GRADIENT_ANGULAR':
-      return `conic-gradient(${stops(paint)})`;
-    case 'GRADIENT_DIAMOND':
-      return `radial-gradient(${stops(paint)})`;
-    default:
-      return null;
-  }
-}
-
 /** Tailwind arbitrary values cannot contain spaces. */
 export function tw(value) {
   return String(value).replace(/\s+/g, '_');

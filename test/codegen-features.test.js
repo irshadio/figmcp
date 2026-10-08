@@ -115,7 +115,7 @@ test('gradient strokes, shadows on content and blend modes', () => {
   assert.match(out, /WebkitMask: "linear-gradient\(#000 0 0\) content-box, linear-gradient\(#000 0 0\)"/);
   assert.match(out, /padding: "2px"/);
   assert.match(out, /mix-blend-multiply/);
-  assert.match(out, /drop-shadow-\[0px_2px_4px_rgba\(0,0,0,0.5\)\]/);
+  assert.match(out, /drop-shadow-\[0px_2px_2px_rgba\(0,0,0,0.5\)\]/, 'drop-shadow() blurs by a standard deviation: half the radius');
   assert.doesNotMatch(out, / shadow-\[0px_2px/);
 });
 

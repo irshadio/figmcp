@@ -77,3 +77,55 @@ test('save_design_export writes a full export with code connect annotations', as
   assert.equal(bad.isError, true);
   plugin.stop();
 });
+
+test('Flutter projects get Flutter code with their asset folders', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  fs.writeFileSync(path.join(dir, 'pubspec.yaml'), 'name: app\nflutter:\n  assets:\n    - assets/svg/\n    - assets/png/\n');
+  const { client } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  await plugin.ready();
+  const ctx = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true } }));
+  assert.match(ctx, /class SampleScreen extends StatelessWidget/);
+  assert.match(ctx, /SvgPicture.asset\(\s*'assets\/svg\/arrow.svg'/);
+  assert.match(ctx, /AssetImage\('assets\/png\/photo.png'\)/);
+  assert.match(ctx, /mkdir -p 'assets\/svg' 'assets\/png'/);
+  assert.match(ctx, /cp '[^']+\.svg' 'assets\/svg\/arrow.svg'/);
+  assert.match(ctx, /- Inter: 500, 600/);
+  assert.match(ctx, /reference Flutter code/);
+  assert.doesNotMatch(ctx, /http:\/\/localhost/, 'no server URLs in Dart code');
+
+  const react = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true, framework: 'react' } }));
+  assert.match(react, /export default function SampleScreen\(\)/);
+  plugin.stop();
+});
+
+test('the client can ask for Flutter, and bad node ids are refused', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  await plugin.ready();
+  const ctx = texts(await client.callTool({ name: 'get_design_context', arguments: {
+    nodeId: '10-1', clientFrameworks: 'flutter', clientLanguages: 'dart', excludeScreenshot: true, assetsDir: 'assets/design/',
+  } }));
+  assert.match(ctx, /class SampleScreen extends StatelessWidget/);
+  assert.match(ctx, /'assets\/design\/photo.png'/);
+  const bad = await client.callTool({ name: 'get_design_context', arguments: { nodeId: 'not-an-id' } });
+  assert.equal(bad.isError, true);
+  assert.match(texts(bad), /Not a Figma node id/);
+  plugin.stop();
+});
+
+test('a read the plugin cut short answers with metadata, not code', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir), truncated: true });
+  await plugin.ready();
+  const ctx = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true } }));
+  assert.match(ctx, /too many for code in one response/);
+  assert.match(ctx, /<frame id="10:1" name="Sample Screen"/);
+  assert.doesNotMatch(ctx, /export default function|extends StatelessWidget/);
+  plugin.stop();
+});

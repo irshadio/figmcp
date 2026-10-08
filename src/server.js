@@ -16,7 +16,7 @@ const INSTRUCTIONS =
 export function createServer(bridge) {
   const source = new DesignSource(bridge);
   const server = new McpServer(
-    { name: 'figma-local', version: '1.1.0' },
+    { name: 'figma-local', version: '1.2.0' },
     { instructions: INSTRUCTIONS },
   );
   registerDesignTools(server, bridge, source);

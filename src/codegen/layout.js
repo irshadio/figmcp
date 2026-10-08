@@ -9,6 +9,8 @@ const ITEMS = {
   MIN: 'items-start', CENTER: 'items-center', MAX: 'items-end',
   BASELINE: 'items-baseline',
 };
+const GRID_JUSTIFY = { MIN: 'justify-self-start', CENTER: 'justify-self-center', MAX: 'justify-self-end' };
+const GRID_ALIGN = { MIN: 'self-start', CENTER: 'self-center', MAX: 'self-end' };
 // Children of these keep plain top-left positions: their box wraps them.
 const WRAPPING_PARENTS = new Set(['GROUP', 'BOOLEAN_OPERATION']);
 
@@ -18,6 +20,12 @@ export function isAutoLayout(node) {
 
 export function isGrid(node) {
   return node.layoutMode === 'GRID';
+}
+
+/** Whether the parent's auto-layout or grid places [node]. */
+export function inFlow(node, parent) {
+  return Boolean(parent) && (isAutoLayout(parent) || isGrid(parent)) &&
+    node.layoutPositioning !== 'ABSOLUTE';
 }
 
 function size(prefix, value, varName) {
@@ -34,17 +42,34 @@ function minMax(node) {
   return out;
 }
 
-function sizing(node, axis) {
+/**
+ * FILL, HUG or FIXED on an axis. Exports without layoutSizing* carry the
+ * older grow / align fields.
+ */
+export function sizingOf(node, parent, axis) {
   const key = axis === 'x' ? 'layoutSizingHorizontal' : 'layoutSizingVertical';
   if (node[key]) return node[key];
-  return undefined;
+  const main = parent && parent.layoutMode === 'HORIZONTAL' ? 'x' : 'y';
+  return (main === axis ? node.layoutGrow : node.layoutAlign === 'STRETCH') ? 'FILL' : 'FIXED';
+}
+
+/**
+ * A grid anchor, or null when the child is not anchored (-1). Older exports
+ * dropped anchors at 0; a sibling with an anchor shows they were exported.
+ */
+export function gridAnchor(node, parent, key) {
+  const v = node[key];
+  if (typeof v === 'number') return v >= 0 ? v : null;
+  const exported = (parent.children || []).some((c) =>
+    ['gridRowAnchorIndex', 'gridColumnAnchorIndex'].some((k) => typeof c[k] === 'number' && c[k] >= 0));
+  return exported ? 0 : null;
 }
 
 /**
  * Where a child sits in its parent.
  * [opts.fixedSize] gives hugging nodes their size too (an <img> has no
- * content size of its own); [opts.index] is the child's position among its
- * visible siblings.
+ * content size of its own); [opts.index] is the child's position among the
+ * siblings the layout places, [opts.count] their number.
  */
 export function positionClasses(node, parent, opts = {}) {
   const vars = node.vars || {};
@@ -58,28 +83,32 @@ export function positionClasses(node, parent, opts = {}) {
     node.textAutoResize === 'HEIGHT');
   const out = [];
 
-  if ((isAutoLayout(parent) || isGrid(parent)) && node.layoutPositioning !== 'ABSOLUTE') {
+  if (inFlow(node, parent)) {
     out.push('relative', 'shrink-0');
     const row = parent.layoutMode === 'HORIZONTAL';
-    const main = row ? 'x' : 'y';
-    let sizeW = sizing(node, 'x');
-    let sizeH = sizing(node, 'y');
-    // Exports without layoutSizing* carry the older grow / align fields.
-    if (!sizeW) sizeW = (main === 'x' ? node.layoutGrow : node.layoutAlign === 'STRETCH') ? 'FILL' : 'FIXED';
-    if (!sizeH) sizeH = (main === 'y' ? node.layoutGrow : node.layoutAlign === 'STRETCH') ? 'FILL' : 'FIXED';
+    let sizeW = sizingOf(node, parent, 'x');
+    let sizeH = sizingOf(node, parent, 'y');
     if (opts.fixedSize) {
       if (sizeW === 'HUG') sizeW = 'FIXED';
       if (sizeH === 'HUG') sizeH = 'FIXED';
     }
     if (isGrid(parent)) {
-      if (typeof node.gridColumnAnchorIndex === 'number') out.push(`col-start-[${node.gridColumnAnchorIndex + 1}]`);
-      if (typeof node.gridRowAnchorIndex === 'number') out.push(`row-start-[${node.gridRowAnchorIndex + 1}]`);
+      const col = gridAnchor(node, parent, 'gridColumnAnchorIndex');
+      const rowAt = gridAnchor(node, parent, 'gridRowAnchorIndex');
+      if (col !== null) out.push(`col-start-[${col + 1}]`);
+      if (rowAt !== null) out.push(`row-start-[${rowAt + 1}]`);
       if (node.gridColumnSpan > 1) out.push(`col-span-[${node.gridColumnSpan}]`);
       if (node.gridRowSpan > 1) out.push(`row-span-[${node.gridRowSpan}]`);
       if (sizeW === 'FILL') out.push('justify-self-stretch');
-      else if (sizeW === 'FIXED' && !hugsWidth) out.push(w);
+      else {
+        if (GRID_JUSTIFY[node.gridChildHorizontalAlign]) out.push(GRID_JUSTIFY[node.gridChildHorizontalAlign]);
+        if (sizeW === 'FIXED' && !hugsWidth) out.push(w);
+      }
       if (sizeH === 'FILL') out.push('self-stretch');
-      else if (sizeH === 'FIXED' && !hugsHeight) out.push(h);
+      else {
+        if (GRID_ALIGN[node.gridChildVerticalAlign]) out.push(GRID_ALIGN[node.gridChildVerticalAlign]);
+        if (sizeH === 'FIXED' && !hugsHeight) out.push(h);
+      }
     } else {
       if (sizeW === 'FILL') out.push(...(row ? ['flex-[1_0_0]', 'min-w-px'] : ['w-full']));
       else if (sizeW === 'FIXED' && !hugsWidth) out.push(w);
@@ -94,7 +123,7 @@ export function positionClasses(node, parent, opts = {}) {
     }
     // Figma rounds a hugging text box up to a whole pixel; the box keeps that
     // width and still grows with longer text.
-    if (hugsWidth) out.push('whitespace-nowrap', `min-w-[${px(node.width)}]`);
+    if (hugsWidth) out.push(`min-w-[${px(node.width)}]`);
     out.push(...minMax(node));
     return out;
   }
@@ -147,7 +176,7 @@ export function positionClasses(node, parent, opts = {}) {
       out.push(`top-[${px(y)}]`);
       if (!hugsHeight) out.push(h);
   }
-  if (hugsWidth) out.push('whitespace-nowrap', `min-w-[${px(node.width)}]`);
+  if (hugsWidth) out.push(`min-w-[${px(node.width)}]`);
   out.push(...minMax(node));
   return out;
 }
@@ -159,11 +188,11 @@ function sign(v) {
 
 function strokeSpace(node) {
   if (!node.strokesIncludedInLayout) return [0, 0, 0, 0];
-  const visible = Array.isArray(node.strokes) && node.strokes.some((p) => p.visible !== false);
+  const visible = Array.isArray(node.strokes) && node.strokes.some((p) => p && p.visible !== false);
   if (!visible) return [0, 0, 0, 0];
   const w = typeof node.strokeWeight === 'number' ? node.strokeWeight : 0;
   return ['strokeLeftWeight', 'strokeRightWeight', 'strokeTopWeight', 'strokeBottomWeight']
-    .map((k) => node[k] ?? w);
+    .map((k) => (typeof node[k] === 'number' ? node[k] : w));
 }
 
 function padding(node) {
@@ -207,35 +236,47 @@ export function containerClasses(node) {
   }
   if (!isAutoLayout(node)) return [];
   const out = ['flex'];
-  if (node.layoutMode === 'VERTICAL') out.push('flex-col');
+  const row = node.layoutMode !== 'VERTICAL';
+  if (!row) out.push('flex-col');
+  const between = node.primaryAxisAlignItems === 'SPACE_BETWEEN';
+  const spacing = node.itemSpacing > 0 && !between ? withVar(vars.itemSpacing, px(node.itemSpacing)) : null;
   if (node.layoutWrap === 'WRAP') {
-    out.push('flex-wrap');
-    if (node.counterAxisAlignContent === 'SPACE_BETWEEN') out.push('content-between');
-    else out.push('content-start');
-  }
-  if (node.itemSpacing > 0 && node.primaryAxisAlignItems !== 'SPACE_BETWEEN') {
-    out.push(`gap-[${tw(withVar(vars.itemSpacing, px(node.itemSpacing)))}]`);
-  }
-  if (node.layoutWrap === 'WRAP' && node.counterAxisSpacing) {
-    const axis = node.layoutMode === 'VERTICAL' ? 'gap-x' : 'gap-y';
-    out.push(`${axis}-[${tw(withVar(vars.counterAxisSpacing, px(node.counterAxisSpacing)))}]`);
+    out.push('flex-wrap', node.counterAxisAlignContent === 'SPACE_BETWEEN' ? 'content-between' : 'content-start');
+    // Wrapped tracks have their own gap; exports drop it when it is 0.
+    const cross = typeof node.counterAxisSpacing === 'number' ? node.counterAxisSpacing : 0;
+    if (spacing) out.push(`${row ? 'gap-x' : 'gap-y'}-[${tw(spacing)}]`);
+    out.push(`${row ? 'gap-y' : 'gap-x'}-[${tw(withVar(vars.counterAxisSpacing, px(cross)))}]`);
+  } else if (spacing) {
+    out.push(`gap-[${tw(spacing)}]`);
   }
   out.push(JUSTIFY[node.primaryAxisAlignItems] || 'justify-start');
   out.push(ITEMS[node.counterAxisAlignItems] || 'items-start');
   return [...out, ...padding(node)];
 }
 
-export function radiusClasses(node) {
-  if (node.type === 'ELLIPSE') return ['rounded-[50%]'];
+const RADIUS_KEYS = ['topLeftRadius', 'topRightRadius', 'bottomRightRadius', 'bottomLeftRadius'];
+
+/** Corner radii (top-left, top-right, bottom-right, bottom-left) with their variables. */
+export function cornerRadii(node) {
   const vars = node.vars || {};
-  const keys = ['topLeftRadius', 'topRightRadius', 'bottomRightRadius', 'bottomLeftRadius'];
-  const corners = keys.map((k) => (typeof node[k] === 'number' ? node[k]
-    : typeof node.cornerRadius === 'number' ? node.cornerRadius : 0));
-  const names = keys.map((k) => vars[k]);
-  if (corners.every((c) => c === corners[0]) && names.every((n) => n === names[0])) {
-    return corners[0] ? [`rounded-[${tw(withVar(names[0], px(corners[0])))}]`] : [];
-  }
+  return RADIUS_KEYS.map((k) => ({
+    value: typeof node[k] === 'number' ? node[k]
+      : typeof node.cornerRadius === 'number' ? node.cornerRadius : 0,
+    name: vars[k] || null,
+  }));
+}
+
+/** Rounded-corner classes; [grow] widens every rounded corner (outside strokes). */
+export function radiusClasses(node, grow = 0) {
+  if (node.type === 'ELLIPSE') return ['rounded-[50%]'];
+  const corners = cornerRadii(node);
+  const value = ({ value: v, name }) => {
+    if (!grow || !v) return tw(withVar(name, px(v)));
+    return name ? tw(`calc(${withVar(name, px(v))} + ${px(grow)})`) : px(v + grow);
+  };
+  const same = corners.every((c) => c.value === corners[0].value && c.name === corners[0].name);
+  if (same) return corners[0].value ? [`rounded-[${value(corners[0])}]`] : [];
   return ['tl', 'tr', 'br', 'bl']
-    .map((k, i) => (corners[i] ? `rounded-${k}-[${tw(withVar(names[i], px(corners[i])))}]` : null))
+    .map((k, i) => (corners[i].value ? `rounded-${k}-[${value(corners[i])}]` : null))
     .filter(Boolean);
 }

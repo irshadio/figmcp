@@ -1,6 +1,7 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Bridge } from './bridge.js';
 import { createServer } from './server.js';
+import { PLUGIN_DIR, setup, syncPlugin } from './setup.js';
 import { importFile } from './store.js';
 
 // stdout carries the protocol; everything else goes to stderr.
@@ -11,10 +12,22 @@ export async function main(argv = process.argv.slice(2)) {
     for (const file of argv.slice(1)) log(`saved ${importFile(file)}`);
     return;
   }
+  if (argv[0] === 'setup') {
+    setup();
+    return;
+  }
+  try {
+    syncPlugin();
+  } catch (e) {
+    log(`could not update the plugin in ${PLUGIN_DIR}: ${e.message}`);
+  }
   const port = Number(process.env.FIGMA_LOCAL_MCP_PORT || 3947);
   const bridge = new Bridge({ port, log });
   await bridge.start();
   if (!bridge.owner) log(`port ${port} is served by another instance; requests go through it`);
+  if (process.stdin.isTTY) {
+    log('this is an MCP server: your AI tool starts it. To set it up, run with "setup". Ctrl+C to quit.');
+  }
   const server = createServer(bridge);
   await server.connect(new StdioServerTransport());
   const stop = () => {

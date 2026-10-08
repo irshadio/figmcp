@@ -1,19 +1,41 @@
 {
-  "name": "figma-local-mcp",
-  "version": "1.1.0",
-  "description": "Local MCP server for Figma: a development plugin streams the open file over a localhost WebSocket, so design reads never touch the Figma API.",
+  "name": "@irshad.io/figma-local-mcp",
+  "version": "1.3.1",
+  "description": "Local MCP server for Figma: a development plugin streams the open file over a localhost WebSocket, so design reads never touch the Figma API. Writes Flutter or React reference code.",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "figma",
+    "figma-plugin",
+    "figma-to-code",
+    "design-to-code",
+    "flutter",
+    "react",
+    "tailwind",
+    "model-context-protocol"
+  ],
+  "author": "irshadio <irshad.kp@icloud.com>",
   "type": "module",
   "bin": {
     "figma-local-mcp": "bin/figma-local-mcp.js"
   },
   "main": "src/index.js",
+  "files": [
+    "bin",
+    "src",
+    "plugin",
+    "tools",
+    "README.md"
+  ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "start": "node bin/figma-local-mcp.js",
     "test": "node --test test/",
-    "visual-check": "node tools/visual-check.js"
+    "visual-check": "node tools/visual-check.js",
+    "flutter-check": "node tools/flutter-check.js",
+    "prepublishOnly": "npm test"
   },
   "license": "MIT",
   "dependencies": {
@@ -24,5 +46,8 @@
   },
   "devDependencies": {
     "puppeteer-core": "^25.12.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
