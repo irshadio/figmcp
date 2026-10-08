@@ -55,7 +55,7 @@ export function setup(out = (s) => process.stdout.write(`${s}\n`)) {
 
   const config = JSON.stringify({ mcpServers: { 'figma-local': server } }, null, 2);
   out(`
-Figma Local MCP ${PKG.version} is set up.
+Local Design MCP ${PKG.version} is set up.
 
 1. MCP server
    ${claude ? 'Registered with Claude Code. Restart Claude Code to load it.' : 'Claude Code was not found.'}
@@ -68,7 +68,7 @@ ${config.replace(/^/gm, '   ')}
    ${manifest}
 
 3. Connect
-   Open a design, run Plugins > Development > Figma Local MCP and enter
+   Open a design, run Plugins > Development > Local Design MCP and enter
    the pairing code:  ${code}
    The dot turns green once your AI tool is running.
 

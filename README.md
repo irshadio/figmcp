@@ -48,7 +48,7 @@ On macOS, press **Cmd+Shift+G** in the file picker and paste the path.
 ### 3. Connect
 
 1. Open your design in Figma Desktop.
-2. Run **Plugins > Development > Figma Local MCP** and keep its window open.
+2. Run **Plugins > Development > Local Design MCP** and keep its window open.
 3. Enter the pairing code printed by the setup. The plugin remembers it.
 
 The dot in the plugin turns green when your MCP client is running and

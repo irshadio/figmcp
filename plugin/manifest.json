@@ -1,6 +1,6 @@
 {
-  "name": "Figma Local MCP",
-  "id": "figma-local-mcp-bridge",
+  "name": "Local Design MCP",
+  "id": "1690019868157511479",
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui.html",
@@ -9,8 +9,7 @@
   "documentAccess": "dynamic-page",
   "permissions": ["currentuser"],
   "networkAccess": {
-    "allowedDomains": ["none"],
-    "devAllowedDomains": ["ws://localhost:3947", "http://localhost:3947"],
-    "reasoning": "Streams the open file to an MCP server on this machine only."
+    "allowedDomains": ["ws://localhost:3947", "http://localhost:3947"],
+    "reasoning": "Connects only to a local MCP server on this computer (localhost:3947). No data leaves the machine."
   }
 }
