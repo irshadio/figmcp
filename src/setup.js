@@ -7,8 +7,22 @@ import { DATA_DIR, pairingCode } from './store.js';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const APP_DIR = path.join(DATA_DIR, 'app');
+const PLUGIN_SRC = path.join(ROOT, 'plugin');
+export const PLUGIN_DIR = path.join(DATA_DIR, 'plugin');
 const WIN = process.platform === 'win32';
-const PLUGIN_URL = 'https://www.figma.com/community/plugin/1690019868157511479';
+
+// Figma keeps the manifest path it was imported from, so the plugin lives at a
+// fixed path outside the package and is refreshed whenever the package changes.
+export function syncPlugin() {
+  fs.mkdirSync(PLUGIN_DIR, { recursive: true });
+  for (const file of fs.readdirSync(PLUGIN_SRC)) {
+    const from = path.join(PLUGIN_SRC, file);
+    const to = path.join(PLUGIN_DIR, file);
+    const data = fs.readFileSync(from);
+    if (!fs.existsSync(to) || !data.equals(fs.readFileSync(to))) fs.writeFileSync(to, data);
+  }
+  return path.join(PLUGIN_DIR, 'manifest.json');
+}
 
 function run(cmd, args) {
   return spawnSync(cmd, args, { stdio: 'ignore', shell: WIN });
@@ -32,9 +46,12 @@ function registerClaudeCode(server) {
 }
 
 export function setup(out = (s) => process.stdout.write(`${s}\n`)) {
+  const manifest = syncPlugin();
   const code = pairingCode();
   const server = { command: process.execPath, args: [installedBin()] };
   const claude = registerClaudeCode(server);
+  if (process.platform === 'darwin') run('open', [PLUGIN_DIR]);
+  else if (WIN) run('explorer', [PLUGIN_DIR]);
 
   const config = JSON.stringify({ mcpServers: { 'figma-local': server } }, null, 2);
   out(`
@@ -46,10 +63,12 @@ Local Design MCP ${PKG.version} is set up.
 ${config.replace(/^/gm, '   ')}
 
 2. Figma plugin (once)
-   Install it in Figma Desktop: ${PLUGIN_URL}
+   In Figma Desktop: Plugins > Development > Import plugin from manifest...
+   and choose:
+   ${manifest}
 
 3. Connect
-   Open a design, run Plugins > Local Design MCP and enter
+   Open a design, run Plugins > Development > Local Design MCP and enter
    the pairing code:  ${code}
    The dot turns green once your AI tool is running.
 

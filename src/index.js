@@ -1,7 +1,7 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Bridge } from './bridge.js';
 import { createServer } from './server.js';
-import { setup } from './setup.js';
+import { PLUGIN_DIR, setup, syncPlugin } from './setup.js';
 import { importFile } from './store.js';
 
 // stdout carries the protocol; everything else goes to stderr.
@@ -15,6 +15,11 @@ export async function main(argv = process.argv.slice(2)) {
   if (argv[0] === 'setup') {
     setup();
     return;
+  }
+  try {
+    syncPlugin();
+  } catch (e) {
+    log(`could not update the plugin in ${PLUGIN_DIR}: ${e.message}`);
   }
   const port = Number(process.env.FIGMA_LOCAL_MCP_PORT || 3947);
   const bridge = new Bridge({ port, log });

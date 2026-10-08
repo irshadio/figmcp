@@ -13,14 +13,18 @@ Needs Node.js 18+ and Figma Desktop.
    npx -y @irshad.io/figma-local-mcp@latest setup
    ```
 
-   It registers the server with Claude Code and prints your pairing code.
-   For other MCP clients, copy the config it prints.
+   It registers the server with Claude Code, copies the Figma plugin to
+   `~/.figma-local-mcp/plugin` and prints your pairing code. For other MCP
+   clients, copy the config it prints.
 
-2. Install the plugin:
-   [Local Design MCP on Figma Community](https://www.figma.com/community/plugin/1690019868157511479)
+2. Import the plugin (once): in Figma Desktop, go to **Plugins > Development >
+   Import plugin from manifest…** and choose
+   `~/.figma-local-mcp/plugin/manifest.json` (on macOS, press Cmd+Shift+G in
+   the file picker and paste the path).
 
-3. Restart Claude Code. In Figma Desktop, run **Plugins > Local Design MCP**
-   and enter the pairing code. The dot turns green when connected.
+3. Restart Claude Code. In Figma Desktop, run **Plugins > Development > Local
+   Design MCP** and enter the pairing code. The dot turns green when
+   connected.
 
 ## Use
 
@@ -40,7 +44,8 @@ while you work.
 npx -y @irshad.io/figma-local-mcp@latest setup
 ```
 
-Then restart Claude Code.
+Then restart Claude Code and run the plugin again. The plugin updates
+itself; no need to import it again.
 
 ## Troubleshooting
 

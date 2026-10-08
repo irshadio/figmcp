@@ -1,6 +1,6 @@
 {
   "name": "@irshad.io/figma-local-mcp",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Local MCP server for Figma: a development plugin streams the open file over a localhost WebSocket, so design reads never touch the Figma API. Writes Flutter or React reference code.",
   "keywords": [
     "mcp",
