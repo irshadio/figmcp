@@ -9,7 +9,7 @@
   "documentAccess": "dynamic-page",
   "permissions": ["currentuser"],
   "networkAccess": {
-    "allowedDomains": ["ws://localhost:3947", "http://localhost:3947"],
-    "reasoning": "Connects only to a local MCP server on this computer (localhost:3947). No data leaves the machine."
+    "allowedDomains": ["*"],
+    "reasoning": "Connects to a local MCP server on this computer (localhost:3947), and loads images and assets from the web for designs it creates."
   }
 }

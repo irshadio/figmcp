@@ -33,6 +33,9 @@ export function registerWriteTools(server, bridge) {
       'search the current page or use figma.getLocalPaintStylesAsync, ' +
       'figma.variables.getLocalVariablesAsync), and set bound variables with ' +
       'figma.variables.setBoundVariableForPaint.\n' +
+      '- Images from the web: const img = await figma.createImageAsync(url), ' +
+      'then fills = [{ type: "IMAGE", imageHash: img.hash, scaleMode: "FILL" }]. ' +
+      'fetch(url) works too (e.g. an SVG for figma.createNodeFromSvg).\n' +
       '- figma.currentPage.selection = [node] and ' +
       'figma.viewport.scrollAndZoomIntoView([node]) show the result.\n\n' +
       'Build a screen in a few calls (structure, then sections), return the ' +
