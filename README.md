@@ -1,4 +1,4 @@
-# Local Design MCP
+# Figma Local MCP
 
 Turn Figma frames into Flutter and React code with Claude Code, locally,
 with no Figma API calls and no rate limits.
