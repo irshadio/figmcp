@@ -882,6 +882,11 @@ async function run(params) {
   }
 }
 
+const LINKS = new Set([
+  'https://www.linkedin.com/in/irshad1212',
+  'https://www.npmjs.com/package/@irshad.io/figma-local-mcp',
+]);
+
 const HANDLERS = {
   info: async function () { return info(); },
   node: node,
@@ -926,6 +931,9 @@ figma.ui.onmessage = function (msg) {
   }
   if (msg.type === 'savePairing') {
     figma.clientStorage.setAsync('pairingCode', msg.code || '');
+  }
+  if (msg.type === 'open' && LINKS.has(msg.url)) {
+    figma.openExternal(msg.url);
   }
   if (msg.type === 'hello') {
     figma.ui.postMessage({ type: 'selection', info: info() });
