@@ -83,6 +83,11 @@ export function fakePlugin(port, { origin, code, truncated = false } = {}) {
           return reply({ format: 'png', base64: data.frames[0].previewPng2x, width: 200, height: 120, scale: 2 });
         case 'snapshot':
           return reply({ ...data, frames: [{ ...data.frames[0], tree: findNode(tree, p.ids[0]) }] });
+        case 'run':
+          if (p.code.includes('throw')) {
+            return ws.send(JSON.stringify({ type: 'response', id: msg.id, error: 'boom' }));
+          }
+          return reply({ result: { id: '20:1', name: 'Card', type: 'FRAME' }, logs: ['made it'] });
         case 'variables':
           return reply({ defs: { 'color/primary': '#0D99FF' }, truncated: false });
         default:

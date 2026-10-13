@@ -38,6 +38,18 @@ Or paste a Figma link with `node-id`. Flutter projects get Flutter
 widgets; other projects get React + Tailwind. Keep the plugin window open
 while you work.
 
+## Design in Figma
+
+Claude Code can also create and edit designs in the open file. Open the file
+in Design mode (not Dev Mode), run the plugin and ask:
+
+```
+design a login screen for a 390x844 phone in Figma
+```
+
+It builds the design with Figma plugin API scripts (`use_figma`) and checks
+each step with a screenshot. Each script is one undo step in Figma.
+
 ## Update
 
 ```bash

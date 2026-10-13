@@ -9,7 +9,7 @@ test('lists the tools of the Figma MCP', async () => {
   const names = (await client.listTools()).tools.map((t) => t.name).sort();
   assert.deepEqual(names, ['add_code_connect_map', 'download_assets', 'get_code_connect_map',
     'get_design_context', 'get_metadata', 'get_screenshot', 'get_variable_defs',
-    'import_design_export', 'remove_code_connect_map', 'save_design_export', 'whoami']);
+    'import_design_export', 'remove_code_connect_map', 'save_design_export', 'use_figma', 'whoami']);
   await transport.close();
 });
 
@@ -123,4 +123,26 @@ test('a second instance proxies, then takes over when the owner exits', async ()
   assert.match(who.role, /serving on port/);
   plugin.stop();
   await b.transport.close();
+});
+
+test('use_figma runs a script in the plugin and reports its errors', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client, transport } = await startClient(dir, port);
+  const offline = await client.callTool({ name: 'use_figma', arguments: { code: 'return 1' } });
+  assert.equal(offline.isError, true);
+  assert.match(texts(offline), /plugin is not connected/);
+
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  assert.equal(await plugin.ready(), true);
+  const ok = await client.callTool({ name: 'use_figma', arguments: { code: 'return figma.createFrame()' } });
+  assert.equal(ok.isError, undefined);
+  assert.equal(JSON.parse(ok.content[0].text).result.id, '20:1');
+  assert.match(texts(ok), /Logs:\nmade it/);
+
+  const failed = await client.callTool({ name: 'use_figma', arguments: { code: 'throw 1' } });
+  assert.equal(failed.isError, true);
+  assert.match(texts(failed), /Error: boom/);
+  plugin.stop();
+  await transport.close();
 });

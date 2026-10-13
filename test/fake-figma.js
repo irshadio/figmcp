@@ -33,7 +33,7 @@ export function makeNode(desc, parent = null, ids = { n: 1 }) {
 }
 
 /** Loads the plugin with [root] as the document; returns { request, posted }. */
-export function loadPlugin(root, { images = {} } = {}) {
+export function loadPlugin(root, { images = {}, editorType = 'figma' } = {}) {
   const byId = new Map();
   const index = (n) => {
     byId.set(n.id, n);
@@ -46,6 +46,15 @@ export function loadPlugin(root, { images = {} } = {}) {
   root.parent = root.parent || page;
   const figma = {
     mixed: MIXED,
+    editorType,
+    undoSteps: 0,
+    commitUndo() { figma.undoSteps++; },
+    createFrame() {
+      const frame = makeNode({ type: 'FRAME', box: [0, 0, 100, 100] }, page, { n: byId.size + 1 });
+      byId.set(frame.id, frame);
+      page.children.push(frame);
+      return frame;
+    },
     showUI() {},
     on() {},
     root: { name: 'Test file', children: [page] },
@@ -76,6 +85,7 @@ export function loadPlugin(root, { images = {} } = {}) {
   vm.runInContext(CODE, context);
   let next = 1;
   return {
+    figma,
     posted,
     request(method, params = {}) {
       const id = next++;

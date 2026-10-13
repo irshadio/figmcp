@@ -122,3 +122,29 @@ test('mixed stroke weights keep per-side zeros', async () => {
   assert.equal(tree.strokeTopWeight, 0);
   assert.equal(tree.strokeBottomWeight, 1);
 });
+
+test('run executes a script, summarises nodes and commits one undo step', async () => {
+  const { request, figma } = loadPlugin(makeNode({ id: '1:1', type: 'FRAME' }));
+  const out = await request('run', {
+    code: 'const f = figma.createFrame(); f.name = "Card"; console.log("made", { w: f.width });' +
+      'return { frame: f, list: [1, figma.mixed], fn() {} };',
+  });
+  assert.equal(out.result.frame.name, 'Card');
+  assert.equal(out.result.frame.type, 'FRAME');
+  assert.equal(out.result.frame.width, 100);
+  assert.equal('parent' in out.result.frame, false);
+  assert.deepEqual(out.result.list, [1, 'mixed']);
+  assert.equal('fn' in out.result, false);
+  assert.deepEqual(out.logs, ['made {"w":100}']);
+  assert.equal(figma.undoSteps, 1);
+});
+
+test('run reports syntax errors, thrown errors with logs, and Dev Mode', async () => {
+  const { request, figma } = loadPlugin(makeNode({ id: '1:1', type: 'FRAME' }));
+  await assert.rejects(request('run', { code: 'return (' }), /Script does not parse/);
+  await assert.rejects(request('run', { code: 'console.log("step 1"); throw new Error("bad")' }),
+    /bad\nLogs before the error:\nstep 1/);
+  assert.equal(figma.undoSteps, 1);
+  const dev = loadPlugin(makeNode({ id: '1:1', type: 'FRAME' }), { editorType: 'dev' });
+  await assert.rejects(dev.request('run', { code: 'return 1' }), /Design mode/);
+});

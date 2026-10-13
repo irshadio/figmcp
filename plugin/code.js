@@ -1,5 +1,6 @@
-// Answers requests from the local MCP server (relayed by ui.html) with data
-// read from the open file. Read-only: nothing here changes the document.
+// Answers requests from the local MCP server (relayed by ui.html): reads of
+// the open file, and `run`, which executes a script against the plugin API
+// to create or edit designs.
 
 figma.showUI(__html__, { width: 300, height: 236, themeColors: true });
 
@@ -815,6 +816,72 @@ async function snapshot(params) {
   };
 }
 
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const MAX_LOGS = 200;
+
+function isNode(v) {
+  return typeof v.id === 'string' && typeof v.type === 'string' && 'parent' in v;
+}
+
+// A JSON-safe copy of a script's return value; nodes become summaries.
+function plain(v, depth) {
+  if (v === undefined || v === null) return null;
+  if (v === figma.mixed) return 'mixed';
+  const t = typeof v;
+  if (t === 'number' || t === 'string' || t === 'boolean') return v;
+  if (t !== 'object') return null;
+  if (v instanceof Uint8Array) return { bytes: v.length };
+  if (isNode(v)) {
+    const out = { id: v.id, name: v.name, type: v.type };
+    if (typeof v.width === 'number') {
+      out.x = v.x;
+      out.y = v.y;
+      out.width = v.width;
+      out.height = v.height;
+    }
+    return out;
+  }
+  if (depth > 6) return '…';
+  if (Array.isArray(v)) return v.map(function (x) { return plain(x, depth + 1); });
+  const out = {};
+  Object.keys(v).forEach(function (k) {
+    if (typeof v[k] !== 'function') out[k] = plain(v[k], depth + 1);
+  });
+  return out;
+}
+
+async function run(params) {
+  if (figma.editorType !== 'figma') {
+    throw new Error('Designs can only be changed in Design mode. Switch the ' +
+      'file out of Dev Mode and run the plugin again.');
+  }
+  const logs = [];
+  const log = function () {
+    if (logs.length >= MAX_LOGS) return;
+    logs.push(Array.prototype.map.call(arguments, function (a) {
+      return typeof a === 'string' ? a : JSON.stringify(plain(a, 0));
+    }).join(' '));
+  };
+  const scope = { log: log, info: log, warn: log, error: log };
+  let script;
+  try {
+    script = new AsyncFunction('figma', 'console', String(params.code || ''));
+  } catch (e) {
+    throw new Error('Script does not parse: ' + (e && e.message ? e.message : e));
+  }
+  try {
+    const value = await script(figma, scope);
+    return { result: plain(value, 0), logs: logs };
+  } catch (e) {
+    const message = String(e && e.message ? e.message : e);
+    throw new Error(logs.length
+      ? message + '\nLogs before the error:\n' + logs.join('\n')
+      : message);
+  } finally {
+    figma.commitUndo();
+  }
+}
+
 const HANDLERS = {
   info: async function () { return info(); },
   node: node,
@@ -823,6 +890,7 @@ const HANDLERS = {
   images: async function (params) { return { images: await imageBytes(params.hashes || []) }; },
   variables: variables,
   snapshot: snapshot,
+  run: run,
 };
 
 figma.on('selectionchange', function () {
