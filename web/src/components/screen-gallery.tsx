@@ -34,27 +34,30 @@ export function ScreenGallery({ screens, desktop = false, label }: { screens: Sh
             : "-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 [scrollbar-width:thin]"
         }
       >
-        {screens.map((s, i) => (
+        {screens.map((s, i) => {
+          const wide = desktop || s.width >= 1200;
+          return (
           <button
             key={s.src}
             type="button"
             onClick={() => setOpen(i)}
-            className={`group shrink-0 snap-start text-left ${desktop ? "" : "w-[200px] sm:w-[230px]"}`}
+            className={`group shrink-0 snap-start text-left ${desktop ? "" : wide ? "w-[300px] sm:w-[500px]" : "w-[200px] sm:w-[230px]"}`}
           >
             <div
               className={`overflow-hidden rounded-2xl border border-line bg-panel transition duration-300 group-hover:-translate-y-1 group-hover:border-line-2 ${
-                desktop ? "aspect-[1440/1000]" : "aspect-[390/844]"
+                desktop ? "aspect-[1440/1000]" : wide ? "aspect-[300/433] sm:aspect-[500/498]" : "aspect-[390/844]"
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={s.src} alt={`${label}: ${s.name}`} loading="lazy" className="size-full object-cover object-top" />
+              <img src={s.src} alt={`${label}: ${s.name}`} loading="lazy" className={`size-full object-cover ${wide && !desktop ? "object-left-top" : "object-top"}`} />
             </div>
             <div className="mt-3 flex items-baseline gap-2 text-sm">
               <span className="font-mono text-xs text-dim">{String(i + 1).padStart(2, "0")}</span>
               <span className="text-muted transition group-hover:text-fg">{s.name}</span>
             </div>
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {current && open !== null && (
@@ -84,7 +87,7 @@ export function ScreenGallery({ screens, desktop = false, label }: { screens: Sh
               src={current.src}
               alt={`${label}: ${current.name}`}
               onClick={(e) => e.stopPropagation()}
-              className={`mx-auto rounded-xl ${desktop ? "w-full max-w-6xl" : "w-full max-w-[420px]"}`}
+              className={`mx-auto rounded-xl ${desktop || current.width >= 1200 ? "w-full max-w-6xl" : "w-full max-w-[420px]"}`}
             />
           </div>
         </div>

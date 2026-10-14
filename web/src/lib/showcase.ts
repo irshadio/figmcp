@@ -1,4 +1,5 @@
 import images from "./showcase-images.json";
+import type { ShowcaseKind } from "@/components/showcase-filter";
 
 export type ShowcaseImage = { src: string; width: number; height: number };
 export type ShowcaseScreen = ShowcaseImage & { name: string };
@@ -7,6 +8,7 @@ export type ShowcaseProject = {
   slug: keyof typeof images;
   name: string;
   kind: string;
+  type: ShowcaseKind;
   platform: string;
   summary: string;
   style: string;
@@ -20,6 +22,7 @@ export type ShowcaseProject = {
 export const projects: ShowcaseProject[] = [
   {
     slug: "voltline",
+    type: "mobile",
     name: "Voltline",
     kind: "Electronics store app",
     platform: "iOS · 390 × 844",
@@ -41,7 +44,124 @@ export const projects: ShowcaseProject[] = [
     figma: "https://www.figma.com/design/uzjFXsA6uxhSuPAqLefn7m/figmacp?node-id=2002-9545",
   },
   {
+    slug: "kindred",
+    type: "mobile",
+    name: "Kindred",
+    kind: "Dating app",
+    platform: "iOS · 390 × 844",
+    summary:
+      "A dating app for Kerala and beyond: phone sign-in, onboarding with intentions, languages, photos and interests, the swipe deck, full profiles with prompts, filters, the match moment, likes, chat, video calls, selfie verification, reporting and a paid plan.",
+    style: "Warm and modern: cream surfaces, a coral accent, Instrument Serif headlines over Figtree, and photos first.",
+    facts: [
+      ["Screens", "19 in 4 flows"],
+      ["Components", "7, with variants"],
+      ["Variables", "31 colours, spacing and radii"],
+      ["Text styles", "11 · Instrument Serif and Figtree"],
+    ],
+    prompts: [
+      "Design a dating app like the popular ones, without copying their look: onboarding, swipe deck, matches, chat and safety.",
+      "Make it local to Kerala: Malayalam and English, language filters and places people know.",
+      "Price a Gold plan for 1, 3 and 6 months and show the real savings.",
+    ],
+    accent: "#e4573d",
+    figma: "https://www.figma.com/design/uzjFXsA6uxhSuPAqLefn7m/figmacp?node-id=2004-5741",
+  },
+  {
+    slug: "tripora",
+    type: "mobile",
+    name: "Tripora",
+    kind: "Travel booking app",
+    platform: "iOS · 390 × 844 · English and Arabic",
+    summary:
+      "Flights and hotels for a Kochi to Dubai trip: airport search, a fare calendar, results with fare families, a seat map, travellers and add-ons, payment, the e-ticket, Dubai hotels on a list and a map, rooms, checkout, my trips, a boarding pass and price alerts, plus Arabic right-to-left screens.",
+    style: "Bright and practical: electric indigo, sunshine yellow for deals, Rubik for both English and Arabic. Every total adds up from fare to coins.",
+    facts: [
+      ["Screens", "19 in 4 flows"],
+      ["Components", "7 sets and 4 airline logos"],
+      ["Variables", "32 colours, spacing and radii"],
+      ["Text styles", "12 · Rubik"],
+    ],
+    prompts: [
+      "Design a travel booking app like the big Indian ones, without copying their look: flights, hotels and trips.",
+      "Add a seat map and a fare summary where seats, meals, insurance and the coupon add up.",
+      "Make Arabic versions of the home and results screens, mirrored right to left with prices in dirhams.",
+    ],
+    accent: "#3d3bd9",
+    figma: "https://www.figma.com/design/uzjFXsA6uxhSuPAqLefn7m/figmacp?node-id=2013-287",
+  },
+  {
+    slug: "paylark",
+    type: "web",
+    name: "Paylark",
+    kind: "Marketing website",
+    platform: "Web · 1440 and 390",
+    summary:
+      "A responsive marketing site for an invoicing and payments product for small businesses in India: a long home page with a product shot, features, stories, pricing and FAQ, a pricing page with a yearly toggle and plan comparison, and sign-up, each rebuilt for phones.",
+    style: "Calm and confident: forest green, a lime accent and warm off-white, Bricolage Grotesque headlines over Geist.",
+    facts: [
+      ["Pages", "3 desktop, 4 mobile"],
+      ["Components", "6, including the product shot"],
+      ["Variables", "32 colours, spacing and radii"],
+      ["Text styles", "15 · Bricolage Grotesque and Geist"],
+    ],
+    prompts: [
+      "Design a marketing website for an invoicing product for Indian small businesses: home, pricing and sign-up.",
+      "Show the product in the hero with a real dashboard, not a stock photo.",
+      "Make mobile versions of each page and an open menu.",
+    ],
+    accent: "#c6f432",
+    figma: "https://www.figma.com/design/uzjFXsA6uxhSuPAqLefn7m/figmacp?node-id=2014-4728",
+  },
+  {
+    slug: "plotline",
+    type: "web",
+    name: "Plotline",
+    kind: "Project management app",
+    platform: "Web · 1440 · light and dark",
+    summary:
+      "A project tool for a product team mid-cycle: my work, a board with a card being dragged, a grouped list with bulk actions, a timeline with dependencies and milestones, a calendar, a full issue page, an inbox, a command palette, a cycle report and member settings, plus the board in dark mode.",
+    style: "Quiet and dense: neutral surfaces, one orange accent, colour kept for status, priority and labels. Inter with Geist Mono for issue IDs. Every count agrees from board to report.",
+    facts: [
+      ["Screens", "11 desktop screens"],
+      ["Components", "7, with variants"],
+      ["Variables", "35 colours in light and dark sets"],
+      ["Text styles", "14 · Inter and Geist Mono"],
+    ],
+    prompts: [
+      "Design a project management web app like Linear or Asana, with a detailed board, list, timeline and issue page.",
+      "Show a card mid-drag on the board, with a drop target in the next column.",
+      "Make a dark version of the board from a second set of tokens with the same names.",
+    ],
+    accent: "#f2621f",
+    figma: "https://www.figma.com/design/uzjFXsA6uxhSuPAqLefn7m/figmacp?node-id=2015-8845",
+    desktop: true,
+  },
+  {
+    slug: "mendly",
+    type: "mobile",
+    name: "Mendly",
+    kind: "Healthcare app",
+    platform: "iOS · 390 × 844",
+    summary:
+      "A family healthcare app from symptom to recovery: symptom search, doctors with ratings and fees, booking a video consult and paying, the call, a digital prescription, medicine delivery from it, a home lab pickup, reports against normal ranges, dose reminders, visits and a parent’s health profile.",
+    style: "Calm and trustworthy: clear blue, mint for good news, amber for things due, coral only for alerts. Nunito, large numbers and doses written the way doctors write them.",
+    facts: [
+      ["Screens", "16 in 4 flows"],
+      ["Components", "7, with variants"],
+      ["Variables", "32 colours, spacing and radii"],
+      ["Text styles", "11 · Nunito"],
+    ],
+    prompts: [
+      "Design a healthcare app like Practo or 1mg: find a doctor, video consult, prescription, medicines, lab tests and records.",
+      "Order exactly the medicines the prescription needs: 1 – 1 – 1 for 3 days is 9 tablets.",
+      "Show lab values against their normal ranges with a plain explanation.",
+    ],
+    accent: "#1d6fe0",
+    figma: "https://www.figma.com/design/uzjFXsA6uxhSuPAqLefn7m/figmacp?node-id=2016-16771",
+  },
+  {
     slug: "forkful",
+    type: "mobile",
     name: "Forkful",
     kind: "Food delivery app",
     platform: "Android · 360 × 800",
@@ -64,6 +184,7 @@ export const projects: ShowcaseProject[] = [
   },
   {
     slug: "partner",
+    type: "web",
     name: "Forkful Partner",
     kind: "Restaurant dashboard",
     platform: "Web · 1440 px",
@@ -87,6 +208,7 @@ export const projects: ShowcaseProject[] = [
   },
   {
     slug: "tradewell",
+    type: "mobile",
     name: "Tradewell",
     kind: "Stock trading app",
     platform: "iOS · 390 × 844 · dark",
@@ -109,6 +231,7 @@ export const projects: ShowcaseProject[] = [
   },
   {
     slug: "haven",
+    type: "mobile",
     name: "Haven",
     kind: "Coffee ordering app",
     platform: "iOS · 390 × 844",
@@ -143,5 +266,3 @@ export function coverOf(slug: ShowcaseProject["slug"]): ShowcaseImage | null {
   const entry = images[slug] as { cover?: ShowcaseImage };
   return entry.cover ?? null;
 }
-
-export const totalScreens = projects.reduce((n, p) => n + images[p.slug].screens.length, 0);

@@ -498,5 +498,589 @@
       "height": 1519,
       "bytes": 180894
     }
+  },
+  "kindred": {
+    "cover": {
+      "src": "/showcase/kindred/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 327229
+    },
+    "screens": [
+      {
+        "name": "Welcome",
+        "src": "/showcase/kindred/01-welcome.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 244552
+      },
+      {
+        "name": "Phone number",
+        "src": "/showcase/kindred/02-phone-number.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 112138
+      },
+      {
+        "name": "Verify code",
+        "src": "/showcase/kindred/03-verify-code.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 84088
+      },
+      {
+        "name": "About you",
+        "src": "/showcase/kindred/04-about-you.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 129029
+      },
+      {
+        "name": "Looking for",
+        "src": "/showcase/kindred/05-looking-for.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 176017
+      },
+      {
+        "name": "Add photos",
+        "src": "/showcase/kindred/06-add-photos.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 246114
+      },
+      {
+        "name": "Interests",
+        "src": "/showcase/kindred/07-interests.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 152096
+      },
+      {
+        "name": "Discover",
+        "src": "/showcase/kindred/08-discover.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 265673
+      },
+      {
+        "name": "Profile detail",
+        "src": "/showcase/kindred/09-profile-detail.jpg",
+        "width": 780,
+        "height": 5648,
+        "bytes": 836569
+      },
+      {
+        "name": "Filters",
+        "src": "/showcase/kindred/10-filters.jpg",
+        "width": 780,
+        "height": 2294,
+        "bytes": 208324
+      },
+      {
+        "name": "It’s a match",
+        "src": "/showcase/kindred/11-its-a-match.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 243849
+      },
+      {
+        "name": "Likes",
+        "src": "/showcase/kindred/12-likes.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 166946
+      },
+      {
+        "name": "Chats",
+        "src": "/showcase/kindred/13-chats.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 189675
+      },
+      {
+        "name": "Chat",
+        "src": "/showcase/kindred/14-chat.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 191950
+      },
+      {
+        "name": "Video call",
+        "src": "/showcase/kindred/15-video-call.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 341427
+      },
+      {
+        "name": "Verify selfie",
+        "src": "/showcase/kindred/16-verify-selfie.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 187472
+      },
+      {
+        "name": "Report",
+        "src": "/showcase/kindred/17-report.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 174641
+      },
+      {
+        "name": "My profile",
+        "src": "/showcase/kindred/18-my-profile.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 179236
+      },
+      {
+        "name": "Kindred Gold",
+        "src": "/showcase/kindred/19-kindred-gold.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 178050
+      }
+    ],
+    "system": {
+      "src": "/showcase/kindred/design-system.jpg",
+      "width": 1500,
+      "height": 1832,
+      "bytes": 218899
+    }
+  },
+  "tripora": {
+    "cover": {
+      "src": "/showcase/tripora/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 323918
+    },
+    "screens": [
+      {
+        "name": "Home",
+        "src": "/showcase/tripora/01-home.jpg",
+        "width": 780,
+        "height": 3382,
+        "bytes": 570018
+      },
+      {
+        "name": "Choose destination",
+        "src": "/showcase/tripora/02-choose-destination.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 171329
+      },
+      {
+        "name": "Pick a date",
+        "src": "/showcase/tripora/03-pick-a-date.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 168412
+      },
+      {
+        "name": "Flight results",
+        "src": "/showcase/tripora/04-flight-results.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 198637
+      },
+      {
+        "name": "Fare options",
+        "src": "/showcase/tripora/05-fare-options.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 194092
+      },
+      {
+        "name": "Seats",
+        "src": "/showcase/tripora/06-seats.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 194566
+      },
+      {
+        "name": "Travellers",
+        "src": "/showcase/tripora/07-travellers.jpg",
+        "width": 780,
+        "height": 2014,
+        "bytes": 229223
+      },
+      {
+        "name": "Review and pay",
+        "src": "/showcase/tripora/08-review-and-pay.jpg",
+        "width": 780,
+        "height": 2350,
+        "bytes": 262877
+      },
+      {
+        "name": "Booking confirmed",
+        "src": "/showcase/tripora/09-booking-confirmed.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 210198
+      },
+      {
+        "name": "Hotel results",
+        "src": "/showcase/tripora/10-hotel-results.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 358484
+      },
+      {
+        "name": "Hotel map",
+        "src": "/showcase/tripora/11-hotel-map.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 174402
+      },
+      {
+        "name": "Hotel detail",
+        "src": "/showcase/tripora/12-hotel-detail.jpg",
+        "width": 780,
+        "height": 2574,
+        "bytes": 430897
+      },
+      {
+        "name": "Choose room",
+        "src": "/showcase/tripora/13-choose-room.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 255516
+      },
+      {
+        "name": "Hotel checkout",
+        "src": "/showcase/tripora/14-hotel-checkout.jpg",
+        "width": 780,
+        "height": 1754,
+        "bytes": 197687
+      },
+      {
+        "name": "My trips",
+        "src": "/showcase/tripora/15-my-trips.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 219608
+      },
+      {
+        "name": "Boarding pass",
+        "src": "/showcase/tripora/16-boarding-pass.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 182050
+      },
+      {
+        "name": "Price alerts",
+        "src": "/showcase/tripora/17-price-alerts.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 186419
+      },
+      {
+        "name": "Home (Arabic)",
+        "src": "/showcase/tripora/18-home-arabic.jpg",
+        "width": 780,
+        "height": 3382,
+        "bytes": 569732
+      },
+      {
+        "name": "Flight results (Arabic)",
+        "src": "/showcase/tripora/19-flight-results-arabic.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 189509
+      }
+    ],
+    "system": {
+      "src": "/showcase/tripora/design-system.jpg",
+      "width": 1500,
+      "height": 1832,
+      "bytes": 232763
+    }
+  },
+  "paylark": {
+    "cover": {
+      "src": "/showcase/paylark/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 261355
+    },
+    "screens": [
+      {
+        "name": "Home",
+        "src": "/showcase/paylark/01-home.jpg",
+        "width": 1440,
+        "height": 7817,
+        "bytes": 1293921
+      },
+      {
+        "name": "Pricing",
+        "src": "/showcase/paylark/02-pricing.jpg",
+        "width": 1440,
+        "height": 3962,
+        "bytes": 574684
+      },
+      {
+        "name": "Sign up",
+        "src": "/showcase/paylark/03-sign-up.jpg",
+        "width": 1440,
+        "height": 1024,
+        "bytes": 161535
+      },
+      {
+        "name": "Home – mobile",
+        "src": "/showcase/paylark/04-home-mobile.jpg",
+        "width": 780,
+        "height": 10608,
+        "bytes": 1106082
+      },
+      {
+        "name": "Menu – mobile",
+        "src": "/showcase/paylark/05-menu-mobile.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 127562
+      },
+      {
+        "name": "Pricing – mobile",
+        "src": "/showcase/paylark/06-pricing-mobile.jpg",
+        "width": 780,
+        "height": 5356,
+        "bytes": 529807
+      },
+      {
+        "name": "Sign up – mobile",
+        "src": "/showcase/paylark/07-sign-up-mobile.jpg",
+        "width": 780,
+        "height": 2002,
+        "bytes": 177971
+      }
+    ],
+    "system": {
+      "src": "/showcase/paylark/design-system.jpg",
+      "width": 1500,
+      "height": 2298,
+      "bytes": 304213
+    }
+  },
+  "plotline": {
+    "cover": {
+      "src": "/showcase/plotline/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 306541
+    },
+    "screens": [
+      {
+        "name": "My work",
+        "src": "/showcase/plotline/01-my-work.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 183052
+      },
+      {
+        "name": "Board",
+        "src": "/showcase/plotline/02-board.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 224015
+      },
+      {
+        "name": "List",
+        "src": "/showcase/plotline/03-list.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 237957
+      },
+      {
+        "name": "Timeline",
+        "src": "/showcase/plotline/04-timeline.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 209927
+      },
+      {
+        "name": "Calendar",
+        "src": "/showcase/plotline/05-calendar.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 158675
+      },
+      {
+        "name": "Issue detail",
+        "src": "/showcase/plotline/06-issue-detail.jpg",
+        "width": 1440,
+        "height": 1270,
+        "bytes": 256806
+      },
+      {
+        "name": "Inbox",
+        "src": "/showcase/plotline/07-inbox.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 221091
+      },
+      {
+        "name": "Command palette",
+        "src": "/showcase/plotline/08-command-palette.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 169213
+      },
+      {
+        "name": "Cycle report",
+        "src": "/showcase/plotline/09-cycle-report.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 164022
+      },
+      {
+        "name": "Members",
+        "src": "/showcase/plotline/10-members.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 159046
+      },
+      {
+        "name": "Board – dark",
+        "src": "/showcase/plotline/11-board-dark.jpg",
+        "width": 1440,
+        "height": 900,
+        "bytes": 208024
+      }
+    ],
+    "system": {
+      "src": "/showcase/plotline/design-system.jpg",
+      "width": 1650,
+      "height": 1382,
+      "bytes": 220705
+    }
+  },
+  "mendly": {
+    "cover": {
+      "src": "/showcase/mendly/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 324139
+    },
+    "screens": [
+      {
+        "name": "Home",
+        "src": "/showcase/mendly/01-home.jpg",
+        "width": 780,
+        "height": 2708,
+        "bytes": 336620
+      },
+      {
+        "name": "Symptom search",
+        "src": "/showcase/mendly/02-symptom-search.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 204207
+      },
+      {
+        "name": "Doctors",
+        "src": "/showcase/mendly/03-doctors.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 231892
+      },
+      {
+        "name": "Doctor profile",
+        "src": "/showcase/mendly/04-doctor-profile.jpg",
+        "width": 780,
+        "height": 2274,
+        "bytes": 342159
+      },
+      {
+        "name": "Book a slot",
+        "src": "/showcase/mendly/05-book-a-slot.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 190508
+      },
+      {
+        "name": "Confirm and pay",
+        "src": "/showcase/mendly/06-confirm-and-pay.jpg",
+        "width": 780,
+        "height": 2035,
+        "bytes": 217812
+      },
+      {
+        "name": "Video consult",
+        "src": "/showcase/mendly/07-video-consult.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 270767
+      },
+      {
+        "name": "Prescription",
+        "src": "/showcase/mendly/08-prescription.jpg",
+        "width": 780,
+        "height": 1944,
+        "bytes": 253273
+      },
+      {
+        "name": "Order medicines",
+        "src": "/showcase/mendly/09-order-medicines.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 214184
+      },
+      {
+        "name": "Lab tests",
+        "src": "/showcase/mendly/10-lab-tests.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 208550
+      },
+      {
+        "name": "Sample pickup",
+        "src": "/showcase/mendly/11-sample-pickup.jpg",
+        "width": 780,
+        "height": 1860,
+        "bytes": 198766
+      },
+      {
+        "name": "Reminders",
+        "src": "/showcase/mendly/12-reminders.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 198586
+      },
+      {
+        "name": "Records",
+        "src": "/showcase/mendly/13-records.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 190307
+      },
+      {
+        "name": "Report",
+        "src": "/showcase/mendly/14-report.jpg",
+        "width": 780,
+        "height": 1770,
+        "bytes": 192707
+      },
+      {
+        "name": "Visits",
+        "src": "/showcase/mendly/15-visits.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 178386
+      },
+      {
+        "name": "Family profile",
+        "src": "/showcase/mendly/16-family-profile.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 190922
+      }
+    ],
+    "system": {
+      "src": "/showcase/mendly/design-system.jpg",
+      "width": 1500,
+      "height": 1338,
+      "bytes": 177678
+    }
   }
 }
