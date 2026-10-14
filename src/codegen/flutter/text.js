@@ -79,6 +79,9 @@ function styleArgs(seg, node, ctx) {
   if (ls && ls.value) {
     const px = ls.unit === 'PIXELS' ? ls.value : (ls.value / 100) * (size || 0);
     args.letterSpacing = ctx.value(Math.round(px * 100) / 100, vars.letterSpacing, 'double');
+  } else {
+    // Theme text styles (inside a Scaffold) carry their own spacing.
+    args.letterSpacing = 0;
   }
   const paint = topPaint(seg.fills);
   if (paint && paint.type === 'SOLID') {

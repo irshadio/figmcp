@@ -162,6 +162,9 @@ test('text: runs, trim, paragraphs, case, spacing and truncation', () => {
   assert.match(upper, /letterSpacing: 0.32/);
   assert.match(upper, /softWrap: false/);
 
+  // Zero spacing is written out, so a theme's spacing is not inherited.
+  assert.match(dart(frame([text('Plain')])).code, /letterSpacing: 0,/);
+
   const soft = dart(frame([text('A B')])).code;
   assert.match(soft, /'A\\nB'/);
 
