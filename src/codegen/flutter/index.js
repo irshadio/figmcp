@@ -8,7 +8,7 @@ import { drawnAsSvg, isTurned, straightLine, visibleChildren } from '../nodes.js
 import { autoLineRatios, segmentsOf } from '../text.js';
 import { visiblePaints } from '../util.js';
 import {
-  call, dColor, dFileName, dIdent, dNum, dType, lambda, list, method, print, raw, str,
+  call, dColor, dFileName, dIdent, dNum, dType, isConst, lambda, list, method, print, raw, str,
 } from './dart.js';
 import {
   alignment, blendMode, blurSigma, blurs, border, borderRadius, boxShadows, composite, gradient, HELPERS,
@@ -93,6 +93,8 @@ class FlutterWriter {
     this.connected = new Map();
     this.imports = new Set(['package:flutter/material.dart']);
     this.helpers = new Set();
+    this.textStyles = new Map();
+    this.textStyleIdents = new Set();
     this.ratios = null;
     this.screen = null;
     this.scrolls = false;
@@ -386,7 +388,32 @@ class FlutterWriter {
       value: (v, name) => this.value(v, name),
       color: (c, o, name) => this.color(c, o, name),
       warn: (message) => this.warn(node, message),
+      textStyle: (name, style) => this.textStyle(name, style),
     };
+  }
+
+  /**
+   * AppTextStyles.<name> for a Figma text style with the TextStyle [style],
+   * or null when the same style already came out differently (a line
+   * height taken from another layer's box).
+   */
+  textStyle(name, style) {
+    const code = print(style);
+    if (this.textStyles.has(name)) {
+      const t = this.textStyles.get(name);
+      return t.code === code ? this.textStyleRef(t) : null;
+    }
+    let ident = dIdent(name, 'style');
+    for (let i = 2; this.textStyleIdents.has(ident); i++) ident = `${dIdent(name, 'style')}${i}`;
+    this.textStyleIdents.add(ident);
+    const t = { ident, code, style, name };
+    this.textStyles.set(name, t);
+    return this.textStyleRef(t);
+  }
+
+  // A style scaled by flutter_screenutil is a getter, so it is not constant.
+  textStyleRef(t) {
+    return raw(`AppTextStyles.${t.ident}`, !this.screenUtil && isConst(t.style));
   }
 
   text(node, size, { keyed = true } = {}) {
@@ -1011,6 +1038,17 @@ export function toFlutter(root, assets, options = {}) {
     '  }',
     '}',
   ];
+  if (writer.textStyles.size) {
+    lines.push('', 'abstract final class AppTextStyles {');
+    for (const t of writer.textStyles.values()) {
+      const style = options.screenUtil ? screenUtil(t.style) : t.style;
+      const body = print(style, 1, isConst(style));
+      lines.push(isConst(style)
+        ? `  static const TextStyle ${t.ident} = ${body}; // ${t.name}`
+        : `  static TextStyle get ${t.ident} => ${body}; // ${t.name}`);
+    }
+    lines.push('}');
+  }
   for (const name of ['innerShadow', 'blend']) {
     if (writer.helpers.has(name)) lines.push('', HELPERS[name]);
   }

@@ -66,6 +66,8 @@ function kitchenSink() {
       fills: [{ type: 'GRADIENT_LINEAR', visible: true, gradientTransform: [[1, 0, 0], [0, 1, 0]],
         gradientStops: [{ position: 0, color: black }, { position: 1, color: { r: 1, g: 0, b: 0, a: 1 } }] }] }] }),
     text('Go', { id: '4:6', x: 150, y: 50, height: 8, leadingTrim: 'CAP_HEIGHT' }, { lineHeight: { unit: 'AUTO' } }),
+    text('Styled', { id: '4:10', x: 0, y: 40 }, { textStyle: 'body/medium' }),
+    text('Styled 2', { id: '4:11', x: 0, y: 60 }, { textStyle: 'body/medium', fills: [solid({ r: 1, g: 0, b: 0, a: 1 })] }),
     { id: '4:7', name: 'Tilted', type: 'RECTANGLE', x: 150, y: 60, width: 20, height: 40, rawWidth: 40, rawHeight: 20,
       transform: [[0, 1], [-1, 0]], fills: [solid()] },
     { id: '4:8', name: 'Mirror', type: 'RECTANGLE', x: 175, y: 60, width: 20, height: 20, rawWidth: 20, rawHeight: 20,
@@ -206,6 +208,7 @@ test('the generated code passes the Flutter analyzer', { timeout: 240000 }, (t) 
   const screen = { ...kitchenSink(), width: 393, height: 1400, numberOfFixedChildren: 1 };
   const codes = [dart(data.frames[0].tree).code, dart(kitchenSink(), { keys: true }).code, dart(kitchenSink()).code,
     dart(screen).code, dart(screen, { keys: true }).code];
+  assert.match(codes[2], /AppTextStyles\.bodyMedium/);
   for (const code of codes) {
     const issues = analyzeCode(flutter, code, dir);
     assert.deepEqual(issues, [], `analyzer issues:\n${JSON.stringify(issues, null, 2)}\n${code}`);
@@ -319,4 +322,28 @@ test('screenutil output scales lengths by axis and keeps ratios', () => {
   assert.match(code, /blurRadius: [\d.]+,/, 'shadows are not scaled');
   assert.match(code, /width: 1[,)]/, 'stroke widths are not scaled');
   assert.doesNotMatch(dart(root).code, /\.w\b|\.sp\b/);
+});
+
+test('a Figma text style becomes a named TextStyle', () => {
+  const styled = (id, y, seg = {}, extra = {}) => text('Hi', { id, x: 0, y, ...extra }, { textStyle: 'heading/h2', ...seg });
+  const both = dart(frame([styled('2:1', 0), styled('2:2', 30, { fills: [solid({ r: 1, g: 0, b: 0, a: 1 })] })]));
+  assert.match(both.code, /static const TextStyle headingH2 = TextStyle\(\s+fontFamily: 'Inter',\s+fontSize: 16,/);
+  assert.equal(both.code.match(/static const TextStyle/g).length, 1);
+  assert.equal(both.code.match(/AppTextStyles\.headingH2\.copyWith\(color: Color\(0xFF000000\)\)/g).length, 1);
+  assert.match(both.code, /AppTextStyles\.headingH2\.copyWith\(color: Color\(0xFFFF0000\)\)/);
+  assert.doesNotMatch(both.code, /\/\/ heading\/h2[\s\S]*fontSize: 16,\s+fontWeight[\s\S]*class/);
+
+  // The same style with another line height (from another layer's box) stays inline.
+  const clash = dart(frame([styled('2:1', 0), styled('2:2', 30, { lineHeight: { unit: 'PIXELS', value: 28 } })]));
+  assert.equal(clash.code.match(/AppTextStyles\.headingH2/g).length, 1);
+  assert.match(clash.code, /height: 1.75,/);
+
+  // Mixed styles in one text are left inline.
+  const mixed = dart(frame([{ ...text('Ab'), segments: [
+    { ...text('A').segments[0], characters: 'A', textStyle: 'a' }, { ...text('b').segments[0], characters: 'b', textStyle: 'b' }] }]));
+  assert.doesNotMatch(mixed.code, /AppTextStyles/);
+
+  const scaled = dart(frame([styled('2:1', 0)]), { screenUtil: true });
+  assert.match(scaled.code, /static TextStyle get headingH2 => TextStyle\(\s+fontFamily: 'Inter',\s+fontSize: 16.sp,/);
+  assert.doesNotMatch(scaled.code, /const Text\(/);
 });

@@ -27,7 +27,8 @@ const FLUTTER_GUIDANCE =
   'logical pixels at the design size: sizes, spacing, radii, colours, fonts ' +
   'and line heights (height with TextLeadingDistribution.even reproduces ' +
   'Figma\'s line boxes). DesignTokens holds each design variable used, with ' +
-  'its Figma name: use the project\'s token of that name. Auto-layout frames ' +
+  'its Figma name: use the project\'s token of that name. AppTextStyles holds ' +
+  'each Figma text style used: map it to the app\'s text theme. Auto-layout frames ' +
   'are Rows, Columns and Wraps; other frames are Stacks whose Positioned ' +
   'children follow the Figma constraints. A phone-sized frame is drawn as a ' +
   'screen: it fills the screen, keeps the shortest height its layers fit ' +
