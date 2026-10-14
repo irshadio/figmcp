@@ -356,5 +356,147 @@
       "height": 1360,
       "bytes": 0
     }
+  },
+  "voltline": {
+    "cover": {
+      "src": "/showcase/voltline/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 331510
+    },
+    "screens": [
+      {
+        "name": "Sign in",
+        "src": "/showcase/voltline/01-sign-in.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 141405
+      },
+      {
+        "name": "Create account",
+        "src": "/showcase/voltline/02-create-account.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 171559
+      },
+      {
+        "name": "Verify mobile",
+        "src": "/showcase/voltline/03-verify-mobile.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 105467
+      },
+      {
+        "name": "Home",
+        "src": "/showcase/voltline/04-home.jpg",
+        "width": 780,
+        "height": 7942,
+        "bytes": 1259589
+      },
+      {
+        "name": "Categories",
+        "src": "/showcase/voltline/05-categories.jpg",
+        "width": 780,
+        "height": 2006,
+        "bytes": 220929
+      },
+      {
+        "name": "Product listing",
+        "src": "/showcase/voltline/06-product-listing.jpg",
+        "width": 780,
+        "height": 2724,
+        "bytes": 479435
+      },
+      {
+        "name": "Filters",
+        "src": "/showcase/voltline/07-filters.jpg",
+        "width": 780,
+        "height": 2264,
+        "bytes": 195587
+      },
+      {
+        "name": "Search",
+        "src": "/showcase/voltline/08-search.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 157159
+      },
+      {
+        "name": "Product detail",
+        "src": "/showcase/voltline/09-product-detail.jpg",
+        "width": 780,
+        "height": 4172,
+        "bytes": 584154
+      },
+      {
+        "name": "Cart",
+        "src": "/showcase/voltline/10-cart.jpg",
+        "width": 780,
+        "height": 2260,
+        "bytes": 272201
+      },
+      {
+        "name": "Choose address",
+        "src": "/showcase/voltline/11-choose-address.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 172776
+      },
+      {
+        "name": "Add address",
+        "src": "/showcase/voltline/12-add-address.jpg",
+        "width": 780,
+        "height": 1868,
+        "bytes": 172513
+      },
+      {
+        "name": "Delivery method",
+        "src": "/showcase/voltline/13-delivery-method.jpg",
+        "width": 780,
+        "height": 1856,
+        "bytes": 214096
+      },
+      {
+        "name": "Payment",
+        "src": "/showcase/voltline/14-payment.jpg",
+        "width": 780,
+        "height": 2332,
+        "bytes": 276418
+      },
+      {
+        "name": "Order placed",
+        "src": "/showcase/voltline/15-order-placed.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 164210
+      },
+      {
+        "name": "Order tracking",
+        "src": "/showcase/voltline/16-order-tracking.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 155609
+      },
+      {
+        "name": "Account",
+        "src": "/showcase/voltline/17-account.jpg",
+        "width": 780,
+        "height": 2016,
+        "bytes": 187313
+      },
+      {
+        "name": "Wishlist",
+        "src": "/showcase/voltline/18-wishlist.jpg",
+        "width": 780,
+        "height": 1942,
+        "bytes": 304665
+      }
+    ],
+    "system": {
+      "src": "/showcase/voltline/design-system.jpg",
+      "width": 1500,
+      "height": 1519,
+      "bytes": 180894
+    }
   }
 }

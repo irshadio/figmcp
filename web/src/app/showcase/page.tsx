@@ -12,7 +12,7 @@ export const metadata: Metadata = pageMeta({
   title: "Showcase",
   path: "/showcase",
   description:
-    "Four app designs built in Figma by a coding agent through figmcp: a food delivery app, a restaurant dashboard, a stock trading app and a coffee ordering app, each with its own design system.",
+    "Five app designs built in Figma by a coding agent through figmcp: an electronics store, a food delivery app, a restaurant dashboard, a stock trading app and a coffee ordering app, each with its own design system.",
 });
 
 function FigmaIcon() {
@@ -62,7 +62,7 @@ export default function Page() {
             {[
               [String(projects.length), "projects"],
               [String(totalScreens), "screens"],
-              ["4", "design systems"],
+              [String(projects.length), "design systems"],
             ].map(([n, l]) => (
               <div key={l} className="rounded-2xl border border-line bg-white/[0.02] px-4 py-4">
                 <div className="text-3xl font-semibold tracking-tight text-fg">{n}</div>

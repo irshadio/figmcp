@@ -19,6 +19,28 @@ export type ShowcaseProject = {
 
 export const projects: ShowcaseProject[] = [
   {
+    slug: "voltline",
+    name: "Voltline",
+    kind: "Electronics store app",
+    platform: "iOS · 390 × 844",
+    summary:
+      "A full Magento-style shop: sign-in with OTP, a CMS home with banners and category scrollers, layered navigation, a configurable product, cart rules with a coupon, checkout with a map pin, delivery slots and payment, then order tracking.",
+    style: "Light and retail: Plus Jakarta Sans, teal for actions, red only for discounts, prices in AED with VAT included.",
+    facts: [
+      ["Screens", "18 in 4 flows"],
+      ["Components", "7 sets with variants"],
+      ["Variables", "30 colours, spacing and radii"],
+      ["Text styles", "11 · Plus Jakarta Sans"],
+    ],
+    prompts: [
+      "Design a full electronics store app for the UAE, with the screens a Magento store needs: auth, CMS home, cart, checkout, address, map and delivery.",
+      "The home page needs more content: category product scrollers, a 2×2 offer grid and single banners.",
+      "Make the cart, checkout and order totals agree, with the coupon, express delivery and VAT.",
+    ],
+    accent: "#12a594",
+    figma: "https://www.figma.com/design/uzjFXsA6uxhSuPAqLefn7m/figmacp?node-id=2002-9545",
+  },
+  {
     slug: "forkful",
     name: "Forkful",
     kind: "Food delivery app",
