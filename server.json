@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.irshadio/figmcp",
+  "title": "figmcp",
+  "description": "Local Figma MCP server: Figma frames to Flutter and React code, and design in Figma. No API limits.",
+  "websiteUrl": "https://figmcp.web.app",
+  "repository": {
+    "url": "https://github.com/irshadio/figmcp",
+    "source": "github"
+  },
+  "version": "1.4.2",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@irshad.io/figma-local-mcp",
+      "version": "1.4.2",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

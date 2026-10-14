@@ -2,6 +2,10 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.4.2",
+    notes: [{ type: "improved", text: "Listed in the official MCP Registry as io.github.irshadio/figmcp." }],
+  },
+  {
     version: "1.4.1",
     notes: [
       { type: "improved", text: "New name: figmcp. The plugin shows as figmcp in Figma; the npm package and setup command stay the same." },
