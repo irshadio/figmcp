@@ -8,6 +8,7 @@
 //          [--export <design export.json>] [--fonts <dir>]... [--fetch-fonts]
 //          [--out <dir>] [--flutter <path>] [--viewport <width>x<height>]
 //          [--code <design.dart> [--assets <assets.json>]]
+//          [--project <flutter project> --file <lib/…dart> --class <Widget>]
 // Reads live through the running MCP server (the plugin must be connected),
 // a saved snapshot with --snapshot, or a design export JSON with --export.
 // With --viewport the design is laid out on a screen of that size instead:
@@ -16,6 +17,11 @@
 // example what get_design_context returned, with its asset map
 // { "assets/…": "/path/on/disk" }) instead of generating it; that code has
 // no layer keys, so only pixels, runtime errors and the analyzer are checked.
+// With --project it checks a widget of a Flutter project as the project
+// builds it (its packages, assets and flutter_screenutil scaling, inside a
+// MaterialApp): a test file is written into the project's test folder for
+// the run and removed after; like --code, only pixels, runtime errors and
+// the analyzer are checked.
 // Fonts are found in the --fonts folders and the system font folders;
 // --fetch-fonts downloads missing Google Fonts families into the data folder.
 import { spawnSync } from 'node:child_process';
@@ -50,6 +56,9 @@ function args(argv) {
     else if (a === '--fetch-fonts') out.fetchFonts = true;
     else if (a === '--code') out.code = argv[++i];
     else if (a === '--assets') out.assets = argv[++i];
+    else if (a === '--project') out.project = argv[++i];
+    else if (a === '--file') out.file = argv[++i];
+    else if (a === '--class') out.className = argv[++i];
     else if (a === '--viewport') {
       const m = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/.exec(argv[++i] || '');
       if (!m) throw new Error('--viewport takes <width>x<height>, e.g. 360x780');
@@ -168,22 +177,22 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:figma_check/design.dart';
+__IMPORTS__
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets('render the design', (tester) async {
-    final config = jsonDecode(File('check_config.json').readAsStringSync()) as Map<String, dynamic>;
+    final config = jsonDecode(File('__CONFIG__').readAsStringSync()) as Map<String, dynamic>;
     final errors = <String>[];
     final previous = FlutterError.onError;
     FlutterError.onError = (details) {
       // Name the widget Flutter blames: its line in lib/design.dart.
-      final where = RegExp(r'design\\.dart:(\\d+):\\d+').firstMatch(details.toString());
-      final line = where == null ? '' : ' (lib/design.dart line \${where.group(1)})';
+      final where = RegExp(r'__FILE_RE__:(\\d+):\\d+').firstMatch(details.toString());
+      final line = where == null ? '' : ' (__FILE__ line \${where.group(1)})';
       errors.add(details.exceptionAsString().split('\\n').first + line);
     };
     addTearDown(tester.view.reset);
@@ -215,7 +224,7 @@ void main() {
               style: const TextStyle(color: Color(0xFF000000)),
               child: Align(
                 alignment: Alignment.topLeft,
-                child: RepaintBoundary(key: boundary, child: const __CLASS__()),
+                child: RepaintBoundary(key: boundary, child: __WIDGET__),
               ),
             ),
           ),
@@ -269,15 +278,60 @@ void main() {
 }
 `;
 
-/** Analyzer issues of lib/design.dart in the scratch project: [{ severity, message, line, code }]. */
-export function analyze(flutter) {
-  const run = spawnSync(flutter, ['analyze', '--no-pub', 'lib/design.dart'], { cwd: HARNESS, encoding: 'utf8' });
+/** Analyzer issues of [file] in [dir] (default: the scratch project's lib/design.dart): [{ severity, message, line, code }]. */
+export function analyze(flutter, file = 'lib/design.dart', dir = HARNESS) {
+  const run = spawnSync(flutter, ['analyze', '--no-pub', file], { cwd: dir, encoding: 'utf8' });
   const issues = [];
+  const at = file.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const pattern = new RegExp(`^\\s*(error|warning|info)\\s+•\\s+(.+?)\\s+•\\s+${at}:(\\d+):(\\d+)\\s+•\\s+(\\S+)`);
   for (const line of `${run.stdout}\n${run.stderr}`.split('\n')) {
-    const m = /^\s*(error|warning|info)\s+•\s+(.+?)\s+•\s+lib\/design\.dart:(\d+):(\d+)\s+•\s+(\S+)/.exec(line);
+    const m = pattern.exec(line);
     if (m) issues.push({ severity: m[1], message: m[2], line: Number(m[3]), code: m[5] });
   }
   return issues;
+}
+
+const PROJECT_TEST = 'test/figmcp_check_test.dart';
+
+function testSource({ imports, config, file, widget }) {
+  const fileRe = file.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const values = { __IMPORTS__: imports, __CONFIG__: config, __FILE_RE__: fileRe, __FILE__: file, __WIDGET__: widget };
+  return TEST.replace(/__(?:IMPORTS|CONFIG|FILE_RE|FILE|WIDGET)__/g, (key) => values[key]);
+}
+
+/**
+ * The widget [opts.className] of [opts.file] in the Flutter project
+ * [opts.project]: { dir, file, code, className, assets, imports, widget }.
+ */
+function projectRun(opts, tree) {
+  const dir = path.resolve(opts.project);
+  const pubspec = fs.readFileSync(path.join(dir, 'pubspec.yaml'), 'utf8');
+  const name = (/^name:\s*([A-Za-z0-9_]+)/m.exec(pubspec) || [])[1];
+  if (!name) throw new Error(`${dir}/pubspec.yaml has no name`);
+  if (!opts.file) throw new Error('--project needs --file <lib/…dart>');
+  const file = path.relative(dir, path.resolve(dir, opts.file)).split(path.sep).join('/');
+  if (!file.startsWith('lib/') || !file.endsWith('.dart')) throw new Error('--file must be a .dart file under lib/');
+  const code = fs.readFileSync(path.join(dir, file), 'utf8');
+  const className = opts.className || (/class (\w+) extends (?:StatelessWidget|StatefulWidget|ConsumerWidget|HookWidget)/.exec(code) || [])[1];
+  if (!className) throw new Error(`${file} has no widget class; pass --class`);
+  if (!new RegExp(`class ${className}\\b`).test(code)) throw new Error(`${file} has no class ${className}`);
+  const assets = [...new Set([...code.matchAll(/['"](assets\/[^'"$]+\.(?:png|jpe?g|webp|gif|svg))['"]/gi)].map((m) => m[1]))]
+    .filter((a) => fs.existsSync(path.join(dir, a)));
+  const screenUtil = /^\s+flutter_screenutil:/m.test(pubspec);
+  if (!/^\s+flutter_test:/m.test(pubspec)) throw new Error(`${dir}/pubspec.yaml has no flutter_test dev dependency, which flutter test needs`);
+  if (!/^\s+flutter_svg:/m.test(pubspec)) throw new Error(`${dir}/pubspec.yaml does not depend on flutter_svg, which the check needs`);
+  const imports = [
+    "import 'package:flutter/material.dart';",
+    `import 'package:${name}/${file.slice('lib/'.length)}';`,
+    ...(screenUtil ? ["import 'package:flutter_screenutil/flutter_screenutil.dart';"] : []),
+  ].join('\n');
+  const widget = () => {
+    const app = `MaterialApp(debugShowCheckedModeBanner: false, home: Material(type: MaterialType.transparency, child: ${className}()))`;
+    return screenUtil
+      ? `ScreenUtilInit(designSize: const Size(${tree.width}, ${tree.height}), minTextAdapt: true, builder: (context, child) => ${app})`
+      : app;
+  };
+  return { dir, file, code, className, assets, imports, widget };
 }
 
 async function main() {
@@ -291,12 +345,18 @@ async function main() {
 
   // The code to check (with a key per layer when generated here) and its
   // assets: { asset path: bytes }.
+  let project = null;
   let code;
   let plainCode;
   let className;
   let generated = null;
   const assetFiles = {};
-  if (opts.code) {
+  let run = null;
+  if (opts.project) {
+    project = projectRun(opts, tree);
+    code = project.code;
+    className = project.className;
+  } else if (opts.code) {
     code = fs.readFileSync(opts.code, 'utf8');
     plainCode = code;
     className = (/class (\w+) extends StatelessWidget/.exec(code) || [])[1];
@@ -330,23 +390,34 @@ async function main() {
     for (const [asset, id] of Object.entries(generated.assets)) assetFiles[asset] = bytes.get(id);
   }
 
-  const assetDirs = [...new Set([ASSET_DIR, ...Object.keys(assetFiles).map((a) => path.posix.dirname(a))])];
-  harness(flutter, HARNESS_DIR, assetDirs);
-  for (const dir of assetDirs) {
-    fs.rmSync(path.join(HARNESS, dir), { recursive: true, force: true });
-    fs.mkdirSync(path.join(HARNESS, dir), { recursive: true });
+  let issues;
+  if (project) {
+    if (!fs.existsSync(path.join(project.dir, '.dart_tool', 'package_config.json'))) {
+      const got = spawnSync(flutter, ['pub', 'get'], { cwd: project.dir, encoding: 'utf8' });
+      if (got.status !== 0) throw new Error(`flutter pub get failed in ${project.dir}:\n${got.stderr || got.stdout}`);
+    }
+    issues = analyze(flutter, project.file, project.dir);
+    fs.writeFileSync(path.join(out, 'design.dart'), code);
+  } else {
+    const assetDirs = [...new Set([ASSET_DIR, ...Object.keys(assetFiles).map((a) => path.posix.dirname(a))])];
+    harness(flutter, HARNESS_DIR, assetDirs);
+    for (const dir of assetDirs) {
+      fs.rmSync(path.join(HARNESS, dir), { recursive: true, force: true });
+      fs.mkdirSync(path.join(HARNESS, dir), { recursive: true });
+    }
+    for (const [asset, data] of Object.entries(assetFiles)) fs.writeFileSync(path.join(HARNESS, asset), data);
+    fs.writeFileSync(path.join(HARNESS, 'lib', 'design.dart'), plainCode);
+    issues = analyze(flutter);
+    fs.writeFileSync(path.join(out, 'design.dart'), plainCode);
+    fs.writeFileSync(path.join(HARNESS, 'lib', 'design.dart'), code);
   }
-  for (const [asset, data] of Object.entries(assetFiles)) fs.writeFileSync(path.join(HARNESS, asset), data);
-  fs.writeFileSync(path.join(HARNESS, 'lib', 'design.dart'), plainCode);
-  const issues = analyze(flutter);
-  fs.writeFileSync(path.join(out, 'design.dart'), plainCode);
-  fs.writeFileSync(path.join(HARNESS, 'lib', 'design.dart'), code);
 
   // Fonts: the given folders, the system folders, and the download cache.
   const used = [...families(tree)];
   if (opts.fetchFonts) {
     for (const family of used) {
-      if (!familyFiles(family, fontFiles([...opts.fonts, ...SYSTEM_FONTS, FONT_CACHE])).length) {
+      if (!familyFiles(family, fontFiles([...opts.fonts, ...(opts.project ? [path.join(path.resolve(opts.project), 'assets', 'fonts')] : []),
+        ...SYSTEM_FONTS, FONT_CACHE])).length) {
         try {
           await fetchGoogleFont(family);
         } catch (e) {
@@ -355,7 +426,8 @@ async function main() {
       }
     }
   }
-  const files = fontFiles([...opts.fonts, ...SYSTEM_FONTS, FONT_CACHE]);
+  const fontDirs = [...opts.fonts, ...(project ? [path.join(project.dir, 'assets', 'fonts')] : [])];
+  const files = fontFiles([...fontDirs, ...SYSTEM_FONTS, FONT_CACHE]);
   const fonts = {};
   for (const family of used) {
     const hit = familyFiles(family, files);
@@ -364,17 +436,39 @@ async function main() {
 
   const boxes = expectedBoxes(tree);
   const [width, height] = opts.viewport || [tree.width, tree.height];
-  fs.writeFileSync(path.join(HARNESS, 'check_config.json'), JSON.stringify({
+  const assetList = project ? project.assets : Object.keys(assetFiles);
+  const config = JSON.stringify({
     width, height, padding: [0, 0],
     fonts, ids: generated ? boxes.map((b) => b.id) : [], out,
-    images: Object.keys(assetFiles).filter((a) => !a.endsWith('.svg')),
-    svgs: Object.keys(assetFiles).filter((a) => a.endsWith('.svg')),
-  }));
-  writeIfChanged(path.join(HARNESS, 'test', 'render_test.dart'), TEST.replace('__CLASS__', className));
+    images: assetList.filter((a) => !a.endsWith('.svg')),
+    svgs: assetList.filter((a) => a.endsWith('.svg')),
+  });
   for (const stale of ['result.json', 'report.json', 'rendered.png', 'diff.png']) fs.rmSync(path.join(out, stale), { force: true });
-  const run = spawnSync(flutter, ['test', '--no-pub', 'test/render_test.dart'], { cwd: HARNESS, encoding: 'utf8', timeout: 600000 });
+  if (project) {
+    const testFile = path.join(project.dir, PROJECT_TEST);
+    const configFile = path.join(project.dir, '.dart_tool', 'figmcp_check.json');
+    fs.writeFileSync(configFile, config);
+    fs.writeFileSync(testFile, testSource({
+      imports: project.imports, config: configFile, file: project.file, widget: project.widget(width, height),
+    }));
+    try {
+      run = spawnSync(flutter, ['test', '--no-pub', PROJECT_TEST], { cwd: project.dir, encoding: 'utf8', timeout: 600000 });
+    } finally {
+      fs.rmSync(testFile, { force: true });
+      fs.rmSync(configFile, { force: true });
+    }
+  } else {
+    fs.writeFileSync(path.join(HARNESS, 'check_config.json'), config);
+    writeIfChanged(path.join(HARNESS, 'test', 'render_test.dart'), testSource({
+      imports: "import 'package:figma_check/design.dart';", config: 'check_config.json',
+      file: 'lib/design.dart', widget: `const ${className}()`,
+    }));
+    run = spawnSync(flutter, ['test', '--no-pub', 'test/render_test.dart'], { cwd: HARNESS, encoding: 'utf8', timeout: 600000 });
+  }
   if (!fs.existsSync(path.join(out, 'result.json'))) {
-    throw new Error(`flutter test did not render the design:\n${(run.stdout || '').slice(-6000)}\n${run.stderr || ''}`);
+    const errors = issues.filter((i) => i.severity === 'error');
+    const listed = errors.length ? `Analyzer errors:\n${errors.map((i) => `- line ${i.line}: ${i.message} (${i.code})`).join('\n')}\n\n` : '';
+    throw new Error(`flutter test did not render the design:\n${listed}${(run.stdout || '').slice(-6000)}\n${run.stderr || ''}`);
   }
   const measured = JSON.parse(fs.readFileSync(path.join(out, 'result.json'), 'utf8'));
   const rects = {};
