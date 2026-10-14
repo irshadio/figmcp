@@ -1,8 +1,8 @@
 <div align="center">
 
-<a href="https://figmcp.web.app"><img src="https://figmcp.web.app/og.png" alt="Figma Local MCP: design to code, locally" width="100%"></a>
+<a href="https://figmcp.web.app"><img src="https://figmcp.web.app/og.png" alt="figmcp: design to code, locally" width="100%"></a>
 
-<h1>Figma Local MCP</h1>
+<h1>figmcp</h1>
 
 <p><strong>Design to code, locally.</strong><br>
 Turn Figma frames into Flutter and React code, and let your coding agent design in Figma.<br>
@@ -26,7 +26,7 @@ No Figma API calls. No rate limits.</p>
 
 ---
 
-Figma Local MCP is an MCP server that gives your coding agent the Figma file you have open in Figma Desktop. A development plugin streams the file to a server on your machine over localhost, so reads never touch the Figma REST API: no access token, no quota, no rate limit.
+figmcp is a local MCP server that gives your coding agent the Figma file you have open in Figma Desktop. A development plugin streams the file to a server on your machine over localhost, so reads never touch the Figma REST API: no access token, no quota, no rate limit.
 
 - **Design to code.** Flutter widgets for Flutter projects, React + Tailwind for everything else, with the assets and a screenshot to compare against.
 - **Design in Figma.** The agent creates and edits frames in the open file with Figma plugin API scripts, one undo step per script.
@@ -60,7 +60,7 @@ On macOS, press <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>G</kbd> in the file picker an
 
 **3. Pair and ask**
 
-Restart your coding agent. In Figma Desktop, run **Plugins › Development › Figma Local MCP** and enter the pairing code. The dot turns green once it's connected. Then select a frame and ask:
+Restart your coding agent. In Figma Desktop, run **Plugins › Development › figmcp** and enter the pairing code. The dot turns green once it's connected. Then select a frame and ask:
 
 ```
 implement the selected Figma frame

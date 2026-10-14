@@ -7,7 +7,7 @@ export const metadata: Metadata = pageMeta({
   title: "Changelog",
   path: "/docs/changelog",
   description:
-    "What's new in each release of Figma Local MCP, the local Figma MCP server for Flutter and React code.",
+    "What's new in each release of figmcp, the local Figma MCP server for Flutter and React code.",
 });
 
 async function publishDates(): Promise<Record<string, string>> {

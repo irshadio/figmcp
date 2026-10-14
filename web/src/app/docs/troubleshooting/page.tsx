@@ -7,7 +7,7 @@ export const metadata: Metadata = pageMeta({
   title: "Troubleshooting",
   path: "/docs/troubleshooting",
   description:
-    "Fix common Figma Local MCP issues: the plugin dot stays grey, a lost pairing code, port 3947 in use or edits failing in Dev Mode.",
+    "Fix common figmcp issues: the plugin dot stays grey, a lost pairing code, port 3947 in use or edits failing in Dev Mode.",
 });
 
 export default function Page() {

@@ -5,7 +5,7 @@ export const metadata: Metadata = pageMeta({
   title: "Tools",
   path: "/docs/tools",
   description:
-    "Reference for every Figma Local MCP tool: get_design_context, get_screenshot, get_metadata, get_variable_defs, download_assets, use_figma, Code Connect and more.",
+    "Reference for every figmcp tool: get_design_context, get_screenshot, get_metadata, get_variable_defs, download_assets, use_figma, Code Connect and more.",
 });
 
 type Arg = [name: string, desc: string];

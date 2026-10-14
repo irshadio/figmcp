@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { site } from "@/lib/site";
+import { CookieSettings } from "./cookie-settings";
 import { GitHubIcon, NpmIcon } from "./icons";
 import { LogoMark } from "./logo";
 
@@ -76,7 +77,13 @@ export function Footer() {
         ))}
       </div>
       <div className="mx-auto flex max-w-7xl flex-col gap-2 border-t border-line px-4 py-6 text-xs text-dim sm:flex-row sm:justify-between sm:px-6">
-        <span>© {new Date().getFullYear()} irshadio</span>
+        <span className="flex flex-wrap gap-x-4 gap-y-1">
+          <span>© {new Date().getFullYear()} irshadio</span>
+          <Link href="/privacy" className="hover:text-muted">
+            Privacy
+          </Link>
+          <CookieSettings className="hover:text-muted" />
+        </span>
         <span>Not affiliated with Figma, Inc.</span>
       </div>
     </footer>

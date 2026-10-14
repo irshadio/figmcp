@@ -31,7 +31,7 @@ export function registerStatusTools(server, bridge, source) {
   }, guard(async () => {
     const info = await source.info();
     return [text({
-      plugin: info ? 'connected' : 'not connected (run Plugins > Development > Figma Local MCP in Figma Desktop)',
+      plugin: info ? 'connected' : 'not connected (run Plugins > Development > figmcp in Figma Desktop)',
       pairingCode: bridge.pairing,
       role: bridge.owner ? `serving on port ${bridge.port}` : `using the server on port ${bridge.port}`,
       user: info ? info.user : null,

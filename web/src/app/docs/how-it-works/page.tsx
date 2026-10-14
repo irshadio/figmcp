@@ -7,7 +7,7 @@ export const metadata: Metadata = pageMeta({
   title: "How it works",
   path: "/docs/how-it-works",
   description:
-    "How Figma Local MCP connects Figma Desktop to your coding agent: a development plugin, a local WebSocket on 127.0.0.1 and an MCP server, with no Figma API calls.",
+    "How figmcp connects Figma Desktop to your coding agent: a development plugin, a local WebSocket on 127.0.0.1 and an MCP server, with no Figma API calls.",
 });
 
 export default function Page() {

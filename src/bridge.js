@@ -251,7 +251,7 @@ export class Bridge {
     if (!this.sockets.length && !(wait && await this.waitForPlugin(wait))) {
       throw new PluginUnavailable(
         'The Figma plugin is not connected. In Figma Desktop run Plugins > ' +
-        'Development > Figma Local MCP and keep its window open.');
+        'Development > figmcp and keep its window open.');
     }
     const ws = this.sockets[this.sockets.length - 1];
     const id = this.nextId++;

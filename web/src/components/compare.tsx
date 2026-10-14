@@ -20,7 +20,7 @@ export function Compare() {
           <thead>
             <tr className="border-b border-line bg-white/[0.02]">
               <th className="w-[26%] px-5 py-4 font-medium text-dim" />
-              <th className="w-[37%] border-x border-sky/20 bg-sky/[0.06] px-5 py-4 font-medium text-fg">Figma Local MCP</th>
+              <th className="w-[37%] border-x border-sky/20 bg-sky/[0.06] px-5 py-4 font-medium text-fg">figmcp</th>
               <th className="w-[37%] px-5 py-4 font-medium text-muted">Figma&apos;s MCP server</th>
             </tr>
           </thead>

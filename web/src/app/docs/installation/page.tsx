@@ -10,7 +10,7 @@ export const metadata: Metadata = pageMeta({
   title: "Installation",
   path: "/docs/installation",
   description:
-    "Install Figma Local MCP in one command on macOS or Windows: run setup, import the Figma plugin and pair it with your coding agent.",
+    "Install figmcp in one command on macOS or Windows: run setup, import the Figma plugin and pair it with your coding agent.",
 });
 
 export default function Page() {
@@ -72,7 +72,7 @@ export default function Page() {
         <Step title="Pair and connect">
           <p>
             Restart your coding agent so it loads the server. In Figma Desktop, open a design and run{" "}
-            <strong>Plugins › Development › Figma Local MCP</strong>. Enter the pairing code. The dot turns green once
+            <strong>Plugins › Development › figmcp</strong>. Enter the pairing code. The dot turns green once
             it&apos;s connected.
           </p>
           <Callout>

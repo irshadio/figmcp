@@ -2,6 +2,12 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.4.1",
+    notes: [
+      { type: "improved", text: "New name: figmcp. The plugin shows as figmcp in Figma; the npm package and setup command stay the same." },
+    ],
+  },
+  {
     version: "1.4.0",
     notes: [
       { type: "new", text: "Design in Figma: use_figma runs Figma plugin API scripts to create and edit frames in the open file, one undo step per script." },

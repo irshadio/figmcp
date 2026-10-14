@@ -150,7 +150,7 @@ const jsonLd = {
     {
       "@type": "SoftwareApplication",
       name: site.name,
-      alternateName: "figmcp",
+      alternateName: "Figma Local MCP",
       description: site.description,
       url: site.url,
       applicationCategory: "DeveloperApplication",
@@ -163,7 +163,7 @@ const jsonLd = {
       author: { "@type": "Person", name: "irshadio", url: site.github },
       sameAs: [site.github, site.npm],
     },
-    { "@type": "WebSite", name: site.name, alternateName: "figmcp", url: site.url },
+    { "@type": "WebSite", name: site.name, alternateName: "Figma Local MCP", url: site.url },
   ],
 };
 
@@ -398,7 +398,7 @@ export default function Home() {
               {
                 n: "03",
                 title: "Pair and ask",
-                text: "Run Plugins › Development › Figma Local MCP, enter the code and wait for the green dot. Then ask your agent.",
+                text: "Run Plugins › Development › figmcp, enter the code and wait for the green dot. Then ask your agent.",
                 cmd: "implement the selected Figma frame",
               },
             ].map((s, i) => (

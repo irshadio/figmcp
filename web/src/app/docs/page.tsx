@@ -8,7 +8,7 @@ export const metadata: Metadata = pageMeta({
   title: "Introduction",
   path: "/docs",
   description:
-    "Figma Local MCP gives Claude Code, Cursor and other coding agents the Figma file open in Figma Desktop: Figma to Flutter and React code, no API limits.",
+    "figmcp gives Claude Code, Cursor and other coding agents the Figma file open in Figma Desktop: Figma to Flutter and React code, no API limits.",
 });
 
 const cards = [

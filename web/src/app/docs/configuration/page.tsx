@@ -7,7 +7,7 @@ export const metadata: Metadata = pageMeta({
   title: "Configuration",
   path: "/docs/configuration",
   description:
-    "Set up Figma Local MCP in Claude Code, Cursor, Claude Desktop or any MCP client on macOS and Windows, plus environment variables.",
+    "Set up figmcp in Claude Code, Cursor, Claude Desktop or any MCP client on macOS and Windows, plus environment variables.",
 });
 
 type Platform = "mac" | "win";
