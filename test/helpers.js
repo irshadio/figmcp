@@ -84,7 +84,7 @@ export function fakePlugin(port, { origin, code, truncated = false } = {}) {
         case 'snapshot':
           return reply({ ...data, frames: [{ ...data.frames[0], tree: findNode(tree, p.ids[0]) }] });
         case 'run':
-          if (p.code.includes('throw')) {
+          if (p.code.trim().startsWith('throw')) {
             return ws.send(JSON.stringify({ type: 'response', id: msg.id, error: 'boom' }));
           }
           return reply({ result: { id: '20:1', name: 'Card', type: 'FRAME' }, logs: ['made it'] });

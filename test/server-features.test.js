@@ -152,3 +152,30 @@ test('verify_code renders the generated Flutter code and compares it with the de
   assert.ok(result.content.some((c) => c.type === 'image'), 'includes the diff');
   await transport.close();
 });
+
+test('place_image sends a local image to the plugin and refuses other files', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client, transport } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  assert.equal(await plugin.ready(), true);
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  fs.writeFileSync(path.join(dir, 'dot.png'), png);
+  fs.writeFileSync(path.join(dir, 'icon.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>');
+  fs.writeFileSync(path.join(dir, 'notes.txt'), 'hello');
+
+  const placed = await client.callTool({ name: 'place_image', arguments: { path: 'dot.png', width: 10 } });
+  assert.equal(placed.isError, undefined, texts(placed));
+  assert.ok(plugin.calls.includes('run'));
+  const svg = await client.callTool({ name: 'place_image', arguments: { path: 'icon.svg' } });
+  assert.equal(svg.isError, undefined, texts(svg));
+
+  const fill = await client.callTool({ name: 'place_image', arguments: { path: 'icon.svg', nodeId: '1:2' } });
+  assert.match(texts(fill), /SVG cannot be a fill/);
+  const other = await client.callTool({ name: 'place_image', arguments: { path: 'notes.txt' } });
+  assert.match(texts(other), /not a PNG, JPG, GIF or SVG/);
+  const missing = await client.callTool({ name: 'place_image', arguments: { path: 'nope.png' } });
+  assert.match(texts(missing), /does not exist/);
+  plugin.stop();
+  await transport.close();
+});
