@@ -9,7 +9,7 @@ test('lists the tools of the Figma MCP', async () => {
   const names = (await client.listTools()).tools.map((t) => t.name).sort();
   assert.deepEqual(names, ['add_code_connect_map', 'download_assets', 'get_code_connect_map',
     'get_design_context', 'get_metadata', 'get_screenshot', 'get_variable_defs',
-    'import_design_export', 'remove_code_connect_map', 'save_design_export', 'use_figma', 'whoami']);
+    'import_design_export', 'remove_code_connect_map', 'save_design_export', 'use_figma', 'verify_code', 'whoami']);
   await transport.close();
 });
 

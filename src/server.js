@@ -6,6 +6,7 @@ import { DesignSource } from './source.js';
 import { registerConnectTools } from './tools/connect.js';
 import { registerDesignTools } from './tools/design.js';
 import { registerStatusTools } from './tools/status.js';
+import { registerVerifyTools } from './tools/verify.js';
 import { registerWriteTools } from './tools/write.js';
 
 const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -28,5 +29,6 @@ export function createServer(bridge) {
   registerConnectTools(server, bridge, source);
   registerStatusTools(server, bridge, source);
   registerWriteTools(server, bridge);
+  registerVerifyTools(server, bridge, source);
   return server;
 }

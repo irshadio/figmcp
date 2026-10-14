@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import WebSocket from 'ws';
-import { fakePlugin, nextPort, pairing, startClient, texts, tmpDir } from './helpers.js';
+import { flutterTool } from '../src/tools/verify.js';
+import { FIXTURE, fakePlugin, nextPort, pairing, startClient, texts, tmpDir } from './helpers.js';
 
 test('the plugin must present the pairing code', async () => {
   const port = nextPort();
@@ -128,4 +129,26 @@ test('a read the plugin cut short answers with metadata, not code', async () => 
   assert.match(ctx, /<frame id="10:1" name="Sample Screen"/);
   assert.doesNotMatch(ctx, /export default function|extends StatelessWidget/);
   plugin.stop();
+});
+
+test('verify_code renders the generated Flutter code and compares it with the design', { timeout: 600000 }, async (t) => {
+  const flutter = flutterTool(process.env.FLUTTER);
+  if (!flutter) {
+    t.skip('flutter is not installed');
+    return;
+  }
+  const { client, transport } = await startClient(tmpDir(), nextPort());
+  await client.callTool({ name: 'import_design_export', arguments: { path: FIXTURE } });
+  const missing = await client.callTool({ name: 'verify_code', arguments: { nodeId: '10:1', file: 'lib/none.dart', flutter } });
+  assert.equal(missing.isError, true);
+  assert.match(texts(missing), /pubspec\.yaml/);
+  const result = await client.callTool({ name: 'verify_code', arguments: { nodeId: '10:1', flutter } });
+  assert.notEqual(result.isError, true, texts(result));
+  const report = JSON.parse(result.content[0].text);
+  assert.deepEqual(report.analyzer.errors, []);
+  assert.deepEqual(report.runtimeErrors, []);
+  assert.ok(report.checkedLayers > 0);
+  assert.equal(typeof report.pixels.differingPercent, 'number');
+  assert.ok(result.content.some((c) => c.type === 'image'), 'includes the diff');
+  await transport.close();
 });
