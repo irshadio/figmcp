@@ -2,13 +2,13 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
-    version: null,
-    title: "Next release",
+    version: "1.4.0",
     notes: [
       { type: "new", text: "Design in Figma: use_figma runs Figma plugin API scripts to create and edit frames in the open file, one undo step per script." },
       { type: "improved", text: "Redesigned plugin panel with a status card, live indicator and footer links." },
       { type: "improved", text: "The plugin is now called Figma Local MCP." },
       { type: "improved", text: "Designs can load images from the web." },
+      { type: "improved", text: "The server reports its real version to MCP clients." },
     ],
   },
   {
