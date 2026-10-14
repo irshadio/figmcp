@@ -30,6 +30,14 @@ const cols = [
     links: [
       { href: site.github, label: "GitHub" },
       { href: site.npm, label: "npm" },
+      { href: `${site.github}/issues`, label: "Report an issue" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { href: "/privacy", label: "Privacy Policy" },
+      { href: "/terms", label: "Terms of Use" },
     ],
   },
 ];
@@ -37,8 +45,8 @@ const cols = [
 export function Footer() {
   return (
     <footer className="relative border-t border-line">
-      <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_repeat(3,1fr)]">
-        <div>
+      <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_repeat(4,1fr)] md:gap-12">
+        <div className="col-span-2 md:col-span-1">
           <Link href="/" className="flex items-center gap-2.5 font-medium">
             <LogoMark size={26} />
             {site.name}
@@ -72,18 +80,17 @@ export function Footer() {
                   )}
                 </li>
               ))}
+              {c.title === "Legal" && (
+                <li>
+                  <CookieSettings className="text-sm text-muted transition hover:text-fg" />
+                </li>
+              )}
             </ul>
           </div>
         ))}
       </div>
       <div className="mx-auto flex max-w-7xl flex-col gap-2 border-t border-line px-4 py-6 text-xs text-dim sm:flex-row sm:justify-between sm:px-6">
-        <span className="flex flex-wrap gap-x-4 gap-y-1">
-          <span>© {new Date().getFullYear()} irshadio</span>
-          <Link href="/privacy" className="hover:text-muted">
-            Privacy
-          </Link>
-          <CookieSettings className="hover:text-muted" />
-        </span>
+        <span>© {new Date().getFullYear()} irshadio</span>
         <span>Not affiliated with Figma, Inc.</span>
       </div>
     </footer>

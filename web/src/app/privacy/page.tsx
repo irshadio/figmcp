@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 import { site } from "@/lib/site";
 
 export const metadata: Metadata = pageMeta({
-  title: "Privacy",
+  title: "Privacy Policy",
   path: "/privacy",
   description: "What figmcp.web.app and the figmcp MCP server collect: anonymous website analytics only, and nothing from your designs or code.",
 });
@@ -13,7 +13,7 @@ export default function Page() {
   return (
     <main className="relative px-4 pt-32 pb-24 sm:px-6">
       <article className="prose-docs mx-auto max-w-3xl">
-        <h1>Privacy</h1>
+        <h1>Privacy Policy</h1>
         <p className="text-lg text-muted">Short version: the tool collects nothing, and this website counts visits.</p>
 
         <h2>The figmcp server and plugin</h2>
