@@ -15,6 +15,14 @@
     "model-context-protocol"
   ],
   "author": "irshadio <irshad.kp@icloud.com>",
+  "homepage": "https://figmcp.web.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/irshadio/figmcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/irshadio/figmcp/issues"
+  },
   "type": "module",
   "bin": {
     "figma-local-mcp": "bin/figma-local-mcp.js"
