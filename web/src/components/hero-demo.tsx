@@ -235,7 +235,7 @@ function Canvas({ scene, step }: { scene: Scene["key"]; step: number }) {
               <span className="text-sky">Scaffold</span>(body: <span className="text-sky">Column</span>(
             </div>
             <div className="pl-6 text-dim">SvgPicture.asset(…),</div>
-            <div className="pl-6 text-dim">Text(&apos;Design to code&apos;),</div>
+            <div className="pl-6 text-dim">Text(&apos;Design and code&apos;),</div>
           </div>
         )}
       </div>

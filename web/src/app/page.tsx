@@ -45,7 +45,7 @@ class OnboardingScreen extends StatelessWidget {
               SvgPicture.asset('assets/svg/hero.svg', height: 256),
               const SizedBox(height: 32),
               const Text(
-                'Design to code, locally',
+                'Design and code, locally',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
@@ -65,7 +65,7 @@ export default function Onboarding() {
     <div className="flex flex-col gap-8 bg-white px-6 pt-12">
       <img alt="" src={hero} className="h-64 w-full rounded-3xl" />
       <h1 className="text-[28px] font-bold leading-[34px] text-[#0a1f44]">
-        Design to code, locally
+        Design and code, locally
       </h1>
       <p className="text-base leading-6 text-[#5b6679]">
         Turn frames into Flutter and React code.
@@ -204,7 +204,7 @@ export default function Home() {
             </Reveal>
             <Reveal delay={80}>
               <h1 className="mt-7 text-[44px] leading-[1.02] font-semibold tracking-[-0.045em] text-balance sm:text-7xl lg:text-[88px]">
-                <span className="text-gradient">Design to code,</span>
+                <span className="text-gradient">Design and code,</span>
                 <br />
                 <span className="text-sky-gradient">locally.</span>
               </h1>

@@ -2,7 +2,7 @@
 // the open file, and `run`, which executes a script against the plugin API
 // to create or edit designs.
 
-figma.showUI(__html__, { width: 300, height: 236, themeColors: true });
+figma.showUI(__html__, { width: 300, height: 268, themeColors: true });
 
 const VECTORS = new Set([
   'VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'LINE', 'POLYGON',

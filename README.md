@@ -1,17 +1,22 @@
 <div align="center">
 
-<a href="https://figmcp.web.app"><img src="https://figmcp.web.app/og.png" alt="figmcp: design to code, locally" width="100%"></a>
+<a href="https://figmcp.web.app"><img src="https://raw.githubusercontent.com/irshadio/figmcp/main/web/public/og.png" alt="figmcp: design and code, locally" width="100%"></a>
 
-<h1>figmcp</h1>
+<h1>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/irshadio/figmcp/main/.github/assets/wordmark-dark.svg">
+  <img src="https://raw.githubusercontent.com/irshadio/figmcp/main/.github/assets/wordmark-light.svg" alt="figmcp" height="56">
+</picture>
+</h1>
 
-<p><strong>Design to code, locally.</strong><br>
+<p><strong>Design and code, locally.</strong><br>
 Turn Figma frames into Flutter and React code, and let your coding agent design in Figma.<br>
 No Figma API calls. No rate limits.</p>
 
 <p>
-<a href="https://www.npmjs.com/package/@irshad.io/figma-local-mcp"><img src="https://img.shields.io/npm/v/@irshad.io/figma-local-mcp?color=0553B1&label=npm" alt="npm version"></a>
-<img src="https://img.shields.io/node/v/@irshad.io/figma-local-mcp?color=54C5F8" alt="Node.js version">
-<img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-0A1F44" alt="macOS and Windows">
+<a href="https://www.npmjs.com/package/@irshad.io/figma-local-mcp"><img src="https://img.shields.io/npm/v/@irshad.io/figma-local-mcp?color=FF5A4E&label=npm" alt="npm version"></a>
+<img src="https://img.shields.io/node/v/@irshad.io/figma-local-mcp?color=3B82F6" alt="Node.js version">
+<img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-111318" alt="macOS and Windows">
 </p>
 
 <p>
