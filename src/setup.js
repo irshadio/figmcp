@@ -24,8 +24,15 @@ export function syncPlugin() {
   return path.join(PLUGIN_DIR, 'manifest.json');
 }
 
+// cmd.exe joins the arguments as they are, so paths with spaces
+// (C:\Program Files\nodejs\node.exe) are quoted for it.
+export function shellArg(arg) {
+  const s = String(arg);
+  return /[\s"&|<>^()%!]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 function run(cmd, args) {
-  return spawnSync(cmd, args, { stdio: 'ignore', shell: WIN });
+  return spawnSync(cmd, WIN ? args.map(shellArg) : args, { stdio: 'ignore', shell: WIN });
 }
 
 // npx resolves the package on every start, which takes tens of seconds; MCP

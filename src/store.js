@@ -19,41 +19,51 @@ function ensureDirs() {
   }
 }
 
-export function secret() {
+/**
+ * The value stored in [file], created with [make] the first time. The file
+ * appears complete or not at all, so a reader never sees it half written;
+ * a value [valid] rejects (an empty file) is replaced.
+ */
+function storedValue(file, make, valid) {
   ensureDirs();
-  const file = path.join(DATA_DIR, 'secret');
-  try {
-    return fs.readFileSync(file, 'utf8').trim();
-  } catch {
-    const value = crypto.randomBytes(32).toString('hex');
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let value = null;
     try {
-      fs.writeFileSync(file, value, { mode: 0o600, flag: 'wx' });
-      return value;
+      value = fs.readFileSync(file, 'utf8').trim();
+    } catch { /* not created yet */ }
+    if (value !== null && valid(value)) return value;
+    const fresh = make();
+    const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}`;
+    fs.writeFileSync(tmp, fresh, { mode: 0o600 });
+    try {
+      if (value === null) fs.linkSync(tmp, file);
+      else fs.renameSync(tmp, file);
     } catch {
-      return fs.readFileSync(file, 'utf8').trim();
+      // Another instance created it first.
+    } finally {
+      fs.rmSync(tmp, { force: true });
     }
+    // Read back what is on disk, so every instance returns the same value.
   }
+  const last = fs.readFileSync(file, 'utf8').trim();
+  if (valid(last)) return last;
+  throw new Error(`Could not create ${file}`);
+}
+
+export function secret() {
+  return storedValue(path.join(DATA_DIR, 'secret'),
+    () => crypto.randomBytes(32).toString('hex'), (v) => /^[a-f0-9]{64}$/.test(v));
 }
 
 const PAIRING_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 /** The code the plugin must present, e.g. 'K7QM-2XDP' (created once). */
 export function pairingCode() {
-  ensureDirs();
-  const file = path.join(DATA_DIR, 'pairing');
-  try {
-    return fs.readFileSync(file, 'utf8').trim();
-  } catch {
+  return storedValue(path.join(DATA_DIR, 'pairing'), () => {
     const bytes = crypto.randomBytes(8);
     const chars = [...bytes].map((b) => PAIRING_ALPHABET[b % PAIRING_ALPHABET.length]).join('');
-    const value = `${chars.slice(0, 4)}-${chars.slice(4)}`;
-    try {
-      fs.writeFileSync(file, value, { mode: 0o600, flag: 'wx' });
-      return value;
-    } catch {
-      return fs.readFileSync(file, 'utf8').trim();
-    }
-  }
+    return `${chars.slice(0, 4)}-${chars.slice(4)}`;
+  }, (v) => /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(v));
 }
 
 export function assetPath(name) {

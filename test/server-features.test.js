@@ -76,6 +76,14 @@ test('save_design_export writes a full export with code connect annotations', as
   assert.ok(written.frames[0].previewPng2x);
   const bad = await client.callTool({ name: 'save_design_export', arguments: { path: 'relative.json' } });
   assert.equal(bad.isError, true);
+  // A previous export may be replaced; any other JSON file may not.
+  const again = await client.callTool({ name: 'save_design_export', arguments: { path: target } });
+  assert.equal(again.isError, undefined, texts(again));
+  const config = path.join(dir, 'package.json');
+  fs.writeFileSync(config, '{"name":"app"}');
+  const clobber = await client.callTool({ name: 'save_design_export', arguments: { path: config } });
+  assert.match(texts(clobber), /is not a design export/);
+  assert.equal(fs.readFileSync(config, 'utf8'), '{"name":"app"}');
   plugin.stop();
 });
 

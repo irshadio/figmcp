@@ -177,7 +177,7 @@
   function connect() {
     if (waitingForCode) return;
     try {
-      socket = new WebSocket('ws://localhost:' + PORT + '/?code=' + encodeURIComponent(code || ''));
+      socket = new WebSocket('ws://127.0.0.1:' + PORT + '/?code=' + encodeURIComponent(code || ''));
     } catch (e) {
       schedule();
       return;

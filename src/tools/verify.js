@@ -56,6 +56,14 @@ function runCheck(args, project = null) {
   });
 }
 
+// Runs share the scratch Flutter project, so they go one at a time.
+let queue = Promise.resolve();
+function oneAtATime(task) {
+  const run = queue.then(task, task);
+  queue = run.catch(() => {});
+  return run;
+}
+
 const brief = (list, n = 15) => (list.length > n ? [...list.slice(0, n), `… ${list.length - n} more`] : list);
 
 export function registerVerifyTools(server, bridge, source) {
@@ -90,13 +98,16 @@ export function registerVerifyTools(server, bridge, source) {
     const tool = flutterTool(flutter);
     if (!tool) throw new Error('The flutter tool was not found: pass `flutter` with its path, or set FLUTTER.');
     if (file && viewport) throw new Error('`viewport` checks the generated code; leave out `file` to use it.');
+    if (viewport && viewport.split('x').some((v) => Number(v) < 1 || Number(v) > 10000)) {
+      throw new Error('Each side of `viewport` must be between 1 and 10000.');
+    }
     const { id } = await source.resolveId(nodeId);
     const exported = await source.exportData(id);
     if (!exported.data.frames[0].previewPng2x) throw new Error(`There is no render of ${id} to compare with.`);
     const slug = id.replace(/[^0-9A-Za-z]+/g, '_');
     const dir = path.join(DATA_DIR, 'verify');
     fs.mkdirSync(dir, { recursive: true });
-    const exportFile = path.join(dir, `${slug}.json`);
+    const exportFile = path.join(dir, `${slug}_${process.pid}_${Date.now()}.json`);
     fs.writeFileSync(exportFile, JSON.stringify(exported.data));
     const args = [id, '--export', exportFile, '--flutter', tool, '--fetch-fonts',
       '--out', path.join(dir, `${slug}${file ? '_project' : ''}${viewport ? `_${viewport}` : ''}`)];
@@ -111,7 +122,12 @@ export function registerVerifyTools(server, bridge, source) {
       args.push('--project', project, '--file', path.relative(project, inProject));
       if (widget) args.push('--class', widget);
     }
-    const report = await runCheck(args, args.includes('--project') ? args[args.indexOf('--project') + 1] : null);
+    let report;
+    try {
+      report = await oneAtATime(() => runCheck(args, args.includes('--project') ? args[args.indexOf('--project') + 1] : null));
+    } finally {
+      fs.rmSync(exportFile, { force: true });
+    }
     const summary = {
       node: report.node,
       ...(exported.source === 'snapshot' ? { source: `snapshot saved ${exported.exportedAt || 'earlier'}` } : {}),
