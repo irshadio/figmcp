@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ShowcaseScreen } from "@/lib/showcase";
 
-export function ScreenGallery({ screens, desktop = false, label }: { screens: ShowcaseScreen[]; desktop?: boolean; label: string }) {
+export function ScreenGallery({ screens, desktop = false, wideAspect, label }: { screens: ShowcaseScreen[]; desktop?: boolean; wideAspect?: string; label: string }) {
   const [open, setOpen] = useState<number | null>(null);
   const close = useCallback(() => setOpen(null), []);
   const step = useCallback((d: number) => setOpen((i) => (i === null ? i : (i + d + screens.length) % screens.length)), [screens.length]);
@@ -45,7 +45,7 @@ export function ScreenGallery({ screens, desktop = false, label }: { screens: Sh
           >
             <div
               className={`overflow-hidden rounded-2xl border border-line bg-panel transition duration-300 group-hover:-translate-y-1 group-hover:border-line-2 ${
-                desktop ? "aspect-[1440/1000]" : wide ? "aspect-[300/433] sm:aspect-[500/498]" : "aspect-[390/844]"
+                desktop ? (wideAspect ?? "aspect-[1440/1000]") : wide ? "aspect-[300/433] sm:aspect-[500/498]" : "aspect-[390/844]"
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

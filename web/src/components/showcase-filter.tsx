@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-export type ShowcaseKind = "mobile" | "web";
+export type ShowcaseKind = "mobile" | "web" | "brand" | "deck";
 type Filter = "all" | ShowcaseKind;
 
 const FilterContext = createContext<{ filter: Filter; setFilter: (f: Filter) => void }>({ filter: "all", setFilter: () => {} });
@@ -18,6 +18,8 @@ export function FilterTabs({ counts }: { counts: Record<Filter, number> }) {
     ["all", "All"],
     ["mobile", "Mobile apps"],
     ["web", "Web"],
+    ["brand", "Brand"],
+    ["deck", "Deck"],
   ];
   return (
     <div role="tablist" aria-label="Filter projects" className="inline-flex rounded-full border border-line-2 bg-white/[0.03] p-1">

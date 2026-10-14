@@ -1082,5 +1082,333 @@
       "height": 1338,
       "bytes": 177678
     }
+  },
+  "kora": {
+    "cover": {
+      "src": "/showcase/kora/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 273673
+    },
+    "screens": [
+      {
+        "name": "Cover",
+        "src": "/showcase/kora/01-cover.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 177360
+      },
+      {
+        "name": "Brand story",
+        "src": "/showcase/kora/02-brand-story.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 197707
+      },
+      {
+        "name": "Logo system",
+        "src": "/showcase/kora/03-logo-system.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 111160
+      },
+      {
+        "name": "Logo usage",
+        "src": "/showcase/kora/04-logo-usage.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 186125
+      },
+      {
+        "name": "Colour",
+        "src": "/showcase/kora/05-colour.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 143637
+      },
+      {
+        "name": "Typography",
+        "src": "/showcase/kora/06-typography.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 142725
+      },
+      {
+        "name": "Graphic elements",
+        "src": "/showcase/kora/07-graphic-elements.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 163758
+      },
+      {
+        "name": "Packaging",
+        "src": "/showcase/kora/08-packaging.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 161639
+      },
+      {
+        "name": "Stationery",
+        "src": "/showcase/kora/09-stationery.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 129077
+      },
+      {
+        "name": "Café",
+        "src": "/showcase/kora/10-cafe.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 168708
+      },
+      {
+        "name": "Social media",
+        "src": "/showcase/kora/11-social-media.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 196620
+      },
+      {
+        "name": "Digital",
+        "src": "/showcase/kora/12-digital.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 173196
+      },
+      {
+        "name": "Merchandise",
+        "src": "/showcase/kora/13-merchandise.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 110620
+      },
+      {
+        "name": "At a glance",
+        "src": "/showcase/kora/14-at-a-glance.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 145268
+      }
+    ],
+    "system": {
+      "src": "/showcase/kora/design-system.jpg",
+      "width": 1275,
+      "height": 891,
+      "bytes": 104029
+    }
+  },
+  "plugd": {
+    "cover": {
+      "src": "/showcase/plugd/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 214613
+    },
+    "screens": [
+      {
+        "name": "Cover",
+        "src": "/showcase/plugd/01-cover.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 139955
+      },
+      {
+        "name": "Brand idea",
+        "src": "/showcase/plugd/02-brand-idea.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 138834
+      },
+      {
+        "name": "Logo",
+        "src": "/showcase/plugd/03-logo.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 144227
+      },
+      {
+        "name": "Logo usage",
+        "src": "/showcase/plugd/04-logo-usage.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 162860
+      },
+      {
+        "name": "Colour",
+        "src": "/showcase/plugd/05-colour.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 141333
+      },
+      {
+        "name": "Typography",
+        "src": "/showcase/plugd/06-typography.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 146887
+      },
+      {
+        "name": "Graphic language",
+        "src": "/showcase/plugd/07-graphic-language.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 182134
+      },
+      {
+        "name": "Packaging",
+        "src": "/showcase/plugd/08-packaging.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 148664
+      },
+      {
+        "name": "App",
+        "src": "/showcase/plugd/09-app.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 181393
+      },
+      {
+        "name": "Website",
+        "src": "/showcase/plugd/10-website.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 201028
+      },
+      {
+        "name": "Charge Days campaign",
+        "src": "/showcase/plugd/11-charge-days-campaign.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 194896
+      },
+      {
+        "name": "On the road",
+        "src": "/showcase/plugd/12-on-the-road.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 135987
+      },
+      {
+        "name": "Merch and stationery",
+        "src": "/showcase/plugd/13-merch-and-stationery.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 149596
+      },
+      {
+        "name": "At a glance",
+        "src": "/showcase/plugd/14-at-a-glance.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 151282
+      }
+    ],
+    "system": {
+      "src": "/showcase/plugd/design-system.jpg",
+      "width": 1425,
+      "height": 1149,
+      "bytes": 132604
+    }
+  },
+  "deck": {
+    "cover": {
+      "src": "/showcase/deck/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 221831
+    },
+    "screens": [
+      {
+        "name": "Title",
+        "src": "/showcase/deck/01-title.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 145789
+      },
+      {
+        "name": "Problem",
+        "src": "/showcase/deck/02-problem.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 142284
+      },
+      {
+        "name": "Solution",
+        "src": "/showcase/deck/03-solution.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 195732
+      },
+      {
+        "name": "Product",
+        "src": "/showcase/deck/04-product.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 176500
+      },
+      {
+        "name": "How it works",
+        "src": "/showcase/deck/05-how-it-works.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 149618
+      },
+      {
+        "name": "Market",
+        "src": "/showcase/deck/06-market.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 132437
+      },
+      {
+        "name": "Traction",
+        "src": "/showcase/deck/07-traction.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 131233
+      },
+      {
+        "name": "Unit economics",
+        "src": "/showcase/deck/08-unit-economics.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 147808
+      },
+      {
+        "name": "Business model",
+        "src": "/showcase/deck/09-business-model.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 182612
+      },
+      {
+        "name": "Competition",
+        "src": "/showcase/deck/10-competition.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 115333
+      },
+      {
+        "name": "Team",
+        "src": "/showcase/deck/11-team.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 199944
+      },
+      {
+        "name": "The ask",
+        "src": "/showcase/deck/12-the-ask.jpg",
+        "width": 1440,
+        "height": 810,
+        "bytes": 176517
+      }
+    ],
+    "system": {
+      "src": "/showcase/deck/design-system.jpg",
+      "width": 1440,
+      "height": 810,
+      "bytes": 117613
+    }
   }
 }

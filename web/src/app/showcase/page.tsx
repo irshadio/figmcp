@@ -13,10 +13,12 @@ const groups: Record<"all" | ShowcaseKind, ShowcaseProject[]> = {
   all: projects,
   mobile: projects.filter((p) => p.type === "mobile"),
   web: projects.filter((p) => p.type === "web"),
+  brand: projects.filter((p) => p.type === "brand"),
+  deck: projects.filter((p) => p.type === "deck"),
 };
 const STATS: { label: string; count: (list: ShowcaseProject[]) => number }[] = [
   { label: "projects", count: (list) => list.length },
-  { label: "screens", count: (list) => list.reduce((n, p) => n + screensOf(p.slug).length, 0) },
+  { label: "screens and boards", count: (list) => list.reduce((n, p) => n + screensOf(p.slug).length, 0) },
   { label: "design systems", count: (list) => list.length },
 ];
 const number = (list: ShowcaseProject[], p: ShowcaseProject) => String(list.indexOf(p) + 1).padStart(2, "0");
@@ -25,7 +27,7 @@ export const metadata: Metadata = pageMeta({
   title: "Showcase",
   path: "/showcase",
   description:
-    "App and web designs built in Figma by a coding agent through figmcp: an electronics store, a dating app, a travel booking app, an invoicing website, a project management tool, a healthcare app, a food delivery app, a restaurant dashboard, a stock trading app and a coffee ordering app, each with its own design system.",
+    "App, web, brand and deck designs built in Figma by a coding agent through figmcp: a Series A pitch deck, an electronics brand identity, a coffee brand identity, an electronics store, a dating app, a travel booking app, an invoicing website, a project management tool, a healthcare app, a food delivery app, a restaurant dashboard, a stock trading app and a coffee ordering app, each with its own design system.",
 });
 
 function FigmaIcon() {
@@ -73,13 +75,13 @@ export default function Page() {
               </p>
             </Reveal>
             <Reveal delay={180} className="mt-10 flex justify-center">
-              <FilterTabs counts={{ all: groups.all.length, mobile: groups.mobile.length, web: groups.web.length }} />
+              <FilterTabs counts={{ all: groups.all.length, mobile: groups.mobile.length, web: groups.web.length, brand: groups.brand.length, deck: groups.deck.length }} />
             </Reveal>
             <Reveal delay={220} className="mt-6 grid grid-cols-3 gap-3 sm:mx-auto sm:max-w-xl">
               {STATS.map(({ label, count }) => (
                 <div key={label} className="rounded-2xl border border-line bg-white/[0.02] px-4 py-4">
                   <div className="text-3xl font-semibold tracking-tight text-fg">
-                    <ByFilter values={{ all: count(groups.all), mobile: count(groups.mobile), web: count(groups.web) }} />
+                    <ByFilter values={{ all: count(groups.all), mobile: count(groups.mobile), web: count(groups.web), brand: count(groups.brand), deck: count(groups.deck) }} />
                   </div>
                   <div className="mt-1 text-sm text-muted">{label}</div>
                 </div>
@@ -180,9 +182,9 @@ export default function Page() {
                   <div className="mt-14">
                     <div className="mb-5 flex items-baseline justify-between gap-4">
                       <h3 className="font-medium text-fg">{screens.length} screens</h3>
-                      <span className="text-sm text-dim">{p.desktop ? "Click a screen to view it full size" : "Scroll sideways · click to view full size"}</span>
+                      <span className="text-sm text-dim">{p.desktop || p.type === "brand" || p.type === "deck" ? "Click to view full size" : "Scroll sideways · click to view full size"}</span>
                     </div>
-                    <ScreenGallery screens={screens} desktop={p.desktop} label={p.name} />
+                    <ScreenGallery screens={screens} desktop={p.desktop || p.type === "brand" || p.type === "deck"} wideAspect={p.type === "brand" || p.type === "deck" ? "aspect-video" : undefined} label={p.name} />
                   </div>
                 </div>
               </section>
