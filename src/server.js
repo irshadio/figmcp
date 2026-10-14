@@ -6,6 +6,7 @@ import { DesignSource } from './source.js';
 import { registerConnectTools } from './tools/connect.js';
 import { registerDesignTools } from './tools/design.js';
 import { registerStatusTools } from './tools/status.js';
+import { registerSystemTools } from './tools/system.js';
 import { registerVerifyTools } from './tools/verify.js';
 import { registerWriteTools } from './tools/write.js';
 
@@ -30,5 +31,6 @@ export function createServer(bridge) {
   registerStatusTools(server, bridge, source);
   registerWriteTools(server, bridge);
   registerVerifyTools(server, bridge, source);
+  registerSystemTools(server, bridge);
   return server;
 }
