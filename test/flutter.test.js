@@ -70,6 +70,9 @@ function kitchenSink() {
       transform: [[0, 1], [-1, 0]], fills: [solid()] },
     { id: '4:8', name: 'Mirror', type: 'RECTANGLE', x: 175, y: 60, width: 20, height: 20, rawWidth: 20, rawHeight: 20,
       transform: [[-1, 0], [0, 1]], fills: [solid()] },
+    { id: '4:9', name: 'Pressed', type: 'RECTANGLE', x: 0, y: 0, width: 30, height: 30, cornerRadius: 6, blendMode: 'MULTIPLY',
+      fills: [solid(), solid({ r: 1, g: 0, b: 0, a: 1 }, { blendMode: 'SCREEN' })],
+      effects: [{ type: 'INNER_SHADOW', visible: true, radius: 4, spread: 1, offset: { x: 0, y: 2 }, color: { r: 0, g: 0, b: 0, a: 0.3 } }] },
   ], { fills: [solid({ r: 0.95, g: 0.95, b: 0.95, a: 1 })] });
 }
 
@@ -256,4 +259,31 @@ test('on a screen, fixed-width text columns may shrink; rows with a filling chil
   const withFill = screen(row([col('6:2', 0, 240), { ...col('6:3', 250, 100), layoutSizingHorizontal: 'FILL' }]));
   assert.doesNotMatch(withFill, /Flexible\(/);
   assert.match(withFill, /Expanded\(/);
+});
+
+test('inner shadows lie on the fills and blend modes blend', () => {
+  const inner = { type: 'INNER_SHADOW', visible: true, radius: 8, spread: 2, offset: { x: 0, y: 4 }, color: { r: 0, g: 0, b: 0, a: 0.25 } };
+  const card = dart(frame([], { cornerRadius: 12, fills: [solid()], effects: [inner] }));
+  assert.match(card.code, /decoration: _InnerShadowDecoration\(\s+decoration: BoxDecoration\(\s+color: Color\(0xFF000000\),\s+borderRadius: BorderRadius.circular\(12\),\s+\),\s+shadows: const \[\s+BoxShadow\([\s\S]*?spreadRadius: 2,\s+\),\s+\],\s+borderRadius: BorderRadius.circular\(12\),\s+shape: BoxShape.rectangle,/);
+  assert.match(card.code, /class _InnerShadowDecoration extends Decoration/);
+  assert.doesNotMatch(card.code, /class _Blend/);
+  assert.deepEqual(card.warnings, []);
+
+  const circle = dart(frame([{ id: '2:1', name: 'Dot', type: 'ELLIPSE', x: 0, y: 0, width: 40, height: 40, fills: [solid()], effects: [inner] }]));
+  assert.match(circle.code, /_InnerShadowDecoration\([\s\S]*shape: BoxShape.circle/);
+
+  // Over an image fill the shadow is its own layer above the image.
+  const photo = dart(frame([], { fills: [solid(), { type: 'IMAGE', visible: true, scaleMode: 'CROP', imageHash: 'h', imageTransform: [[1, 0, 0], [0, 1, 0]] }], effects: [inner] }));
+  assert.match(photo.code, /Image.asset[\s\S]*DecoratedBox\(\s+decoration: _InnerShadowDecoration\(/);
+
+  const fill = dart(frame([], { fills: [solid(), solid({ r: 1, g: 0, b: 0, a: 1 }, { blendMode: 'MULTIPLY' })] }));
+  assert.match(fill.code, /_Blend\(\s+mode: BlendMode.multiply,\s+child: DecoratedBox\(/);
+  assert.match(fill.code, /import 'package:flutter\/rendering.dart';/);
+  assert.deepEqual(fill.warnings, []);
+
+  const layer = dart(frame([{ id: '2:1', name: 'Glow', type: 'RECTANGLE', x: 0, y: 0, width: 40, height: 40, fills: [solid()], blendMode: 'SCREEN' }]));
+  assert.match(layer.code, /_Blend\(\s+mode: BlendMode.screen,/);
+
+  const burn = dart(frame([{ id: '2:1', name: 'Burn', type: 'RECTANGLE', x: 0, y: 0, width: 40, height: 40, fills: [solid()], blendMode: 'LINEAR_BURN' }]));
+  assert.match(JSON.stringify(burn.warnings), /linear_burn blend of the layer is drawn normal/);
 });

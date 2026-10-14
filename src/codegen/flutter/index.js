@@ -11,7 +11,7 @@ import {
   call, dColor, dFileName, dIdent, dNum, dType, lambda, list, method, print, raw, str,
 } from './dart.js';
 import {
-  alignment, blurSigma, blurs, border, borderRadius, boxShadows, composite, gradient,
+  alignment, blendMode, blurSigma, blurs, border, borderRadius, boxShadows, composite, gradient, HELPERS,
 } from './paint.js';
 import { fontWeight, runGradient, textWidget } from './text.js';
 
@@ -90,6 +90,7 @@ class FlutterWriter {
     this.rasterized = [];
     this.connected = new Map();
     this.imports = new Set(['package:flutter/material.dart']);
+    this.helpers = new Set();
     this.ratios = null;
     this.screen = null;
     this.scrolls = false;
@@ -504,14 +505,16 @@ class FlutterWriter {
     const vars = node.vars || {};
     const paints = (Array.isArray(node.fills) ? node.fills : [])
       .map((p, i) => ({ p, i })).filter(({ p }) => p && p.visible !== false);
-    for (const { p } of paints) {
-      if (p.blendMode && !['NORMAL', 'PASS_THROUGH'].includes(p.blendMode)) this.warn(node, `the ${p.blendMode.toLowerCase()} blend of a fill is not drawn`);
-    }
+    const blendOf = (p) => {
+      const mode = blendMode(p.blendMode);
+      if (mode === null) this.warn(node, `the ${p.blendMode.toLowerCase()} blend of a fill is drawn normal`);
+      return mode && mode !== 'normal' ? mode : null;
+    };
     // Solid paints over solid paints composite to one colour.
     const merged = [];
     for (const item of paints) {
       const last = merged[merged.length - 1];
-      if (item.p.type === 'SOLID' && last && last.p.type === 'SOLID') {
+      if (item.p.type === 'SOLID' && last && last.p.type === 'SOLID' && !blendOf(item.p) && !blendOf(last.p)) {
         const c = composite({ color: last.p.color, opacity: last.p.opacity ?? 1 }, { color: item.p.color, opacity: item.p.opacity ?? 1 });
         merged[merged.length - 1] = { p: { type: 'SOLID', color: c.color, opacity: 1 }, i: -1 };
       } else merged.push(item);
@@ -524,11 +527,15 @@ class FlutterWriter {
       if (p.type === 'IMAGE') return { image: p };
       return null;
     };
-    const items = merged.map(paintOf).filter(Boolean);
+    const items = merged.map((m) => {
+      const item = paintOf(m);
+      const blend = blendOf(m.p);
+      return item && blend ? { ...item, blend } : item;
+    }).filter(Boolean);
     const out = { base: null, image: null, layers: [] };
     items.forEach((item, k) => {
-      if (k === 0 && !item.image) out.base = item;
-      else if (k === items.length - 1 && item.image && item.image.scaleMode !== 'CROP' && !out.image) out.image = item.image;
+      if (k === 0 && !item.image && !item.blend) out.base = item;
+      else if (k === items.length - 1 && item.image && item.image.scaleMode !== 'CROP' && !out.image && !item.blend) out.image = item.image;
       else out.layers.push(item);
     });
     return out;
@@ -556,8 +563,22 @@ class FlutterWriter {
     return call('DecorationImage', args);
   }
 
-  /** A fill drawn as its own layer: a decorated box, or a cropped image. */
+  /** A fill drawn as its own layer, blended with the fills under it. */
   fillLayer(node, item, radius) {
+    const { blend, ...paint } = item;
+    const layer = this.plainFillLayer(node, paint, radius);
+    return layer && blend ? this.blend(blend, layer) : layer;
+  }
+
+  /** [child] blended with what is painted under it by the Flutter BlendMode [mode]. */
+  blend(mode, child) {
+    this.helpers.add('blend');
+    this.imports.add('package:flutter/rendering.dart');
+    return call('_Blend', { mode: raw(`BlendMode.${mode}`), child });
+  }
+
+  /** A fill drawn as its own layer: a decorated box, or a cropped image. */
+  plainFillLayer(node, item, radius) {
     if (item.image && item.image.scaleMode === 'CROP' && Array.isArray(item.image.imageTransform)) {
       const [[a, b, tx], [c, d, ty]] = item.image.imageTransform;
       if (Math.abs(b) > 1e-6 || Math.abs(c) > 1e-6) this.warn(node, 'a turned image crop is drawn unturned');
@@ -601,12 +622,13 @@ class FlutterWriter {
     const radius = this.shapeRadius(node);
     const shape = this.circle(node);
     const fills = this.fills(node);
-    const shadows = boxShadows(node, (c) => this.color(c), (m) => this.warn(node, m));
+    const shadows = boxShadows(node, (c) => this.color(c));
+    const inner = boxShadows(node, (c) => this.color(c), 'INNER_SHADOW');
     const hasPaint = Boolean(fills.base || fills.image || fills.layers.length);
     if (shadows.length && !hasPaint && visibleChildren(node).length) {
       this.warn(node, 'the drop shadow follows the box, not its content');
     }
-    const decoration = fills.base || fills.image || shadows.length || (radius && node.clipsContent)
+    let decoration = fills.base || fills.image || shadows.length || (radius && node.clipsContent)
       ? call('BoxDecoration', {
         ...(fills.base || {}),
         image: fills.image ? this.decorationImage(node, fills.image) : null,
@@ -620,6 +642,18 @@ class FlutterWriter {
     const content = given || this.content(node);
     let child = content.widget;
     const layers = fills.layers.map((item) => this.fillLayer(node, item, radius)).filter(Boolean);
+    if (inner.length) {
+      // Inner shadows lie on the fills, under the content.
+      this.helpers.add('innerShadow');
+      const innerArgs = {
+        shadows: list(inner), borderRadius: (!shape && radius) || raw('null'), shape: shape || raw('BoxShape.rectangle'),
+      };
+      if (layers.length) {
+        layers.push(call('DecoratedBox', { decoration: call('_InnerShadowDecoration', { decoration: raw('null'), ...innerArgs }) }));
+      } else {
+        decoration = call('_InnerShadowDecoration', { decoration: decoration || raw('null'), ...innerArgs });
+      }
+    }
     if (layers.length) {
       child = call('Stack', {
         fit: raw('StackFit.passthrough'),
@@ -670,9 +704,9 @@ class FlutterWriter {
     if (typeof node.opacity === 'number' && node.opacity < 1) {
       out = call('Opacity', { opacity: this.value(node.opacity, node.vars && node.vars.opacity), child: out });
     }
-    if (node.blendMode && !['NORMAL', 'PASS_THROUGH'].includes(node.blendMode)) {
-      this.warn(node, `the ${node.blendMode.toLowerCase()} blend of the layer is not drawn`);
-    }
+    const mode = blendMode(node.blendMode);
+    if (mode === null) this.warn(node, `the ${node.blendMode.toLowerCase()} blend of the layer is drawn normal`);
+    else if (mode !== 'normal') out = this.blend(mode, out);
     return out;
   }
 
@@ -961,6 +995,9 @@ export function toFlutter(root, assets, options = {}) {
     '  }',
     '}',
   ];
+  for (const name of ['innerShadow', 'blend']) {
+    if (writer.helpers.has(name)) lines.push('', HELPERS[name]);
+  }
   if (writer.tokens.size) {
     lines.push('', 'abstract final class DesignTokens {');
     for (const t of writer.tokens.values()) {
