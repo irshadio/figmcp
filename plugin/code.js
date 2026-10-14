@@ -883,6 +883,7 @@ async function run(params) {
 }
 
 const LINKS = new Set([
+  'https://figmcp.web.app',
   'https://www.linkedin.com/in/irshad1212',
   'https://www.npmjs.com/package/@irshad.io/figma-local-mcp',
 ]);
