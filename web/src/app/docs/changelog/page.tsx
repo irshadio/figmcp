@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import { releases } from "@/lib/changelog";
 import { site } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Changelog" };
+export const metadata: Metadata = pageMeta({
+  title: "Changelog",
+  path: "/docs/changelog",
+  description:
+    "What's new in each release of Figma Local MCP, the local Figma MCP server for Flutter and React code.",
+});
 
 async function publishDates(): Promise<Record<string, string>> {
   try {

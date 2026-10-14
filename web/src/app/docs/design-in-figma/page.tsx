@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import { Callout } from "@/components/callout";
 import { Code } from "@/components/code";
 
-export const metadata: Metadata = { title: "Design in Figma" };
+export const metadata: Metadata = pageMeta({
+  title: "Design in Figma",
+  path: "/docs/design-in-figma",
+  description:
+    "Let Claude Code or Cursor design in Figma: use_figma runs Figma plugin API scripts to create and edit frames in the open file, one undo step per script.",
+});
 
 export default function Page() {
   return (

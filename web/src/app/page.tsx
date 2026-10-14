@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Architecture } from "@/components/architecture";
@@ -141,9 +142,35 @@ function Feature({ icon, title, children, className = "", delay = 0 }: { icon: R
   );
 }
 
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      name: site.name,
+      alternateName: "figmcp",
+      description: site.description,
+      url: site.url,
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "macOS, Windows",
+      softwareVersion: site.version,
+      downloadUrl: site.npm,
+      installUrl: `${site.url}/docs/installation`,
+      softwareRequirements: "Node.js 18 or newer, Figma Desktop",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      author: { "@type": "Person", name: "irshadio", url: site.github },
+      sameAs: [site.github, site.npm],
+    },
+    { "@type": "WebSite", name: site.name, alternateName: "figmcp", url: site.url },
+  ],
+};
+
 export default function Home() {
   return (
     <main>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40">
         <div className="grid-bg pointer-events-none absolute inset-0" />
         <div className="animate-aurora pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,#0553b1aa,transparent)] blur-3xl" />

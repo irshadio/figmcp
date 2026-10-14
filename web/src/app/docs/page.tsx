@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { Code } from "@/components/code";
 import { site } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Introduction" };
+export const metadata: Metadata = pageMeta({
+  title: "Introduction",
+  path: "/docs",
+  description:
+    "Figma Local MCP gives Claude Code, Cursor and other coding agents the Figma file open in Figma Desktop: Figma to Flutter and React code, no API limits.",
+});
 
 const cards = [
   { href: "/docs/installation", title: "Installation", text: "Set up the server and the Figma plugin in a few minutes." },

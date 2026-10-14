@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Tools" };
+export const metadata: Metadata = pageMeta({
+  title: "Tools",
+  path: "/docs/tools",
+  description:
+    "Reference for every Figma Local MCP tool: get_design_context, get_screenshot, get_metadata, get_variable_defs, download_assets, use_figma, Code Connect and more.",
+});
 
 type Arg = [name: string, desc: string];
 type Tool = { name: string; desc: string; args: Arg[] };

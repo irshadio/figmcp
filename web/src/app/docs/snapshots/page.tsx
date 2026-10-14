@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import { Code } from "@/components/code";
 import { OsCode, OsPath } from "@/components/os";
 
-export const metadata: Metadata = { title: "Offline snapshots" };
+export const metadata: Metadata = pageMeta({
+  title: "Offline snapshots",
+  path: "/docs/snapshots",
+  description:
+    "Read Figma designs with the plugin closed: Figma Local MCP caches every read as a snapshot and can import and export full design JSON.",
+});
 
 export default function Page() {
   return (

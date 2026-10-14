@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import { Os, OsCode, OsPath } from "@/components/os";
 import { site } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Configuration" };
+export const metadata: Metadata = pageMeta({
+  title: "Configuration",
+  path: "/docs/configuration",
+  description:
+    "Set up Figma Local MCP in Claude Code, Cursor, Claude Desktop or any MCP client on macOS and Windows, plus environment variables.",
+});
 
 type Platform = "mac" | "win";
 type Default = { mac: string; win: string } | null;

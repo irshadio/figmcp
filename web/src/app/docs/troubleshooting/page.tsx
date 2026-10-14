@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import { Code } from "@/components/code";
 import { site } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Troubleshooting" };
+export const metadata: Metadata = pageMeta({
+  title: "Troubleshooting",
+  path: "/docs/troubleshooting",
+  description:
+    "Fix common Figma Local MCP issues: the plugin dot stays grey, a lost pairing code, port 3947 in use or edits failing in Dev Mode.",
+});
 
 export default function Page() {
   return (

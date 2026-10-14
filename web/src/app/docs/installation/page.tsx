@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { Callout, Step, Steps } from "@/components/callout";
 import { Code } from "@/components/code";
 import { site } from "@/lib/site";
 import { Os, OsCode, OsPath } from "@/components/os";
 
-export const metadata: Metadata = { title: "Installation" };
+export const metadata: Metadata = pageMeta({
+  title: "Installation",
+  path: "/docs/installation",
+  description:
+    "Install Figma Local MCP in one command on macOS or Windows: run setup, import the Figma plugin and pair it with your coding agent.",
+});
 
 export default function Page() {
   return (

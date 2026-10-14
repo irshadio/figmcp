@@ -6,8 +6,9 @@ export const site = {
   npm: "https://www.npmjs.com/package/@irshad.io/figma-local-mcp",
   github: "https://github.com/irshadio/figmcp",
   install: "npx -y @irshad.io/figma-local-mcp@latest setup",
+  title: "Figma Local MCP: Figma to Flutter and React code, locally",
   description:
-    "Turn Figma frames into Flutter and React code, and design in Figma, from your coding agent. Runs locally with no Figma API calls and no rate limits.",
+    "A local Figma MCP server for Claude Code, Cursor and any MCP client. Turn Figma frames into Flutter and React code, or design in Figma. No API limits.",
 };
 
 export const docsNav = [

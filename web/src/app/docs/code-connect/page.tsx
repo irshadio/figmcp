@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import { Code } from "@/components/code";
 import { OsPath } from "@/components/os";
 
-export const metadata: Metadata = { title: "Code Connect" };
+export const metadata: Metadata = pageMeta({
+  title: "Code Connect",
+  path: "/docs/code-connect",
+  description:
+    "Map Figma components to your Flutter or React components so generated code reuses them. Mappings live in your project, on any Figma plan.",
+});
 
 export default function Page() {
   return (

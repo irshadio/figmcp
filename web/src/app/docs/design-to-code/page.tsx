@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { Callout } from "@/components/callout";
 import { Code } from "@/components/code";
 
-export const metadata: Metadata = { title: "Design to code" };
+export const metadata: Metadata = pageMeta({
+  title: "Design to code",
+  path: "/docs/design-to-code",
+  description:
+    "Turn Figma frames into Flutter widgets or React + Tailwind components with your coding agent, with assets saved to your project and a screenshot to compare against.",
+});
 
 export default function Page() {
   return (
