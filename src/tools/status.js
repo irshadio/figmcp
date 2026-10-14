@@ -20,6 +20,16 @@ function annotate(tree, mappings) {
   return rasterized;
 }
 
+/** Whether [file] holds a design export, which a new export may replace. */
+function isExport(file) {
+  try {
+    const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return Boolean(data && Array.isArray(data.frames) && data.frames.every((f) => f && f.tree));
+  } catch {
+    return false;
+  }
+}
+
 export function registerStatusTools(server, bridge, source) {
   server.registerTool('whoami', {
     description:
@@ -80,6 +90,9 @@ export function registerStatusTools(server, bridge, source) {
     const file = target || path.join(DATA_DIR, 'exports',
       `${String(frame.name).replace(/[^A-Za-z0-9]+/g, '_')}_${frame.id.replace(/[^0-9]+/g, '_')}.json`);
     if (!path.isAbsolute(file) || !file.endsWith('.json')) throw new Error('path must be an absolute .json path');
+    if (fs.existsSync(file) && !isExport(file)) {
+      throw new Error(`${file} exists and is not a design export; choose another path.`);
+    }
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify(result.data));
     return [text({

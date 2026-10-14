@@ -47,3 +47,10 @@ test('the server refreshes the plugin files when it starts', async () => {
   assert.deepEqual(fs.readFileSync(path.join(dir, 'plugin', 'ui.html')), fs.readFileSync(path.join(PLUGIN, 'ui.html')));
   await transport.close();
 });
+
+test('arguments with spaces are quoted for the Windows shell', async () => {
+  const { shellArg } = await import('../src/setup.js');
+  assert.equal(shellArg('C:\\Program Files\\nodejs\\node.exe'), '"C:\\Program Files\\nodejs\\node.exe"');
+  assert.equal(shellArg('--scope'), '--scope');
+  assert.equal(shellArg('a"b c'), '"a""b c"');
+});

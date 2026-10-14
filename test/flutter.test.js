@@ -66,10 +66,15 @@ function kitchenSink() {
       fills: [{ type: 'GRADIENT_LINEAR', visible: true, gradientTransform: [[1, 0, 0], [0, 1, 0]],
         gradientStops: [{ position: 0, color: black }, { position: 1, color: { r: 1, g: 0, b: 0, a: 1 } }] }] }] }),
     text('Go', { id: '4:6', x: 150, y: 50, height: 8, leadingTrim: 'CAP_HEIGHT' }, { lineHeight: { unit: 'AUTO' } }),
+    text('Styled', { id: '4:10', x: 0, y: 40 }, { textStyle: 'body/medium' }),
+    text('Styled 2', { id: '4:11', x: 0, y: 60 }, { textStyle: 'body/medium', fills: [solid({ r: 1, g: 0, b: 0, a: 1 })] }),
     { id: '4:7', name: 'Tilted', type: 'RECTANGLE', x: 150, y: 60, width: 20, height: 40, rawWidth: 40, rawHeight: 20,
       transform: [[0, 1], [-1, 0]], fills: [solid()] },
     { id: '4:8', name: 'Mirror', type: 'RECTANGLE', x: 175, y: 60, width: 20, height: 20, rawWidth: 20, rawHeight: 20,
       transform: [[-1, 0], [0, 1]], fills: [solid()] },
+    { id: '4:9', name: 'Pressed', type: 'RECTANGLE', x: 0, y: 0, width: 30, height: 30, cornerRadius: 6, blendMode: 'MULTIPLY',
+      fills: [solid(), solid({ r: 1, g: 0, b: 0, a: 1 }, { blendMode: 'SCREEN' })],
+      effects: [{ type: 'INNER_SHADOW', visible: true, radius: 4, spread: 1, offset: { x: 0, y: 2 }, color: { r: 0, g: 0, b: 0, a: 0.3 } }] },
   ], { fills: [solid({ r: 0.95, g: 0.95, b: 0.95, a: 1 })] });
 }
 
@@ -162,6 +167,9 @@ test('text: runs, trim, paragraphs, case, spacing and truncation', () => {
   assert.match(upper, /letterSpacing: 0.32/);
   assert.match(upper, /softWrap: false/);
 
+  // Zero spacing is written out, so a theme's spacing is not inherited.
+  assert.match(dart(frame([text('Plain')])).code, /letterSpacing: 0,/);
+
   const soft = dart(frame([text('A B')])).code;
   assert.match(soft, /'A\\nB'/);
 
@@ -200,6 +208,7 @@ test('the generated code passes the Flutter analyzer', { timeout: 240000 }, (t) 
   const screen = { ...kitchenSink(), width: 393, height: 1400, numberOfFixedChildren: 1 };
   const codes = [dart(data.frames[0].tree).code, dart(kitchenSink(), { keys: true }).code, dart(kitchenSink()).code,
     dart(screen).code, dart(screen, { keys: true }).code];
+  assert.match(codes[2], /AppTextStyles\.bodyMedium/);
   for (const code of codes) {
     const issues = analyzeCode(flutter, code, dir);
     assert.deepEqual(issues, [], `analyzer issues:\n${JSON.stringify(issues, null, 2)}\n${code}`);
@@ -253,4 +262,88 @@ test('on a screen, fixed-width text columns may shrink; rows with a filling chil
   const withFill = screen(row([col('6:2', 0, 240), { ...col('6:3', 250, 100), layoutSizingHorizontal: 'FILL' }]));
   assert.doesNotMatch(withFill, /Flexible\(/);
   assert.match(withFill, /Expanded\(/);
+});
+
+test('inner shadows lie on the fills and blend modes blend', () => {
+  const inner = { type: 'INNER_SHADOW', visible: true, radius: 8, spread: 2, offset: { x: 0, y: 4 }, color: { r: 0, g: 0, b: 0, a: 0.25 } };
+  const card = dart(frame([], { cornerRadius: 12, fills: [solid()], effects: [inner] }));
+  assert.match(card.code, /decoration: _InnerShadowDecoration\(\s+decoration: BoxDecoration\(\s+color: Color\(0xFF000000\),\s+borderRadius: BorderRadius.circular\(12\),\s+\),\s+shadows: const \[\s+BoxShadow\([\s\S]*?spreadRadius: 2,\s+\),\s+\],\s+borderRadius: BorderRadius.circular\(12\),\s+shape: BoxShape.rectangle,/);
+  assert.match(card.code, /class _InnerShadowDecoration extends Decoration/);
+  assert.doesNotMatch(card.code, /class _Blend/);
+  assert.deepEqual(card.warnings, []);
+
+  const circle = dart(frame([{ id: '2:1', name: 'Dot', type: 'ELLIPSE', x: 0, y: 0, width: 40, height: 40, fills: [solid()], effects: [inner] }]));
+  assert.match(circle.code, /_InnerShadowDecoration\([\s\S]*shape: BoxShape.circle/);
+
+  // Over an image fill the shadow is its own layer above the image.
+  const photo = dart(frame([], { fills: [solid(), { type: 'IMAGE', visible: true, scaleMode: 'CROP', imageHash: 'h', imageTransform: [[1, 0, 0], [0, 1, 0]] }], effects: [inner] }));
+  assert.match(photo.code, /Image.asset[\s\S]*DecoratedBox\(\s+decoration: _InnerShadowDecoration\(/);
+
+  // Fill layers cover the padding; only the content is padded.
+  const padded = dart(frame([text('Hi', { x: 16, y: 16 })], {
+    layoutMode: 'VERTICAL', paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 16,
+    primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED',
+    fills: [solid(), { type: 'IMAGE', visible: true, scaleMode: 'CROP', imageHash: 'h', imageTransform: [[1, 0, 0], [0, 1, 0]] }], effects: [inner],
+  })).code;
+  assert.match(padded, /Positioned.fill\([\s\S]*Positioned.fill\([\s\S]*_InnerShadowDecoration[\s\S]*Padding\(\s+padding: EdgeInsets.all\(16\),/);
+  assert.doesNotMatch(padded, /Container\([^]*?padding: EdgeInsets.all\(16\),\s+decoration:/);
+
+  const fill = dart(frame([], { fills: [solid(), solid({ r: 1, g: 0, b: 0, a: 1 }, { blendMode: 'MULTIPLY' })] }));
+  assert.match(fill.code, /_Blend\(\s+mode: BlendMode.multiply,\s+child: DecoratedBox\(/);
+  assert.match(fill.code, /import 'package:flutter\/rendering.dart';/);
+  assert.deepEqual(fill.warnings, []);
+
+  const layer = dart(frame([{ id: '2:1', name: 'Glow', type: 'RECTANGLE', x: 0, y: 0, width: 40, height: 40, fills: [solid()], blendMode: 'SCREEN' }]));
+  assert.match(layer.code, /_Blend\(\s+mode: BlendMode.screen,/);
+
+  const burn = dart(frame([{ id: '2:1', name: 'Burn', type: 'RECTANGLE', x: 0, y: 0, width: 40, height: 40, fills: [solid()], blendMode: 'LINEAR_BURN' }]));
+  assert.match(JSON.stringify(burn.warnings), /linear_burn blend of the layer is drawn normal/);
+});
+
+test('screenutil output scales lengths by axis and keeps ratios', () => {
+  const root = frame([
+    { id: '2:1', name: 'Card', type: 'FRAME', x: 16, y: 24, width: 120, height: 48, cornerRadius: 12,
+      layoutMode: 'HORIZONTAL', itemSpacing: 8, paddingLeft: 10, paddingRight: 10, paddingTop: 6, paddingBottom: 6,
+      primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED', fills: [solid()],
+      strokes: [solid()], strokeWeight: 1,
+      effects: [{ type: 'DROP_SHADOW', visible: true, radius: 8, offset: { x: 0, y: 2 }, color: { r: 0, g: 0, b: 0, a: 0.2 } }],
+      children: [text('Hi', { id: '2:2', x: 26, y: 30 }, { letterSpacing: { unit: 'PIXELS', value: 0.5 } })] },
+  ]);
+  const { code } = dart(root, { screenUtil: true });
+  assert.match(code, /import 'package:flutter_screenutil\/flutter_screenutil.dart';/);
+  assert.match(code, /left: 16.w,\s+top: 24.h,/);
+  assert.match(code, /width: 120.w,\s+height: 48.h,/);
+  assert.match(code, /EdgeInsets.symmetric\(horizontal: 10.w, vertical: 6.h\)|EdgeInsets.fromLTRB\(10.w, 6.h, 10.w, 6.h\)/);
+  assert.match(code, /BorderRadius.circular\(12.r\)/);
+  assert.match(code, /spacing: 8.w,/);
+  assert.match(code, /fontSize: 16.sp,/);
+  assert.match(code, /height: 1.25,/, 'line height stays a ratio');
+  assert.match(code, /letterSpacing: 0.5,/);
+  assert.match(code, /blurRadius: [\d.]+,/, 'shadows are not scaled');
+  assert.match(code, /width: 1[,)]/, 'stroke widths are not scaled');
+  assert.doesNotMatch(dart(root).code, /\.w\b|\.sp\b/);
+});
+
+test('a Figma text style becomes a named TextStyle', () => {
+  const styled = (id, y, seg = {}, extra = {}) => text('Hi', { id, x: 0, y, ...extra }, { textStyle: 'heading/h2', ...seg });
+  const both = dart(frame([styled('2:1', 0), styled('2:2', 30, { fills: [solid({ r: 1, g: 0, b: 0, a: 1 })] })]));
+  assert.match(both.code, /static const TextStyle headingH2 = TextStyle\(\s+fontFamily: 'Inter',\s+fontSize: 16,/);
+  assert.equal(both.code.match(/static const TextStyle/g).length, 1);
+  assert.equal(both.code.match(/AppTextStyles\.headingH2\.copyWith\(color: Color\(0xFF000000\)\)/g).length, 1);
+  assert.match(both.code, /AppTextStyles\.headingH2\.copyWith\(color: Color\(0xFFFF0000\)\)/);
+  assert.doesNotMatch(both.code, /\/\/ heading\/h2[\s\S]*fontSize: 16,\s+fontWeight[\s\S]*class/);
+
+  // The same style with another line height (from another layer's box) stays inline.
+  const clash = dart(frame([styled('2:1', 0), styled('2:2', 30, { lineHeight: { unit: 'PIXELS', value: 28 } })]));
+  assert.equal(clash.code.match(/AppTextStyles\.headingH2/g).length, 1);
+  assert.match(clash.code, /height: 1.75,/);
+
+  // Mixed styles in one text are left inline.
+  const mixed = dart(frame([{ ...text('Ab'), segments: [
+    { ...text('A').segments[0], characters: 'A', textStyle: 'a' }, { ...text('b').segments[0], characters: 'b', textStyle: 'b' }] }]));
+  assert.doesNotMatch(mixed.code, /AppTextStyles/);
+
+  const scaled = dart(frame([styled('2:1', 0)]), { screenUtil: true });
+  assert.match(scaled.code, /static TextStyle get headingH2 => TextStyle\(\s+fontFamily: 'Inter',\s+fontSize: 16.sp,/);
+  assert.doesNotMatch(scaled.code, /const Text\(/);
 });

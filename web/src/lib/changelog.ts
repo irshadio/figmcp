@@ -2,6 +2,22 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.5.0",
+    notes: [
+      { type: "new", text: "verify_code renders Flutter code with flutter test and compares it with Figma's render, inside your own project when you name the widget's file." },
+      { type: "new", text: "search_design_system lists the components, styles and variables of the open file, so designs reuse them." },
+      { type: "new", text: "place_image puts local images and SVGs into the open file." },
+      { type: "new", text: "Flutter: projects using flutter_screenutil get .w, .h, .r and .sp lengths." },
+      { type: "new", text: "Flutter: Figma text styles become named AppTextStyles." },
+      { type: "improved", text: "Flutter: inner shadows and blend modes are drawn." },
+      { type: "improved", text: "Faster reads: images the server already has, and images of hidden layers, are not sent again; large nodes stop reading early." },
+      { type: "fixed", text: "A malformed request or plugin message no longer stops the server; requests must come from this machine." },
+      { type: "fixed", text: "save_design_export no longer replaces JSON files that are not design exports." },
+      { type: "fixed", text: "Flutter: text no longer takes the letter spacing of the app's theme." },
+      { type: "improved", text: "A link to the website in the plugin panel." },
+    ],
+  },
+  {
     version: "1.4.2",
     notes: [{ type: "improved", text: "Listed in the official MCP Registry as io.github.irshadio/figmcp." }],
   },

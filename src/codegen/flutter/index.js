@@ -8,11 +8,12 @@ import { drawnAsSvg, isTurned, straightLine, visibleChildren } from '../nodes.js
 import { autoLineRatios, segmentsOf } from '../text.js';
 import { visiblePaints } from '../util.js';
 import {
-  call, dColor, dFileName, dIdent, dNum, dType, lambda, list, method, print, raw, str,
+  call, dColor, dFileName, dIdent, dNum, dType, isConst, lambda, list, method, print, raw, str,
 } from './dart.js';
 import {
-  alignment, blurSigma, blurs, border, borderRadius, boxShadows, composite, gradient,
+  alignment, blendMode, blurSigma, blurs, border, borderRadius, boxShadows, composite, gradient, HELPERS,
 } from './paint.js';
+import { screenUtil } from './scale.js';
 import { fontWeight, runGradient, textWidget } from './text.js';
 
 const WRAPPING_PARENTS = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -76,8 +77,9 @@ function edgeInsets([top, right, bottom, left]) {
 }
 
 class FlutterWriter {
-  constructor(assets, { connect = null, keys = false, assetDirs = {} } = {}) {
+  constructor(assets, { connect = null, keys = false, assetDirs = {}, screenUtil = false } = {}) {
     this.assets = assets;
+    this.screenUtil = screenUtil;
     this.connect = connect;
     this.keys = keys;
     this.dirs = { svg: assetDirs.svg || 'assets/figma', image: assetDirs.image || 'assets/figma' };
@@ -90,9 +92,17 @@ class FlutterWriter {
     this.rasterized = [];
     this.connected = new Map();
     this.imports = new Set(['package:flutter/material.dart']);
+    this.helpers = new Set();
+    this.textStyles = new Map();
+    this.textStyleIdents = new Set();
     this.ratios = null;
     this.screen = null;
     this.scrolls = false;
+  }
+
+  /** Dart code for a length in design pixels: scaled by flutter_screenutil when it is on. */
+  length(v, unit) {
+    return this.screenUtil ? `${dNum(v)}.${unit}` : dNum(v);
   }
 
   warn(node, message) {
@@ -378,7 +388,32 @@ class FlutterWriter {
       value: (v, name) => this.value(v, name),
       color: (c, o, name) => this.color(c, o, name),
       warn: (message) => this.warn(node, message),
+      textStyle: (name, style) => this.textStyle(name, style),
     };
+  }
+
+  /**
+   * AppTextStyles.<name> for a Figma text style with the TextStyle [style],
+   * or null when the same style already came out differently (a line
+   * height taken from another layer's box).
+   */
+  textStyle(name, style) {
+    const code = print(style);
+    if (this.textStyles.has(name)) {
+      const t = this.textStyles.get(name);
+      return t.code === code ? this.textStyleRef(t) : null;
+    }
+    let ident = dIdent(name, 'style');
+    for (let i = 2; this.textStyleIdents.has(ident); i++) ident = `${dIdent(name, 'style')}${i}`;
+    this.textStyleIdents.add(ident);
+    const t = { ident, code, style, name };
+    this.textStyles.set(name, t);
+    return this.textStyleRef(t);
+  }
+
+  // A style scaled by flutter_screenutil is a getter, so it is not constant.
+  textStyleRef(t) {
+    return raw(`AppTextStyles.${t.ident}`, !this.screenUtil && isConst(t.style));
   }
 
   text(node, size, { keyed = true } = {}) {
@@ -504,14 +539,16 @@ class FlutterWriter {
     const vars = node.vars || {};
     const paints = (Array.isArray(node.fills) ? node.fills : [])
       .map((p, i) => ({ p, i })).filter(({ p }) => p && p.visible !== false);
-    for (const { p } of paints) {
-      if (p.blendMode && !['NORMAL', 'PASS_THROUGH'].includes(p.blendMode)) this.warn(node, `the ${p.blendMode.toLowerCase()} blend of a fill is not drawn`);
-    }
+    const blendOf = (p) => {
+      const mode = blendMode(p.blendMode);
+      if (mode === null) this.warn(node, `the ${p.blendMode.toLowerCase()} blend of a fill is drawn normal`);
+      return mode && mode !== 'normal' ? mode : null;
+    };
     // Solid paints over solid paints composite to one colour.
     const merged = [];
     for (const item of paints) {
       const last = merged[merged.length - 1];
-      if (item.p.type === 'SOLID' && last && last.p.type === 'SOLID') {
+      if (item.p.type === 'SOLID' && last && last.p.type === 'SOLID' && !blendOf(item.p) && !blendOf(last.p)) {
         const c = composite({ color: last.p.color, opacity: last.p.opacity ?? 1 }, { color: item.p.color, opacity: item.p.opacity ?? 1 });
         merged[merged.length - 1] = { p: { type: 'SOLID', color: c.color, opacity: 1 }, i: -1 };
       } else merged.push(item);
@@ -524,11 +561,15 @@ class FlutterWriter {
       if (p.type === 'IMAGE') return { image: p };
       return null;
     };
-    const items = merged.map(paintOf).filter(Boolean);
+    const items = merged.map((m) => {
+      const item = paintOf(m);
+      const blend = blendOf(m.p);
+      return item && blend ? { ...item, blend } : item;
+    }).filter(Boolean);
     const out = { base: null, image: null, layers: [] };
     items.forEach((item, k) => {
-      if (k === 0 && !item.image) out.base = item;
-      else if (k === items.length - 1 && item.image && item.image.scaleMode !== 'CROP' && !out.image) out.image = item.image;
+      if (k === 0 && !item.image && !item.blend) out.base = item;
+      else if (k === items.length - 1 && item.image && item.image.scaleMode !== 'CROP' && !out.image && !item.blend) out.image = item.image;
       else out.layers.push(item);
     });
     return out;
@@ -556,8 +597,22 @@ class FlutterWriter {
     return call('DecorationImage', args);
   }
 
-  /** A fill drawn as its own layer: a decorated box, or a cropped image. */
+  /** A fill drawn as its own layer, blended with the fills under it. */
   fillLayer(node, item, radius) {
+    const { blend, ...paint } = item;
+    const layer = this.plainFillLayer(node, paint, radius);
+    return layer && blend ? this.blend(blend, layer) : layer;
+  }
+
+  /** [child] blended with what is painted under it by the Flutter BlendMode [mode]. */
+  blend(mode, child) {
+    this.helpers.add('blend');
+    this.imports.add('package:flutter/rendering.dart');
+    return call('_Blend', { mode: raw(`BlendMode.${mode}`), child });
+  }
+
+  /** A fill drawn as its own layer: a decorated box, or a cropped image. */
+  plainFillLayer(node, item, radius) {
     if (item.image && item.image.scaleMode === 'CROP' && Array.isArray(item.image.imageTransform)) {
       const [[a, b, tx], [c, d, ty]] = item.image.imageTransform;
       if (Math.abs(b) > 1e-6 || Math.abs(c) > 1e-6) this.warn(node, 'a turned image crop is drawn unturned');
@@ -601,12 +656,13 @@ class FlutterWriter {
     const radius = this.shapeRadius(node);
     const shape = this.circle(node);
     const fills = this.fills(node);
-    const shadows = boxShadows(node, (c) => this.color(c), (m) => this.warn(node, m));
+    const shadows = boxShadows(node, (c) => this.color(c));
+    const inner = boxShadows(node, (c) => this.color(c), 'INNER_SHADOW');
     const hasPaint = Boolean(fills.base || fills.image || fills.layers.length);
     if (shadows.length && !hasPaint && visibleChildren(node).length) {
       this.warn(node, 'the drop shadow follows the box, not its content');
     }
-    const decoration = fills.base || fills.image || shadows.length || (radius && node.clipsContent)
+    let decoration = fills.base || fills.image || shadows.length || (radius && node.clipsContent)
       ? call('BoxDecoration', {
         ...(fills.base || {}),
         image: fills.image ? this.decorationImage(node, fills.image) : null,
@@ -620,18 +676,34 @@ class FlutterWriter {
     const content = given || this.content(node);
     let child = content.widget;
     const layers = fills.layers.map((item) => this.fillLayer(node, item, radius)).filter(Boolean);
+    if (inner.length) {
+      // Inner shadows lie on the fills, under the content.
+      this.helpers.add('innerShadow');
+      const innerArgs = {
+        shadows: list(inner), borderRadius: (!shape && radius) || raw('null'), shape: shape || raw('BoxShape.rectangle'),
+      };
+      if (layers.length) {
+        layers.push(call('DecoratedBox', { decoration: call('_InnerShadowDecoration', { decoration: raw('null'), ...innerArgs }) }));
+      } else {
+        decoration = call('_InnerShadowDecoration', { decoration: decoration || raw('null'), ...innerArgs });
+      }
+    }
+    let padding = content.padding;
     if (layers.length) {
+      // Fill layers cover the whole box; only the content is padded.
+      const inside = padding ? call('Padding', { padding, child: child || call('SizedBox', {}) }) : child;
+      padding = null;
       child = call('Stack', {
         fit: raw('StackFit.passthrough'),
         clipBehavior: raw('Clip.none'),
-        children: list([...layers.map((l) => call('Positioned.fill', { child: l })), child]),
+        children: list([...layers.map((l) => call('Positioned.fill', { child: l })), inside]),
       });
     }
     const clip = node.clipsContent ? (radius || shape ? raw('Clip.antiAlias') : raw('Clip.hardEdge')) : null;
     const args = {
       width: dim(size.w),
       height: dim(size.h),
-      padding: content.padding,
+      padding,
       decoration: decoration || (clip ? call('BoxDecoration', {}) : null),
       foregroundDecoration: foreground,
       clipBehavior: clip,
@@ -670,9 +742,9 @@ class FlutterWriter {
     if (typeof node.opacity === 'number' && node.opacity < 1) {
       out = call('Opacity', { opacity: this.value(node.opacity, node.vars && node.vars.opacity), child: out });
     }
-    if (node.blendMode && !['NORMAL', 'PASS_THROUGH'].includes(node.blendMode)) {
-      this.warn(node, `the ${node.blendMode.toLowerCase()} blend of the layer is not drawn`);
-    }
+    const mode = blendMode(node.blendMode);
+    if (mode === null) this.warn(node, `the ${node.blendMode.toLowerCase()} blend of the layer is drawn normal`);
+    else if (mode !== 'normal') out = this.blend(mode, out);
     return out;
   }
 
@@ -735,7 +807,7 @@ class FlutterWriter {
     const page = (child) => call('LayoutBuilder', {
       builder: lambda(['context', 'constraints'], call('SingleChildScrollView', {
         child: call('SizedBox', {
-          height: raw(`constraints.hasBoundedHeight && constraints.maxHeight > ${dNum(H)} ? constraints.maxHeight : ${dNum(H)}`, false),
+          height: raw(`constraints.hasBoundedHeight && constraints.maxHeight > ${this.length(H, 'h')} ? constraints.maxHeight : ${this.length(H, 'h')}`, false),
           child,
         }),
       })),
@@ -920,7 +992,8 @@ class FlutterWriter {
  * layer's widget (used to measure the result). [assetDirs] sets the folders
  * of the asset paths: { svg, image }. [screen] draws the root as a phone
  * screen (it fills the screen and tall frames scroll); by default portrait
- * frames of a phone's width are screens.
+ * frames of a phone's width are screens. [screenUtil] writes lengths with
+ * flutter_screenutil's .w, .h, .r and .sp.
  */
 export function toFlutter(root, assets, options = {}) {
   const writer = new FlutterWriter(assets, options);
@@ -938,6 +1011,10 @@ export function toFlutter(root, assets, options = {}) {
     }
   }
   tree = tree || writer.node(rootNode, { kind: 'root' }) || call('SizedBox', {});
+  if (options.screenUtil) {
+    tree = screenUtil(tree);
+    writer.imports.add('package:flutter_screenutil/flutter_screenutil.dart');
+  }
   const className = options.className || dType(root.name, 'Design');
   const body = print(tree, 2);
   // dart: imports first, then packages, each sorted by URI.
@@ -961,6 +1038,20 @@ export function toFlutter(root, assets, options = {}) {
     '  }',
     '}',
   ];
+  if (writer.textStyles.size) {
+    lines.push('', 'abstract final class AppTextStyles {');
+    for (const t of writer.textStyles.values()) {
+      const style = options.screenUtil ? screenUtil(t.style) : t.style;
+      const body = print(style, 1, isConst(style));
+      lines.push(isConst(style)
+        ? `  static const TextStyle ${t.ident} = ${body}; // ${t.name}`
+        : `  static TextStyle get ${t.ident} => ${body}; // ${t.name}`);
+    }
+    lines.push('}');
+  }
+  for (const name of ['innerShadow', 'blend']) {
+    if (writer.helpers.has(name)) lines.push('', HELPERS[name]);
+  }
   if (writer.tokens.size) {
     lines.push('', 'abstract final class DesignTokens {');
     for (const t of writer.tokens.values()) {

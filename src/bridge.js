@@ -30,7 +30,24 @@ function normalizeCode(code) {
 function sameSecret(a, b) {
   const x = Buffer.from(String(a || ''));
   const y = Buffer.from(String(b || ''));
-  return x.length === y.length && crypto.timingSafeEqual(x, y);
+  return x.length > 0 && x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+// Requests must name this machine, so a web page reaching the port through a
+// rebound DNS name is refused.
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+function localHost(req) {
+  const host = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
+  return LOCAL_HOSTS.has(host);
+}
+
+function requestUrl(req, base) {
+  try {
+    return new URL(req.url, base);
+  } catch {
+    return null;
+  }
 }
 
 function readBody(req) {
@@ -98,12 +115,24 @@ export class Bridge {
   tryOwn() {
     if (this.owner) return Promise.resolve(true);
     return new Promise((resolve) => {
-      const server = http.createServer((req, res) => this.handle(req, res));
+      const server = http.createServer((req, res) => {
+        this.handle(req, res).catch((e) => {
+          this.log(`request failed: ${e.message}`);
+          if (!res.headersSent) res.writeHead(500);
+          res.end();
+        });
+      });
       const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_BODY });
       server.on('upgrade', (req, socket, head) => {
         // Plugin iframes have an opaque origin ("null"); a web page would
         // send its own origin, so it is refused.
         const origin = req.headers.origin;
+        const url = requestUrl(req, this.baseUrl);
+        if (!url || !localHost(req)) {
+          socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+          socket.destroy();
+          return;
+        }
         if (origin !== undefined && origin !== 'null' &&
             !EXTRA_ORIGINS.includes(origin)) {
           this.lastRefusedOrigin = origin;
@@ -112,7 +141,7 @@ export class Bridge {
           socket.destroy();
           return;
         }
-        const code = new URL(req.url, this.baseUrl).searchParams.get('code');
+        const code = url.searchParams.get('code');
         wss.handleUpgrade(req, socket, head, (ws) => this.admit(ws, code));
       });
       server.once('error', () => resolve(false));
@@ -129,6 +158,12 @@ export class Bridge {
   // A wrong code gets a close code the plugin UI recognises, so it can ask
   // for the right one; repeated failures lock pairing for a minute.
   admit(ws, code) {
+    // A bad or oversized frame errors the socket; unhandled, it would end
+    // the process every session shares.
+    ws.on('error', (e) => {
+      this.log(`plugin connection error: ${e.message}`);
+      ws.terminate();
+    });
     const now = Date.now();
     this.failures = this.failures.filter((t) => now - t < 60000);
     if (this.failures.length >= MAX_FAILURES) {
@@ -197,7 +232,11 @@ export class Bridge {
   }
 
   async handle(req, res) {
-    const url = new URL(req.url, this.baseUrl);
+    const url = requestUrl(req, this.baseUrl);
+    if (!url || !localHost(req)) {
+      res.writeHead(400).end();
+      return;
+    }
     if (req.method === 'GET' && url.pathname.startsWith('/assets/')) {
       const file = assetPath(url.pathname.slice('/assets/'.length));
       if (!file || !fs.existsSync(file)) {
@@ -219,6 +258,12 @@ export class Bridge {
         res.writeHead(403).end();
         return;
       }
+      // Headers go out at once and a space every 30 s, so a call that runs
+      // for minutes is not cut off by the client's header or body timeout;
+      // JSON allows the leading spaces.
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.flushHeaders();
+      const keepAlive = setInterval(() => res.write(' '), 30000);
       let reply;
       try {
         const { method, params, timeout } = JSON.parse(await readBody(req));
@@ -228,8 +273,9 @@ export class Bridge {
           error: e.message,
           unavailable: e instanceof PluginUnavailable,
         };
+      } finally {
+        clearInterval(keepAlive);
       }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(reply));
       return;
     }
@@ -272,8 +318,14 @@ export class Bridge {
       body: JSON.stringify({ method, params, timeout }),
       signal: AbortSignal.timeout(timeout + 5000),
     });
-    if (res.status === 403) throw new Error('Port is used by another program');
-    const reply = await res.json();
+    const notOurs = new Error(`Port ${this.port} is used by another program`);
+    if (res.status === 403 || !res.ok || !String(res.headers.get('content-type')).includes('application/json')) throw notOurs;
+    let reply;
+    try {
+      reply = JSON.parse(await res.text());
+    } catch {
+      throw notOurs;
+    }
     if (reply.error) {
       throw reply.unavailable
         ? new PluginUnavailable(reply.error)

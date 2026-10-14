@@ -7,7 +7,7 @@ import { toFlutter } from '../codegen/flutter/index.js';
 import { toMetadataXml } from '../codegen/metadata.js';
 import { countNodes, toReactTailwind } from '../codegen/react.js';
 import { systemUi } from '../codegen/system-ui.js';
-import { detectFramework, flutterAssetDirs, FRAMEWORKS } from '../project.js';
+import { detectFramework, flutterAssetDirs, FRAMEWORKS, usesScreenUtil } from '../project.js';
 import { ASSETS, imageExt, saveAsset, snapshotSummary } from '../store.js';
 import {
   assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, resolver, selectionBlock,
@@ -27,7 +27,8 @@ const FLUTTER_GUIDANCE =
   'logical pixels at the design size: sizes, spacing, radii, colours, fonts ' +
   'and line heights (height with TextLeadingDistribution.even reproduces ' +
   'Figma\'s line boxes). DesignTokens holds each design variable used, with ' +
-  'its Figma name: use the project\'s token of that name. Auto-layout frames ' +
+  'its Figma name: use the project\'s token of that name. AppTextStyles holds ' +
+  'each Figma text style used: map it to the app\'s text theme. Auto-layout frames ' +
   'are Rows, Columns and Wraps; other frames are Stacks whose Positioned ' +
   'children follow the Figma constraints. A phone-sized frame is drawn as a ' +
   'screen: it fills the screen, keeps the shortest height its layers fit ' +
@@ -119,6 +120,9 @@ export function registerDesignTools(server, bridge, source) {
         'Flutter: draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
       assetsDir: z.string().optional().describe(
         'Flutter: folder of the asset paths in the code (default: the svg/png/images folders of the project\'s pubspec.yaml, else assets/figma).'),
+      screenUtil: z.boolean().optional().describe(
+        'Flutter: write lengths with flutter_screenutil (.w, .h, .r, .sp) so the layout scales from the design size ' +
+        '(default: when the project\'s pubspec.yaml depends on flutter_screenutil).'),
       excludeScreenshot: z.boolean().optional().describe('Leave the screenshot out of the response.'),
       forceCode: z.boolean().optional().describe('Always return code, even for very large nodes.'),
       disableCodeConnect: z.boolean().optional().describe('Draw mapped components from their layers instead of naming the code component.'),
@@ -126,8 +130,16 @@ export function registerDesignTools(server, bridge, source) {
     },
   }, guard(async (args) => {
     const { nodeId, excludeScreenshot, forceCode, disableCodeConnect, assetsDir, screen } = args;
+    const scaled = args.screenUtil ?? usesScreenUtil();
     const { id } = await source.resolveId(nodeId);
-    const node = await source.node(id, { images: true, maxNodes: forceCode ? FORCED_NODE_LIMIT : READ_NODE_LIMIT });
+    // Variables and the screenshot are read while the layers are.
+    const varsRead = source.variables(id).catch(() => null);
+    const shotRead = excludeScreenshot ? null : source.screenshot(id, { maxDimension: 1024 }).catch(() => null);
+    const node = await source.node(id, {
+      images: true,
+      maxNodes: forceCode ? FORCED_NODE_LIMIT : READ_NODE_LIMIT,
+      ...(forceCode ? {} : { maxVisible: CODE_NODE_LIMIT + 1 }),
+    });
     const count = countNodes(node.tree);
     if (node.truncated || (count > CODE_NODE_LIMIT && !forceCode)) {
       const outline = node.truncated ? (await source.outline(id)).tree : node.tree;
@@ -146,8 +158,13 @@ export function registerDesignTools(server, bridge, source) {
     try {
       if (framework === 'flutter') {
         const dirs = assetsDir ? { svg: assetsDir.replace(/\/+$/, ''), image: assetsDir.replace(/\/+$/, '') } : flutterAssetDirs();
-        const result = toFlutter(node.tree, fileResolver(node.images), { connect, assetDirs: dirs, screen });
+        const result = toFlutter(node.tree, fileResolver(node.images), { connect, assetDirs: dirs, screen, screenUtil: scaled });
         out = [text(result.code), ...flutterDetails(result, node.tree)];
+        if (scaled) {
+          out.push(text(`Lengths use flutter_screenutil: .w and .h scale from a ${node.tree.width}x${node.tree.height} ` +
+            'design, .r takes the smaller scale and .sp scales text. Keep the app\'s ScreenUtilInit designSize; ' +
+            'when it differs from this frame, the frame\'s numbers still scale against it.'));
+        }
       } else {
         const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });
         out = [text(result.code)];
@@ -180,19 +197,14 @@ export function registerDesignTools(server, bridge, source) {
       out.push(text(`The plugin could not read some layers; they are left out:\n${
         node.failures.map((f) => `- ${f.id} "${f.name}": ${f.error}`).join('\n')}`));
     }
-    try {
-      const vars = await source.variables(id);
-      if (vars.source === 'live' && Object.keys(vars.defs).length) {
-        out.push(text(`These variables and styles are used in the design:\n${JSON.stringify(vars.defs, null, 2)}`));
-      }
-    } catch { /* variables are optional context */ }
-    out.push(text(framework === 'flutter' ? FLUTTER_GUIDANCE : GUIDANCE));
-    if (!excludeScreenshot) {
-      try {
-        const shot = await source.screenshot(id, { maxDimension: 1024 });
-        out.push(image(shot.png));
-      } catch { /* a node too large to render still gets its code */ }
+    const vars = await varsRead;
+    if (vars && vars.source === 'live' && Object.keys(vars.defs).length) {
+      out.push(text(`These variables and styles are used in the design:\n${JSON.stringify(vars.defs, null, 2)}`));
     }
+    out.push(text(framework === 'flutter' ? FLUTTER_GUIDANCE : GUIDANCE));
+    // A node too large to render still gets its code.
+    const shot = shotRead && await shotRead;
+    if (shot) out.push(image(shot.png));
     out.push(sourceNote(node));
     return out;
   }));
@@ -290,8 +302,10 @@ export function registerDesignTools(server, bridge, source) {
     },
   }, guard(async ({ nodeId, defaultFormat = 'png', defaultScale = 1 }) => {
     const { id } = await source.resolveId(nodeId);
-    const exported = await source.export(id, { format: defaultFormat, scale: defaultScale });
-    const node = await source.node(id, { images: true });
+    const [exported, node] = await Promise.all([
+      source.export(id, { format: defaultFormat, scale: defaultScale }),
+      source.node(id, { images: true }),
+    ]);
     const rawImages = Object.entries(node.images).slice(0, ASSET_CAP).map(([hash, b64]) => {
       const bytes = Buffer.from(b64, 'base64');
       const format = imageExt(bytes);

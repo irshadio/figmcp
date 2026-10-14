@@ -121,6 +121,9 @@ function newContext(options) {
     meta: options.meta === true,
     maxDepth: options.maxDepth,
     maxNodes: typeof options.maxNodes === 'number' ? options.maxNodes : Infinity,
+    // Visible layers: what the code draws, so a read stops once code is out of reach.
+    maxVisible: typeof options.maxVisible === 'number' ? options.maxVisible : Infinity,
+    visibleCount: 0,
     exportTimeout: options.exportTimeout || EXPORT_TIMEOUT,
     count: 0,
     truncated: false,
@@ -167,11 +170,12 @@ async function nodeName(ctx, id) {
   return name;
 }
 
-function paints(list, ctx) {
+function paints(list, ctx, shown) {
   if (list === figma.mixed) return 'mixed';
   if (!list) return undefined;
   return list.map(function (p) {
-    if (p.type === 'IMAGE' && p.imageHash) ctx.imageHashes.add(p.imageHash);
+    // Images of hidden layers and paints are never drawn, so their bytes stay behind.
+    if (shown && p.visible !== false && p.type === 'IMAGE' && p.imageHash) ctx.imageHashes.add(p.imageHash);
     return clean(p);
   });
 }
@@ -383,6 +387,41 @@ async function reactions(ctx, node) {
   return out.length ? out : null;
 }
 
+const AUTO_LAYOUT_PROPS = new Set([
+  'layoutWrap', 'itemSpacing', 'counterAxisSpacing', 'counterAxisAlignContent', 'itemReverseZIndex',
+  'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom', 'primaryAxisAlignItems',
+  'counterAxisAlignItems', 'primaryAxisSizingMode', 'counterAxisSizingMode', 'strokesIncludedInLayout',
+]);
+const STROKE_PROPS = new Set(['strokeWeight', 'strokeAlign', 'strokeCap', 'strokeJoin', 'dashPattern']);
+const SIDE_STROKE_PROPS = new Set(['strokeTopWeight', 'strokeBottomWeight', 'strokeLeftWeight', 'strokeRightWeight']);
+const CORNER_PROPS = new Set(['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius']);
+const TEXT_PROPS = new Set(['maxLines', 'textTruncation', 'paragraphSpacing', 'paragraphIndent', 'listSpacing', 'leadingTrim']);
+const FLOW_CHILD_PROPS = new Set(['layoutAlign', 'layoutGrow', 'layoutPositioning']);
+
+// Every property read crosses into Figma, so groups that cannot apply to
+// the node (padding without auto layout, per-corner radii when the corners
+// match) are not read.
+function propsFor(node) {
+  const read = function (key) { return safe(function () { return node[key]; }); };
+  const autoLayout = 'layoutMode' in node && read('layoutMode') !== 'NONE';
+  const strokes = 'strokes' in node ? read('strokes') : null;
+  const stroked = strokes === figma.mixed || (Array.isArray(strokes) && strokes.length > 0);
+  const sides = stroked && 'strokeTopWeight' in node && read('strokeWeight') === figma.mixed;
+  const corners = 'topLeftRadius' in node && read('cornerRadius') === figma.mixed;
+  const parent = node.parent;
+  const inFlow = parent && 'layoutMode' in parent && parent.layoutMode !== 'NONE';
+  return PROPS.filter(function (key) {
+    if (AUTO_LAYOUT_PROPS.has(key)) return autoLayout;
+    if (STROKE_PROPS.has(key)) return stroked;
+    if (SIDE_STROKE_PROPS.has(key)) return sides;
+    if (CORNER_PROPS.has(key)) return corners;
+    if (TEXT_PROPS.has(key)) return node.type === 'TEXT';
+    if (FLOW_CHILD_PROPS.has(key)) return inFlow;
+    if (key === 'arcData') return node.type === 'ELLIPSE';
+    return true;
+  });
+}
+
 function copyProps(node, out, keys) {
   for (const key of keys) {
     if (!(key in node)) continue;
@@ -410,6 +449,8 @@ function track(ctx, node, promise, onDone, onFail) {
 
 async function serialize(node, origin, ctx, depth) {
   ctx.count++;
+  const shown = node.visible !== false && !ctx.hidden;
+  if (shown) ctx.visibleCount++;
   const out = { id: node.id, name: node.name, type: node.type };
   if ('visible' in node) out.visible = node.visible;
   const box = 'absoluteBoundingBox' in node ? node.absoluteBoundingBox : null;
@@ -421,7 +462,7 @@ async function serialize(node, origin, ctx, depth) {
   }
 
   if (!ctx.meta) {
-    copyProps(node, out, PROPS);
+    copyProps(node, out, propsFor(node));
     if (node.layoutMode === 'GRID') copyProps(node, out, GRID_PROPS);
     if (node.parent && node.parent.layoutMode === 'GRID') copyProps(node, out, GRID_CHILD_PROPS);
     const transform = linearTransform(node);
@@ -431,8 +472,8 @@ async function serialize(node, origin, ctx, depth) {
       out.rawHeight = round(node.height);
     }
     try {
-      if ('fills' in node) out.fills = paints(node.fills, ctx);
-      if ('strokes' in node) out.strokes = paints(node.strokes, ctx);
+      if ('fills' in node) out.fills = paints(node.fills, ctx, shown);
+      if ('strokes' in node) out.strokes = paints(node.strokes, ctx, shown);
       if ('effects' in node && node.effects.length) {
         out.effects = clean(node.effects);
       }
@@ -513,8 +554,9 @@ async function serialize(node, origin, ctx, depth) {
   }
 
   if ('children' in node) {
-    if ((ctx.maxDepth !== undefined && depth >= ctx.maxDepth) || ctx.count >= ctx.maxNodes) {
-      if (ctx.count >= ctx.maxNodes && node.children.length) ctx.truncated = true;
+    const full = ctx.count >= ctx.maxNodes || ctx.visibleCount >= ctx.maxVisible;
+    if ((ctx.maxDepth !== undefined && depth >= ctx.maxDepth) || full) {
+      if (full && node.children.length) ctx.truncated = true;
       out.childCount = node.children.length;
       return out;
     }
@@ -564,16 +606,18 @@ function pageOf(node) {
   return n ? { id: n.id, name: n.name } : null;
 }
 
-async function imageBytes(hashes) {
+// Bytes of the images the server does not have yet ([known] lists those it has).
+async function imageBytes(hashes, known) {
+  const skip = new Set(known || []);
   const images = {};
-  for (const hash of hashes) {
+  await Promise.all(Array.from(hashes).filter(function (hash) { return !skip.has(hash); }).map(async function (hash) {
     try {
       const image = figma.getImageByHash(hash);
       if (image) {
         images[hash] = figma.base64Encode(await withTimeout(image.getBytesAsync(), EXPORT_TIMEOUT));
       }
     } catch (e) { /* an unreadable image only loses that fill */ }
-  }
+  }));
   return images;
 }
 
@@ -608,7 +652,7 @@ async function node(params) {
   if (ctx.truncated) result.truncated = true;
   if (ctx.failures.length) result.failures = ctx.failures;
   if (params.images) {
-    result.images = await timed(ctx, 'images', function () { return imageBytes(ctx.imageHashes); });
+    result.images = await timed(ctx, 'images', function () { return imageBytes(ctx.imageHashes, params.knownImages); });
   }
   if (ctx.timings) {
     result.timings = ctx.timings;
@@ -883,6 +927,7 @@ async function run(params) {
 }
 
 const LINKS = new Set([
+  'https://figmcp.web.app',
   'https://www.linkedin.com/in/irshad1212',
   'https://www.npmjs.com/package/@irshad.io/figma-local-mcp',
 ]);

@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import WebSocket from 'ws';
-import { fakePlugin, nextPort, pairing, startClient, texts, tmpDir } from './helpers.js';
+import { flutterTool } from '../src/tools/verify.js';
+import { FIXTURE, fakePlugin, nextPort, pairing, startClient, texts, tmpDir } from './helpers.js';
 
 test('the plugin must present the pairing code', async () => {
   const port = nextPort();
@@ -75,6 +76,14 @@ test('save_design_export writes a full export with code connect annotations', as
   assert.ok(written.frames[0].previewPng2x);
   const bad = await client.callTool({ name: 'save_design_export', arguments: { path: 'relative.json' } });
   assert.equal(bad.isError, true);
+  // A previous export may be replaced; any other JSON file may not.
+  const again = await client.callTool({ name: 'save_design_export', arguments: { path: target } });
+  assert.equal(again.isError, undefined, texts(again));
+  const config = path.join(dir, 'package.json');
+  fs.writeFileSync(config, '{"name":"app"}');
+  const clobber = await client.callTool({ name: 'save_design_export', arguments: { path: config } });
+  assert.match(texts(clobber), /is not a design export/);
+  assert.equal(fs.readFileSync(config, 'utf8'), '{"name":"app"}');
   plugin.stop();
 });
 
@@ -95,8 +104,19 @@ test('Flutter projects get Flutter code with their asset folders', async () => {
   assert.match(ctx, /reference Flutter code/);
   assert.doesNotMatch(ctx, /http:\/\/localhost/, 'no server URLs in Dart code');
 
+  assert.doesNotMatch(ctx, /flutter_screenutil/);
+
   const react = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true, framework: 'react' } }));
   assert.match(react, /export default function SampleScreen\(\)/);
+
+  // A project using flutter_screenutil gets scaled lengths, unless it asks not to.
+  fs.writeFileSync(path.join(dir, 'pubspec.yaml'), 'name: app\ndependencies:\n  flutter_screenutil: ^5.9.3\nflutter:\n  assets:\n    - assets/svg/\n');
+  const scaled = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true } }));
+  assert.match(scaled, /import 'package:flutter_screenutil\/flutter_screenutil.dart';/);
+  assert.match(scaled, /\d\.w,/);
+  assert.match(scaled, /Lengths use flutter_screenutil/);
+  const plain = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true, screenUtil: false } }));
+  assert.doesNotMatch(plain, /flutter_screenutil/);
   plugin.stop();
 });
 
@@ -128,4 +148,53 @@ test('a read the plugin cut short answers with metadata, not code', async () => 
   assert.match(ctx, /<frame id="10:1" name="Sample Screen"/);
   assert.doesNotMatch(ctx, /export default function|extends StatelessWidget/);
   plugin.stop();
+});
+
+test('verify_code renders the generated Flutter code and compares it with the design', { timeout: 600000 }, async (t) => {
+  const flutter = flutterTool(process.env.FLUTTER);
+  if (!flutter) {
+    t.skip('flutter is not installed');
+    return;
+  }
+  const { client, transport } = await startClient(tmpDir(), nextPort());
+  await client.callTool({ name: 'import_design_export', arguments: { path: FIXTURE } });
+  const missing = await client.callTool({ name: 'verify_code', arguments: { nodeId: '10:1', file: 'lib/none.dart', flutter } });
+  assert.equal(missing.isError, true);
+  assert.match(texts(missing), /pubspec\.yaml/);
+  const result = await client.callTool({ name: 'verify_code', arguments: { nodeId: '10:1', flutter } });
+  assert.notEqual(result.isError, true, texts(result));
+  const report = JSON.parse(result.content[0].text);
+  assert.deepEqual(report.analyzer.errors, []);
+  assert.deepEqual(report.runtimeErrors, []);
+  assert.ok(report.checkedLayers > 0);
+  assert.equal(typeof report.pixels.differingPercent, 'number');
+  assert.ok(result.content.some((c) => c.type === 'image'), 'includes the diff');
+  await transport.close();
+});
+
+test('place_image sends a local image to the plugin and refuses other files', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client, transport } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  assert.equal(await plugin.ready(), true);
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  fs.writeFileSync(path.join(dir, 'dot.png'), png);
+  fs.writeFileSync(path.join(dir, 'icon.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>');
+  fs.writeFileSync(path.join(dir, 'notes.txt'), 'hello');
+
+  const placed = await client.callTool({ name: 'place_image', arguments: { path: 'dot.png', width: 10 } });
+  assert.equal(placed.isError, undefined, texts(placed));
+  assert.ok(plugin.calls.includes('run'));
+  const svg = await client.callTool({ name: 'place_image', arguments: { path: 'icon.svg' } });
+  assert.equal(svg.isError, undefined, texts(svg));
+
+  const fill = await client.callTool({ name: 'place_image', arguments: { path: 'icon.svg', nodeId: '1:2' } });
+  assert.match(texts(fill), /SVG cannot be a fill/);
+  const other = await client.callTool({ name: 'place_image', arguments: { path: 'notes.txt' } });
+  assert.match(texts(other), /not a PNG, JPG, GIF or SVG/);
+  const missing = await client.callTool({ name: 'place_image', arguments: { path: 'nope.png' } });
+  assert.match(texts(missing), /does not exist/);
+  plugin.stop();
+  await transport.close();
 });

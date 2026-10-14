@@ -136,17 +136,140 @@ export function border(node, color, warn = () => {}) {
   return call('Border', named);
 }
 
-/** BoxShadows for the node's drop shadows (inner shadows are reported through [warn]). */
-export function boxShadows(node, color, warn = () => {}) {
+/** BoxShadows for the node's shadows of [type] (DROP_SHADOW or INNER_SHADOW). */
+export function boxShadows(node, color, type = 'DROP_SHADOW') {
   const effects = (Array.isArray(node.effects) ? node.effects : []).filter((e) => e && e.visible !== false);
-  if (effects.some((e) => e.type === 'INNER_SHADOW')) warn('inner shadows are not drawn');
-  return effects.filter((e) => e.type === 'DROP_SHADOW').map((e) => call('BoxShadow', {
+  return effects.filter((e) => e.type === type).map((e) => call('BoxShadow', {
     color: color(e.color || { r: 0, g: 0, b: 0, a: 0.25 }),
     offset: call('Offset', {}, { positional: [e.offset?.x ?? 0, e.offset?.y ?? 0] }),
     blurRadius: Math.round(flutterBlur(e.radius) * 100) / 100 || null,
     spreadRadius: e.spread || null,
   }));
 }
+
+// Figma blend modes Flutter draws the same way; LINEAR_BURN has no match.
+const BLEND_MODES = {
+  DARKEN: 'darken', MULTIPLY: 'multiply', COLOR_BURN: 'colorBurn', LIGHTEN: 'lighten',
+  SCREEN: 'screen', COLOR_DODGE: 'colorDodge', LINEAR_DODGE: 'plus', PLUS_LIGHTER: 'plus',
+  OVERLAY: 'overlay', SOFT_LIGHT: 'softLight', HARD_LIGHT: 'hardLight', DIFFERENCE: 'difference',
+  EXCLUSION: 'exclusion', HUE: 'hue', SATURATION: 'saturation', COLOR: 'color', LUMINOSITY: 'luminosity',
+};
+
+/** 'normal' for no blend, the Flutter BlendMode name, or null when Flutter has none. */
+export function blendMode(mode) {
+  if (!mode || mode === 'NORMAL' || mode === 'PASS_THROUGH') return 'normal';
+  return BLEND_MODES[mode] || null;
+}
+
+// Helper classes added to the code when it uses them.
+export const HELPERS = {
+  innerShadow: `/// Paints [decoration], then inner shadows inside the box's shape.
+class _InnerShadowDecoration extends Decoration {
+  const _InnerShadowDecoration({
+    required this.decoration,
+    required this.shadows,
+    required this.borderRadius,
+    required this.shape,
+  });
+
+  final BoxDecoration? decoration;
+  final List<BoxShadow> shadows;
+  final BorderRadius? borderRadius;
+  final BoxShape shape;
+
+  @override
+  EdgeInsetsGeometry get padding => decoration?.padding ?? EdgeInsets.zero;
+
+  Path _outline(Rect rect, [double inset = 0]) {
+    final inner = rect.deflate(inset);
+    if (shape == BoxShape.circle) {
+      return Path()..addOval(Rect.fromCircle(center: inner.center, radius: inner.shortestSide / 2));
+    }
+    return Path()..addRRect((borderRadius ?? BorderRadius.zero).toRRect(rect).deflate(inset));
+  }
+
+  @override
+  Path getClipPath(Rect rect, TextDirection textDirection) => _outline(rect);
+
+  @override
+  BoxPainter createBoxPainter([VoidCallback? onChanged]) => _InnerShadowPainter(this, onChanged);
+}
+
+class _InnerShadowPainter extends BoxPainter {
+  _InnerShadowPainter(this.owner, VoidCallback? onChanged)
+      : base = owner.decoration?.createBoxPainter(onChanged),
+        super(onChanged);
+
+  final _InnerShadowDecoration owner;
+  final BoxPainter? base;
+
+  @override
+  void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
+    base?.paint(canvas, offset, configuration);
+    final rect = offset & configuration.size!;
+    canvas.save();
+    canvas.clipPath(owner._outline(rect));
+    for (final shadow in owner.shadows) {
+      final hole = owner._outline(rect.shift(shadow.offset), shadow.spreadRadius);
+      final reach = shadow.blurRadius * 2 + shadow.spreadRadius.abs() + shadow.offset.distance + 1;
+      final path = Path()
+        ..fillType = PathFillType.evenOdd
+        ..addRect(rect.inflate(reach))
+        ..addPath(hole, Offset.zero);
+      final paint = Paint()..color = shadow.color;
+      if (shadow.blurRadius > 0) paint.maskFilter = MaskFilter.blur(BlurStyle.normal, shadow.blurSigma);
+      canvas.drawPath(path, paint);
+    }
+    canvas.restore();
+  }
+
+  @override
+  void dispose() {
+    base?.dispose();
+    super.dispose();
+  }
+}`,
+  blend: `/// Blends [child] with what is painted under it.
+class _Blend extends SingleChildRenderObjectWidget {
+  const _Blend({required this.mode, super.child});
+
+  final BlendMode mode;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderBlend(mode);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderBlend renderObject) {
+    renderObject.mode = mode;
+  }
+}
+
+class _RenderBlend extends RenderProxyBox {
+  _RenderBlend(this._mode);
+
+  BlendMode _mode;
+
+  set mode(BlendMode value) {
+    if (value == _mode) return;
+    _mode = value;
+    markNeedsPaint();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child;
+    if (child == null) return;
+    // A composited child paints into its own layer, which the blend cannot reach.
+    if (child.needsCompositing) {
+      super.paint(context, offset);
+      return;
+    }
+    context.canvas.saveLayer(offset & size, Paint()..blendMode = _mode);
+    super.paint(context, offset);
+    context.canvas.restore();
+  }
+}`,
+};
 
 /** Text shadows for a text node's drop shadows. */
 export function textShadows(node, color) {

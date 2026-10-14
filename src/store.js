@@ -19,41 +19,51 @@ function ensureDirs() {
   }
 }
 
-export function secret() {
+/**
+ * The value stored in [file], created with [make] the first time. The file
+ * appears complete or not at all, so a reader never sees it half written;
+ * a value [valid] rejects (an empty file) is replaced.
+ */
+function storedValue(file, make, valid) {
   ensureDirs();
-  const file = path.join(DATA_DIR, 'secret');
-  try {
-    return fs.readFileSync(file, 'utf8').trim();
-  } catch {
-    const value = crypto.randomBytes(32).toString('hex');
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let value = null;
     try {
-      fs.writeFileSync(file, value, { mode: 0o600, flag: 'wx' });
-      return value;
+      value = fs.readFileSync(file, 'utf8').trim();
+    } catch { /* not created yet */ }
+    if (value !== null && valid(value)) return value;
+    const fresh = make();
+    const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}`;
+    fs.writeFileSync(tmp, fresh, { mode: 0o600 });
+    try {
+      if (value === null) fs.linkSync(tmp, file);
+      else fs.renameSync(tmp, file);
     } catch {
-      return fs.readFileSync(file, 'utf8').trim();
+      // Another instance created it first.
+    } finally {
+      fs.rmSync(tmp, { force: true });
     }
+    // Read back what is on disk, so every instance returns the same value.
   }
+  const last = fs.readFileSync(file, 'utf8').trim();
+  if (valid(last)) return last;
+  throw new Error(`Could not create ${file}`);
+}
+
+export function secret() {
+  return storedValue(path.join(DATA_DIR, 'secret'),
+    () => crypto.randomBytes(32).toString('hex'), (v) => /^[a-f0-9]{64}$/.test(v));
 }
 
 const PAIRING_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 /** The code the plugin must present, e.g. 'K7QM-2XDP' (created once). */
 export function pairingCode() {
-  ensureDirs();
-  const file = path.join(DATA_DIR, 'pairing');
-  try {
-    return fs.readFileSync(file, 'utf8').trim();
-  } catch {
+  return storedValue(path.join(DATA_DIR, 'pairing'), () => {
     const bytes = crypto.randomBytes(8);
     const chars = [...bytes].map((b) => PAIRING_ALPHABET[b % PAIRING_ALPHABET.length]).join('');
-    const value = `${chars.slice(0, 4)}-${chars.slice(4)}`;
-    try {
-      fs.writeFileSync(file, value, { mode: 0o600, flag: 'wx' });
-      return value;
-    } catch {
-      return fs.readFileSync(file, 'utf8').trim();
-    }
-  }
+    return `${chars.slice(0, 4)}-${chars.slice(4)}`;
+  }, (v) => /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(v));
 }
 
 export function assetPath(name) {
@@ -92,6 +102,67 @@ export function validSnapshot(data) {
     data.frames.every((f) => f && f.tree && typeof f.tree.id === 'string');
 }
 
+// Figma image hash -> saved asset name, so an image already on disk is not
+// sent by the plugin again.
+const IMAGE_INDEX = path.join(DATA_DIR, 'images.json');
+let imageIndex = null;
+
+function images() {
+  if (!imageIndex) {
+    try {
+      imageIndex = JSON.parse(fs.readFileSync(IMAGE_INDEX, 'utf8'));
+    } catch {
+      imageIndex = {};
+    }
+  }
+  return imageIndex;
+}
+
+/** Saves the image bytes ({ hash: base64 }) as assets and remembers them. */
+export function rememberImages(bytesByHash) {
+  const index = images();
+  let changed = false;
+  for (const [hash, base64] of Object.entries(bytesByHash)) {
+    const buffer = Buffer.from(base64, 'base64');
+    const name = saveAsset(buffer, imageExt(buffer));
+    if (index[hash] !== name) {
+      index[hash] = name;
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  // Other instances may have added images too: keep theirs.
+  let onDisk = {};
+  try {
+    onDisk = JSON.parse(fs.readFileSync(IMAGE_INDEX, 'utf8'));
+  } catch { /* first image */ }
+  imageIndex = { ...onDisk, ...index };
+  const tmp = `${IMAGE_INDEX}.${process.pid}`;
+  fs.writeFileSync(tmp, JSON.stringify(imageIndex));
+  fs.renameSync(tmp, IMAGE_INDEX);
+}
+
+/** Hashes of the images saved as assets. */
+export function knownImages() {
+  imageIndex = null;
+  const index = images();
+  return Object.keys(index).filter((hash) => fs.existsSync(path.join(ASSETS, index[hash])));
+}
+
+/** { hash: base64 } of the saved images among [hashes]. */
+export function savedImages(hashes) {
+  const index = images();
+  const out = {};
+  for (const hash of hashes) {
+    const name = index[hash];
+    if (!name) continue;
+    try {
+      out[hash] = fs.readFileSync(path.join(ASSETS, name)).toString('base64');
+    } catch { /* removed since */ }
+  }
+  return out;
+}
+
 /**
  * Stores a snapshot; the newest copy of a node wins on lookup. [live] marks a
  * cached plugin read, kept apart so it never replaces a saved frame.
@@ -103,7 +174,19 @@ export function saveSnapshot(data, { live = false } = {}) {
   const tmp = path.join(SNAPSHOTS, '.' + name + '.' + process.pid);
   fs.writeFileSync(tmp, JSON.stringify(data));
   fs.renameSync(tmp, path.join(SNAPSHOTS, name));
+  if (live) pruneLive();
   return name;
+}
+
+// Cached plugin reads kept on disk; saved frames are never pruned.
+const MAX_LIVE = 20;
+
+function pruneLive() {
+  const live = listSnapshots().filter((s) => s.name.startsWith('live_'));
+  for (const { name } of live.slice(MAX_LIVE)) {
+    fs.rmSync(path.join(SNAPSHOTS, name), { force: true });
+    loaded.delete(name);
+  }
 }
 
 export function importFile(file) {
@@ -130,13 +213,21 @@ function listSnapshots() {
     .sort((a, b) => b.mtime - a.mtime);
 }
 
+// Parsed snapshots kept in memory, least recently used dropped first.
+const MAX_LOADED = 8;
+
 function load(name) {
   const file = path.join(SNAPSHOTS, name);
   const mtime = fs.statSync(file).mtimeMs;
   const cached = loaded.get(name);
-  if (cached && cached.mtime === mtime) return cached.data;
+  if (cached && cached.mtime === mtime) {
+    loaded.delete(name);
+    loaded.set(name, cached);
+    return cached.data;
+  }
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
   loaded.set(name, { mtime, data });
+  while (loaded.size > MAX_LOADED) loaded.delete(loaded.keys().next().value);
   return data;
 }
 

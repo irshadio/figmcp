@@ -79,6 +79,9 @@ function styleArgs(seg, node, ctx) {
   if (ls && ls.value) {
     const px = ls.unit === 'PIXELS' ? ls.value : (ls.value / 100) * (size || 0);
     args.letterSpacing = ctx.value(Math.round(px * 100) / 100, vars.letterSpacing, 'double');
+  } else {
+    // Theme text styles (inside a Scaffold) carry their own spacing.
+    args.letterSpacing = 0;
   }
   const paint = topPaint(seg.fills);
   if (paint && paint.type === 'SOLID') {
@@ -104,6 +107,19 @@ function styleArgs(seg, node, ctx) {
   return args;
 }
 
+// What a Figma text style sets; paints and decorations stay on the text.
+const TYPOGRAPHY = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'height', 'leadingDistribution', 'letterSpacing', 'fontFeatures'];
+
+/** AppTextStyles.<style>, with copyWith for the rest of [shared]; null when the style cannot be named. */
+function namedStyle(name, shared, ctx) {
+  const typography = Object.fromEntries(TYPOGRAPHY.filter((k) => k in shared).map((k) => [k, shared[k]]));
+  if (!Object.keys(typography).length) return null;
+  const ref = ctx.textStyle(name, call('TextStyle', typography));
+  if (!ref) return null;
+  const rest = Object.fromEntries(Object.entries(shared).filter(([k]) => !TYPOGRAPHY.includes(k)));
+  return Object.keys(rest).length ? call(`${ref.code}.copyWith`, rest, { constable: false }) : ref;
+}
+
 function sameValue(a, b) {
   return print(a) === print(b);
 }
@@ -119,6 +135,9 @@ export function textWidget(node, ctx) {
   const styles = segs.map((seg) => styleArgs(seg, node, ctx));
   const keys = Object.keys(styles[0]).filter((k) => styles.every((s) => k in s && sameValue(s[k], styles[0][k])));
   const shared = Object.fromEntries(keys.map((k) => [k, styles[0][k]]));
+  // One Figma text style for the whole text: its typography is a named style.
+  const named = segs[0].textStyle && segs.every((s) => s.textStyle === segs[0].textStyle) && ctx.textStyle
+    ? namedStyle(segs[0].textStyle, shared, ctx) : null;
   const own = styles.map((s) => Object.fromEntries(Object.entries(s).filter(([k]) => !keys.includes(k))));
   const align = ALIGN[node.textAlignHorizontal] ? raw(ALIGN[node.textAlignHorizontal]) : null;
   const hug = node.textAutoResize === 'WIDTH_AND_HEIGHT';
@@ -149,8 +168,9 @@ export function textWidget(node, ctx) {
       if (runs.length) runs[0].text = prefix + runs[0].text;
       else runs.push({ index: 0, text: prefix });
     }
+    const sharedStyle = () => named || (Object.keys(shared).length ? call('TextStyle', shared) : null);
     if (runs.length <= 1 && segs.length === 1) {
-      const style = Object.keys(shared).length ? call('TextStyle', shared) : null;
+      const style = sharedStyle();
       return call('Text', { style, ...common }, { positional: [str(runs.length ? runs[0].text : '')] });
     }
     const spans = runs.map((r) => call('TextSpan', {
@@ -158,7 +178,7 @@ export function textWidget(node, ctx) {
       style: Object.keys(own[r.index]).length ? call('TextStyle', own[r.index]) : null,
     }));
     return call('Text.rich', {
-      style: Object.keys(shared).length ? call('TextStyle', shared) : null, ...common,
+      style: sharedStyle(), ...common,
     }, { positional: [call('TextSpan', { children: list(spans) })] });
   };
 
