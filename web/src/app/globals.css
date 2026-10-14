@@ -367,3 +367,13 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .text-rainbow { animation: none; }
 }
+
+@keyframes nf-agent {
+  0%, 100% { transform: translate(0, 0); }
+  40% { transform: translate(90px, -30px); }
+  70% { transform: translate(40px, 10px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="nf-agent"] { animation: none; }
+}
