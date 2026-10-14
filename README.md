@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="https://figmcp.web.app"><img src="https://raw.githubusercontent.com/irshadio/figmcp/main/web/public/og.png" alt="figmcp: design and code, locally" width="100%"></a>
+<a href="https://figmcp.web.app"><img src="web/public/og.png" alt="figmcp: design and code, locally" width="100%"></a>
 
 <h1>
 <picture>
