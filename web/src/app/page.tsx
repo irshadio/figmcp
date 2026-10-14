@@ -179,6 +179,8 @@ export default function Home() {
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <Link
                   href="/docs/installation"
+                  data-track="click_get_started"
+                  data-track-location="hero"
                   className="inline-flex items-center gap-2 rounded-xl bg-fg px-5 py-2.5 text-sm font-medium text-bg transition hover:bg-white"
                 >
                   Get started <ArrowRight width={16} height={16} />
@@ -187,6 +189,8 @@ export default function Home() {
                   href={site.github}
                   target="_blank"
                   rel="noreferrer"
+                  data-track="click_github"
+                  data-track-location="hero"
                   className="inline-flex items-center gap-2 rounded-xl border border-line-2 bg-white/[0.02] px-5 py-2.5 text-sm font-medium text-fg transition hover:bg-white/[0.06]"
                 >
                   <GitHubIcon width={16} height={16} /> GitHub
@@ -195,6 +199,8 @@ export default function Home() {
                   href={site.npm}
                   target="_blank"
                   rel="noreferrer"
+                  data-track="click_npm"
+                  data-track-location="hero"
                   className="group inline-flex items-center gap-2 rounded-xl border border-line-2 bg-white/[0.02] px-5 py-2.5 text-sm font-medium text-fg transition hover:bg-white/[0.06]"
                 >
                   <NpmIcon width={22} height={22} className="text-[#cb3837]" /> Package

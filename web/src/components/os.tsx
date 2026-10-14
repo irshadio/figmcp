@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore, type ReactNode } from "react";
+import { track } from "@/lib/analytics";
 import { Code, type Lang } from "./code";
 
 export type OS = "mac" | "win";
@@ -31,6 +32,7 @@ export function useOs(): [OS, (os: OS) => void] {
     try {
       localStorage.setItem(KEY, next);
     } catch {}
+    track("os_switch", { os: next });
     window.dispatchEvent(new Event(EVENT));
   };
   return [os, set];

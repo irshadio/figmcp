@@ -82,7 +82,7 @@ export function Faq() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {faqs.map((f, i) => (
         <Reveal key={f.q} delay={i * 40}>
-          <details className="group py-1 [&_summary::-webkit-details-marker]:hidden">
+          <details data-faq={f.q} className="group py-1 [&_summary::-webkit-details-marker]:hidden">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-left text-[17px] font-medium text-fg transition-colors hover:text-ice">
               {f.q}
               <span className="relative size-4 shrink-0 text-dim transition-transform duration-300 group-open:rotate-45">

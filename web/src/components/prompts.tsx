@@ -46,7 +46,7 @@ export function Prompts() {
               >
                 <span className="mt-[3px] font-mono text-xs text-sky select-none">&gt;</span>
                 <span className="flex-1 pt-px font-mono text-[12.5px] leading-relaxed text-fg">{p}</span>
-                <CopyButton text={p} className="-my-0.5 opacity-60 group-hover:opacity-100" />
+                <CopyButton text={p} event="copy_prompt" className="-my-0.5 opacity-60 group-hover:opacity-100" />
               </li>
             ))}
           </ul>

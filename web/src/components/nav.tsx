@@ -58,6 +58,8 @@ export function Nav() {
             target="_blank"
             rel="noreferrer"
             aria-label="GitHub"
+            data-track="click_github"
+            data-track-location="nav"
             className="hidden size-9 place-items-center rounded-lg text-muted transition hover:bg-white/6 hover:text-fg sm:grid"
           >
             <GitHubIcon />
@@ -67,12 +69,16 @@ export function Nav() {
             target="_blank"
             rel="noreferrer"
             aria-label="npm package"
+            data-track="click_npm"
+            data-track-location="nav"
             className="hidden size-9 place-items-center rounded-lg text-muted transition hover:bg-white/6 hover:text-[#cb3837] sm:grid"
           >
             <NpmIcon width={22} height={22} />
           </a>
           <Link
             href="/docs/installation"
+            data-track="click_get_started"
+            data-track-location="nav"
             className="hidden rounded-lg bg-fg px-3.5 py-1.5 text-sm font-medium text-bg transition hover:bg-white sm:inline-block"
           >
             Get started

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { track } from "@/lib/analytics";
 
 type Step = { tool: string; file?: string; detail: string };
 type Scene = { key: "read" | "write"; label: string; prompt: string; steps: Step[]; done: string };
@@ -92,6 +93,7 @@ export function HeroDemo() {
                 role="tab"
                 aria-selected={i === sceneIdx}
                 onClick={() => {
+                  track("demo_tab", { scene: s.key });
                   setAuto(false);
                   setSceneIdx(i);
                 }}

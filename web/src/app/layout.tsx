@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@/components/analytics";
 import { Footer } from "@/components/footer";
 import { Nav } from "@/components/nav";
 import { site } from "@/lib/site";
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Nav />
         <div className="flex-1 overflow-x-clip">{children}</div>
         <Footer />
+        <Analytics />
       </body>
     </html>
   );

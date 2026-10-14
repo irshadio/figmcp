@@ -60,7 +60,7 @@ function Tile({ item, delay }: { item: Item; delay: number }) {
   return (
     <Reveal delay={delay} className="w-[104px] sm:w-[120px]">
       {item.href ? (
-        <Link href={item.href} className={cls} aria-label={`${item.label} setup`}>
+        <Link href={item.href} className={cls} aria-label={`${item.label} setup`} data-track="works_with_click" data-track-label={item.label}>
           {body}
         </Link>
       ) : (

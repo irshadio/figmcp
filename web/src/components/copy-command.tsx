@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@/lib/analytics";
 import { CheckIcon, CopyIcon } from "./icons";
 
-export function CopyButton({ text, className = "" }: { text: string; className?: string }) {
+export function CopyButton({ text, event = "copy_code", className = "" }: { text: string; event?: string; className?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
       type="button"
       aria-label={copied ? "Copied" : "Copy to clipboard"}
       onClick={async () => {
+        track(event, { text: text.slice(0, 100), page: location.pathname });
         try {
           await navigator.clipboard.writeText(text);
           setCopied(true);
@@ -24,6 +26,7 @@ export function CopyButton({ text, className = "" }: { text: string; className?:
 }
 
 export function CopyCommand({ command, large = false }: { command: string; large?: boolean }) {
+  const event = command.includes("setup") ? "copy_install" : "copy_command";
   return (
     <div
       className={`glow-ring group flex w-full max-w-full items-center gap-3 rounded-2xl border border-line-2 bg-panel/80 font-mono backdrop-blur ${
@@ -32,7 +35,7 @@ export function CopyCommand({ command, large = false }: { command: string; large
     >
       <span className="select-none text-sky">$</span>
       <code className="min-w-0 flex-1 break-all text-fg sm:break-normal sm:whitespace-nowrap">{command}</code>
-      <CopyButton text={command} />
+      <CopyButton text={command} event={event} />
     </div>
   );
 }

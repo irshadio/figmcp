@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { docsNav } from "@/lib/site";
+import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/slug";
 
 type Entry = { page: string; heading: string; href: string; text: string; level: number };
@@ -91,6 +92,7 @@ export function Search() {
   const router = useRouter();
 
   const show = useCallback(() => {
+    track("search_open");
     setOpen(true);
     loadIndex().then(setIndex);
   }, []);
@@ -140,6 +142,7 @@ export function Search() {
   };
   const go = (e?: Entry) => {
     if (!e) return;
+    track("search", { search_term: q.trim() || undefined, result: e.href });
     close();
     router.push(e.href);
   };
