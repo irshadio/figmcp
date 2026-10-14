@@ -57,7 +57,7 @@ export default function Page() {
       <FilterScope>
         <section className="relative overflow-hidden pt-32 pb-16 sm:pt-40">
           <div className="grid-bg pointer-events-none absolute inset-0" />
-          <div className="pointer-events-none absolute -top-40 left-1/2 h-[480px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,#0553b199,transparent)] blur-3xl" />
+          <div className="pointer-events-none absolute -top-40 left-1/2 h-[480px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,#ff5a4e66,transparent)] blur-3xl" />
           <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6">
             <Reveal>
               <Eyebrow>Showcase</Eyebrow>

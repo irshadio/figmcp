@@ -5,7 +5,7 @@ function Node({ title, sub, icon, accent = false }: { title: string; sub: string
   return (
     <div
       className={`relative z-10 flex w-full items-center gap-3 rounded-2xl border p-4 md:w-auto md:min-w-[190px] md:flex-col md:items-start md:gap-4 md:p-5 ${
-        accent ? "glow-ring border-sky/30 bg-[#081426]" : "border-line-2 bg-panel"
+        accent ? "glow-ring border-sky/30 bg-[#1a0f0f]" : "border-line-2 bg-panel"
       }`}
     >
       <div className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 bg-white/[0.03]">{icon}</div>
@@ -23,11 +23,11 @@ function Link({ label, delay = 0 }: { label: string; delay?: number }) {
       <div className="absolute top-0 bottom-0 left-1/2 w-px bg-gradient-to-b from-sky/0 via-sky/50 to-sky/0 md:hidden" />
       <div className="absolute inset-x-0 top-1/2 hidden h-px bg-gradient-to-r from-sky/0 via-sky/50 to-sky/0 md:block">
         <span
-          className="absolute -top-[3px] size-[7px] rounded-full bg-sky shadow-[0_0_12px_2px_#54c5f8]"
+          className="absolute -top-[3px] size-[7px] rounded-full bg-sky shadow-[0_0_12px_2px_#ff6b5f]"
           style={{ animation: `packet 2.4s ${delay}ms ease-in-out infinite` }}
         />
         <span
-          className="absolute -top-[3px] size-[7px] rounded-full bg-ice shadow-[0_0_12px_2px_#b3e5fc]"
+          className="absolute -top-[3px] size-[7px] rounded-full bg-sun shadow-[0_0_12px_2px_#ffc93c]"
           style={{ animation: `packet-back 2.4s ${delay + 1200}ms ease-in-out infinite` }}
         />
       </div>
@@ -49,7 +49,7 @@ const FigmaGlyph = () => (
 );
 
 const TermGlyph = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b3e5fc" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffdca8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <path d="m5 8 4 4-4 4M12 16h7" />
   </svg>
 );

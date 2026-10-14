@@ -1,17 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #05070c;
-  --bg-2: #0a0e17;
-  --panel: #0c111c;
+  --bg: #07080c;
+  --bg-2: #0d0f15;
+  --panel: #11131a;
   --line: #ffffff14;
   --line-2: #ffffff22;
-  --fg: #eef3fb;
-  --muted: #8b97ab;
-  --dim: #5b6679;
-  --brand: #0553b1;
-  --sky: #54c5f8;
-  --ice: #b3e5fc;
+  --fg: #f2f3f6;
+  --muted: #9499a6;
+  --dim: #5d626e;
+  --brand: #3b82f6;
+  --sky: #ff6b5f;
+  --ice: #ffdca8;
+  --blue: #5b9bff;
+  --coral: #ff5a4e;
+  --sun: #ffc93c;
   --ok: #4ade80;
   --warn: #ffcb6b;
 }
@@ -28,6 +31,9 @@
   --color-brand: var(--brand);
   --color-sky: var(--sky);
   --color-ice: var(--ice);
+  --color-coral: var(--coral);
+  --color-blue: var(--blue);
+  --color-sun: var(--sun);
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --font-sans: var(--font-geist-sans);
@@ -47,18 +53,18 @@ body {
 }
 
 ::selection {
-  background: #54c5f855;
+  background: #ff5a4e55;
 }
 
 .text-gradient {
-  background: linear-gradient(180deg, #ffffff 20%, #9fb3cf 100%);
+  background: linear-gradient(180deg, #ffffff 20%, #a6abb8 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .text-sky-gradient {
-  background: linear-gradient(90deg, var(--ice), var(--sky) 45%, #3b8ef0);
+  background: linear-gradient(90deg, var(--coral), var(--sun) 45%, var(--brand) 90%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -81,7 +87,7 @@ body {
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: conic-gradient(from var(--angle), transparent 0deg, #54c5f8 60deg, transparent 120deg, transparent 360deg);
+  background: conic-gradient(from var(--angle), transparent 0deg, var(--coral) 40deg, var(--sun) 80deg, var(--brand) 120deg, transparent 160deg, transparent 360deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -265,7 +271,7 @@ body {
 .prose-docs a {
   color: var(--sky);
   text-decoration: underline;
-  text-decoration-color: #54c5f855;
+  text-decoration-color: #ff6b5f55;
   text-underline-offset: 3px;
 }
 .prose-docs a:hover {
@@ -296,8 +302,8 @@ body {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 0.86em;
   color: var(--ice);
-  background: #54c5f812;
-  border: 1px solid #54c5f81f;
+  background: #ffc93c10;
+  border: 1px solid #ffc93c24;
   border-radius: 6px;
   padding: 0.12em 0.4em;
   overflow-wrap: anywhere;

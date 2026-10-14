@@ -2,7 +2,7 @@ import Link from "next/link";
 import { site } from "@/lib/site";
 import { CookieSettings } from "./cookie-settings";
 import { GitHubIcon, NpmIcon } from "./icons";
-import { LogoMark } from "./logo";
+import { Logo } from "./logo";
 
 const cols = [
   {
@@ -49,8 +49,7 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_repeat(4,1fr)] md:gap-12">
         <div className="col-span-2 md:col-span-1">
           <Link href="/" className="flex items-center gap-2.5 font-medium">
-            <LogoMark size={26} />
-            {site.name}
+            <Logo height={24} />
           </Link>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
             Design to code and code to design, on your own machine.

@@ -112,33 +112,43 @@ const tools = [
   { group: "Status", name: "import_design_export", text: "Load an export JSON as a snapshot." },
 ];
 
-function Eyebrow({ children }: { children: ReactNode }) {
+const COUNT_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty"];
+const countWord = (n: number) => COUNT_WORDS[n] ?? String(n);
+
+type Tone = "blue" | "coral" | "sun";
+const TONE = {
+  blue: { text: "text-blue", line: "bg-blue/60", dot: "bg-blue", tile: "border-blue/25 bg-blue/10 text-blue", glow: "bg-blue/15" },
+  coral: { text: "text-coral", line: "bg-coral/60", dot: "bg-coral", tile: "border-coral/25 bg-coral/10 text-coral", glow: "bg-coral/15" },
+  sun: { text: "text-sun", line: "bg-sun/60", dot: "bg-sun", tile: "border-sun/25 bg-sun/10 text-sun", glow: "bg-sun/15" },
+} as const;
+
+function Eyebrow({ children, tone = "blue" }: { children: ReactNode; tone?: Tone }) {
   return (
-    <div className="inline-flex items-center gap-2 font-mono text-xs tracking-wider text-sky uppercase">
-      <span className="h-px w-6 bg-sky/60" />
+    <div className={`inline-flex items-center gap-2 font-mono text-xs tracking-wider uppercase ${TONE[tone].text}`}>
+      <span className={`h-px w-6 ${TONE[tone].line}`} />
       {children}
     </div>
   );
 }
 
-function SectionHead({ eyebrow, title, text }: { eyebrow: string; title: ReactNode; text?: ReactNode }) {
+function SectionHead({ eyebrow, title, text, tone }: { eyebrow: string; title: ReactNode; text?: ReactNode; tone?: Tone }) {
   return (
     <Reveal className="mx-auto max-w-3xl text-center">
-      <Eyebrow>{eyebrow}</Eyebrow>
+      <Eyebrow tone={tone}>{eyebrow}</Eyebrow>
       <h2 className="text-gradient mt-4 text-4xl font-semibold tracking-[-0.035em] text-balance sm:text-5xl">{title}</h2>
       {text && <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-pretty text-muted">{text}</p>}
     </Reveal>
   );
 }
 
-function Feature({ icon, title, children, className = "", delay = 0 }: { icon: ReactNode; title: string; children: ReactNode; className?: string; delay?: number }) {
+function Feature({ icon, title, children, className = "", delay = 0, tone = "blue" }: { icon: ReactNode; title: string; children: ReactNode; className?: string; delay?: number; tone?: Tone }) {
   return (
     <Reveal
       delay={delay}
       className={`group relative overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-white/[0.035] to-transparent p-6 transition-colors hover:border-line-2 ${className}`}
     >
-      <div className="pointer-events-none absolute -top-24 -right-24 size-48 rounded-full bg-sky/10 opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100" />
-      <div className="grid size-10 place-items-center rounded-xl border border-line-2 bg-white/[0.03] text-ice">{icon}</div>
+      <div className={`pointer-events-none absolute -top-24 -right-24 size-48 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100 ${TONE[tone].glow}`} />
+      <div className={`grid size-10 place-items-center rounded-xl border ${TONE[tone].tile}`}>{icon}</div>
       <h3 className="mt-5 font-medium text-fg">{title}</h3>
       <div className="mt-2 text-sm leading-relaxed text-muted">{children}</div>
     </Reveal>
@@ -176,8 +186,9 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40">
         <div className="grid-bg pointer-events-none absolute inset-0" />
-        <div className="animate-aurora pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,#0553b1aa,transparent)] blur-3xl" />
-        <div className="pointer-events-none absolute top-20 left-[15%] h-[300px] w-[400px] rounded-full bg-[radial-gradient(closest-side,#54c5f830,transparent)] blur-3xl" />
+        <div className="animate-aurora pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,#ff5a4e66,transparent)] blur-3xl" />
+        <div className="pointer-events-none absolute top-24 left-[8%] h-[320px] w-[420px] rounded-full bg-[radial-gradient(closest-side,#ffc93c2e,transparent)] blur-3xl" />
+        <div className="pointer-events-none absolute top-40 right-[8%] h-[300px] w-[400px] rounded-full bg-[radial-gradient(closest-side,#3b82f62e,transparent)] blur-3xl" />
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
           <div className="mx-auto max-w-4xl text-center">
@@ -186,7 +197,7 @@ export default function Home() {
                 href="/docs/design-in-figma"
                 className="group inline-flex items-center gap-2 rounded-full border border-line-2 bg-white/[0.03] py-1 pr-3 pl-1 text-xs text-muted backdrop-blur transition hover:border-sky/40 hover:text-fg"
               >
-                <span className="rounded-full bg-sky/15 px-2 py-0.5 font-mono text-[11px] text-sky">v{site.version}</span>
+                <span className="rounded-full bg-coral/15 px-2 py-0.5 font-mono text-[11px] text-coral">v{site.version}</span>
                 Your agent can now design in Figma
                 <ArrowRight width={14} height={14} className="transition-transform group-hover:translate-x-0.5" />
               </Link>
@@ -211,7 +222,7 @@ export default function Home() {
                   href="/docs/installation"
                   data-track="click_get_started"
                   data-track-location="hero"
-                  className="inline-flex items-center gap-2 rounded-xl bg-fg px-5 py-2.5 text-sm font-medium text-bg transition hover:bg-white"
+                  className="inline-flex items-center gap-2 rounded-xl bg-coral px-5 py-2.5 text-sm font-medium text-white shadow-[0_8px_30px_-8px_#ff5a4e] transition hover:bg-[#ff6f64]"
                 >
                   Get started <ArrowRight width={16} height={16} />
                 </Link>
@@ -251,7 +262,7 @@ export default function Home() {
       <section id="features" className="relative scroll-mt-16 py-28 sm:py-36">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <SectionHead
-            eyebrow="Why local"
+            eyebrow="Why local" tone="coral"
             title="Your design, read straight from the canvas."
             text="A development plugin streams the open file over localhost, so reads never touch the Figma REST API. No tokens, no quotas, no waiting."
           />
@@ -262,7 +273,7 @@ export default function Home() {
               { big: "127.0.0.1", label: "only", text: "The plugin talks to a server on your machine, guarded by a pairing code. No cloud relay." },
             ].map((s, i) => (
               <Reveal key={s.label} delay={i * 90} className="relative overflow-hidden rounded-2xl border border-line bg-panel/60 p-7">
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky/50 to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-coral/70 via-sun/70 to-brand/70" />
                 <div className="flex items-baseline gap-2">
                   <span className="text-sky-gradient font-mono text-4xl font-semibold tracking-tight sm:text-5xl">{s.big}</span>
                   <span className="text-sm text-muted">{s.label}</span>
@@ -277,7 +288,7 @@ export default function Home() {
       <section className="relative py-12 sm:py-20">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:gap-20">
           <Reveal>
-            <Eyebrow>Read</Eyebrow>
+            <Eyebrow tone="blue">Read</Eyebrow>
             <h2 className="text-gradient mt-4 text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">Frames in, code out.</h2>
             <p className="mt-5 text-lg leading-relaxed text-muted">
               Select a frame or paste a link with <code className="font-mono text-ice">node-id</code>. You get reference code
@@ -291,7 +302,7 @@ export default function Home() {
                 "Your own components named, through Code Connect",
               ].map((t) => (
                 <li key={t} className="flex gap-3">
-                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-sky" />
+                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-blue" />
                   {t}
                 </li>
               ))}
@@ -311,7 +322,7 @@ export default function Home() {
       <section className="relative py-12 sm:py-20">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:gap-20">
           <Reveal className="lg:order-2">
-            <Eyebrow>Write</Eyebrow>
+            <Eyebrow tone="coral">Write</Eyebrow>
             <h2 className="text-gradient mt-4 text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">Prompt in, design out.</h2>
             <p className="mt-5 text-lg leading-relaxed text-muted">
               Ask for a screen and the agent builds it in the open file with Figma plugin API scripts, then takes a
@@ -320,14 +331,14 @@ export default function Home() {
             <ul className="mt-8 space-y-3 text-sm text-muted">
               {["Auto layout, real text and web images", "Each script is one undo step in Figma", "No Dev Mode seat needed"].map((t) => (
                 <li key={t} className="flex gap-3">
-                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-sky" />
+                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-coral" />
                   {t}
                 </li>
               ))}
             </ul>
           </Reveal>
           <Reveal delay={120} className="lg:order-1">
-            <div className="overflow-hidden rounded-2xl border border-line-2 bg-[#070a11]">
+            <div className="overflow-hidden rounded-2xl border border-line-2 bg-[#0a0b10]">
               <div className="flex items-center justify-between border-b border-line px-4 py-3">
                 <span className="font-mono text-xs text-fg">use_figma</span>
                 <span className="rounded-full border border-ok/30 bg-ok/10 px-2 py-0.5 font-mono text-[10.5px] text-ok">1 undo step</span>
@@ -340,34 +351,34 @@ export default function Home() {
 
       <section className="relative py-28 sm:py-36">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <SectionHead eyebrow="Features" title="Everything the agent needs from a design." />
+          <SectionHead eyebrow="Features" tone="blue" title="Everything the agent needs from a design." />
           <div className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Feature icon={<LayersIcon />} title="Full design context" className="lg:col-span-2" delay={0}>
+            <Feature icon={<LayersIcon />} title="Full design context" className="lg:col-span-2" delay={0} tone="coral">
               Layout, auto layout, paints, effects, text styles, components and interactions, turned into code that follows
               the structure of the frame.
             </Feature>
-            <Feature icon={<ImageIcon />} title="Assets and SVGs" delay={60}>
+            <Feature icon={<ImageIcon />} title="Assets and SVGs" delay={60} tone="sun">
               Exported renders, original image fills and SVGs of vector layers, saved where your project expects them.
             </Feature>
-            <Feature icon={<PaletteIcon />} title="Variables and styles" delay={120}>
+            <Feature icon={<PaletteIcon />} title="Variables and styles" delay={120} tone="blue">
               Design tokens resolved for the node&apos;s own mode, ready to map to your theme.
             </Feature>
-            <Feature icon={<LinkIcon />} title="Code Connect" delay={0}>
+            <Feature icon={<LinkIcon />} title="Code Connect" delay={0} tone="sun">
               Map design components to your code components once. Instances come back as your own widgets.
             </Feature>
-            <Feature icon={<ArchiveIcon />} title="Offline snapshots" delay={60}>
+            <Feature icon={<ArchiveIcon />} title="Offline snapshots" delay={60} tone="blue">
               Save a frame as a snapshot and keep reading it with the plugin closed.
             </Feature>
-            <Feature icon={<EyeIcon />} title="Screenshots to verify" className="lg:col-span-2" delay={120}>
+            <Feature icon={<EyeIcon />} title="Screenshots to verify" className="lg:col-span-2" delay={120} tone="coral">
               Every read can include a screenshot, so the agent compares its output with the design instead of guessing.
             </Feature>
-            <Feature icon={<PenIcon />} title="Design on the canvas" className="lg:col-span-2" delay={0}>
+            <Feature icon={<PenIcon />} title="Design on the canvas" className="lg:col-span-2" delay={0} tone="blue">
               The agent creates and edits frames in the file you have open, one undo step per script.
             </Feature>
-            <Feature icon={<LockIcon />} title="Paired and local" delay={60}>
+            <Feature icon={<LockIcon />} title="Paired and local" delay={60} tone="coral">
               The plugin connects only to localhost and needs your pairing code.
             </Feature>
-            <Feature icon={<BoltIcon />} title="Updates itself" delay={120}>
+            <Feature icon={<BoltIcon />} title="Updates itself" delay={120} tone="sun">
               Run setup again to update. The plugin refreshes in place, no re-import.
             </Feature>
           </div>
@@ -377,7 +388,7 @@ export default function Home() {
       <section id="how" className="relative scroll-mt-16 border-y border-line bg-bg-2/40 py-28 sm:py-36">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <SectionHead
-            eyebrow="How it works"
+            eyebrow="How it works" tone="sun"
             title="Three steps, then just ask."
             text="The plugin in Figma Desktop and the MCP server on your machine talk over a local WebSocket. Your agent talks to the server."
           />
@@ -406,7 +417,7 @@ export default function Home() {
               },
             ].map((s, i) => (
               <Reveal key={s.n} delay={i * 100} className="flex flex-col rounded-2xl border border-line bg-panel/70 p-6">
-                <span className="font-mono text-sm text-sky">{s.n}</span>
+                <span className={`grid size-9 place-items-center rounded-full font-mono text-sm font-semibold text-bg ${["bg-coral", "bg-sun", "bg-brand"][i]}`}>{s.n}</span>
                 <h3 className="mt-3 text-lg font-medium text-fg">{s.title}</h3>
                 <p className="mt-2 flex-1 text-sm leading-relaxed text-muted">{s.text}</p>
                 <div className="mt-6 overflow-x-auto rounded-lg border border-line bg-black/30 px-3 py-2.5 font-mono text-xs whitespace-nowrap text-ice [scrollbar-width:none]">
@@ -426,7 +437,7 @@ export default function Home() {
       <section className="relative py-28 sm:py-36">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <SectionHead
-            eyebrow="Prompts"
+            eyebrow="Prompts" tone="coral"
             title="Just ask."
             text="No commands to learn. Copy one of these to get started, then talk to your agent the way you normally do."
           />
@@ -439,8 +450,8 @@ export default function Home() {
       <section id="tools" className="relative scroll-mt-16 py-28 sm:py-36">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <SectionHead
-            eyebrow="Tools"
-            title="Twelve tools. One local server."
+            eyebrow="Tools" tone="blue"
+            title={`${countWord(tools.length)} tools. One local server.`}
             text="Familiar names for anyone who has used a Figma MCP before, so existing prompts and skills keep working."
           />
           <Reveal className="mt-16 grid gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
@@ -450,7 +461,7 @@ export default function Home() {
                   <code className="truncate font-mono text-sm text-fg transition-colors group-hover:text-ice">{t.name}</code>
                   <span
                     className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] ${
-                      t.group === "Write" ? "border-ok/30 text-ok" : "border-line-2 text-dim"
+                      ({ Read: "border-blue/30 text-blue", Write: "border-coral/30 text-coral", Connect: "border-sun/30 text-sun" } as Record<string, string>)[t.group] ?? "border-line-2 text-dim"
                     }`}
                   >
                     {t.group}
@@ -461,7 +472,7 @@ export default function Home() {
             ))}
           </Reveal>
           <Reveal className="mt-8 text-center">
-            <Link href="/docs/tools" className="inline-flex items-center gap-1.5 text-sm text-sky hover:text-ice">
+            <Link href="/docs/tools" className="inline-flex items-center gap-1.5 text-sm text-coral hover:text-sun">
               Tools reference <ArrowRight width={15} height={15} />
             </Link>
           </Reveal>
@@ -471,7 +482,7 @@ export default function Home() {
       <section id="compare" className="relative scroll-mt-16 border-t border-line py-28 sm:py-36">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <SectionHead
-            eyebrow="Compare"
+            eyebrow="Compare" tone="sun"
             title="Local, next to Figma's own MCP."
             text="Both connect your agent to Figma. This one reads through a plugin on your machine, so reads are never metered."
           />
@@ -483,7 +494,7 @@ export default function Home() {
 
       <section id="faq" className="relative scroll-mt-16 py-28 sm:py-36">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <SectionHead eyebrow="FAQ" title="Questions, answered." />
+          <SectionHead eyebrow="FAQ" tone="coral" title="Questions, answered." />
           <div className="mt-14">
             <Faq />
           </div>
@@ -492,7 +503,9 @@ export default function Home() {
 
       <section className="relative overflow-hidden border-t border-line py-28 sm:py-40">
         <div className="grid-bg pointer-events-none absolute inset-0 rotate-180" />
-        <div className="animate-aurora pointer-events-none absolute bottom-[-260px] left-1/2 h-[520px] w-[1000px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,#0553b199,transparent)] blur-3xl" />
+        <div className="animate-aurora pointer-events-none absolute bottom-[-260px] left-1/2 h-[520px] w-[1000px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,#ff5a4e55,transparent)] blur-3xl" />
+        <div className="pointer-events-none absolute bottom-[-200px] left-[12%] h-[420px] w-[520px] rounded-full bg-[radial-gradient(closest-side,#ffc93c38,transparent)] blur-3xl" />
+        <div className="pointer-events-none absolute bottom-[-200px] right-[12%] h-[420px] w-[520px] rounded-full bg-[radial-gradient(closest-side,#3b82f640,transparent)] blur-3xl" />
         <Reveal className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
           <h2 className="text-5xl font-semibold tracking-[-0.045em] text-balance sm:text-7xl">
             <span className="text-gradient">Open Figma.</span> <span className="text-sky-gradient">Start building.</span>

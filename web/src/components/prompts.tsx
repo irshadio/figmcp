@@ -4,7 +4,7 @@ import { Reveal } from "./reveal";
 const groups: { title: string; tone: string; prompts: string[] }[] = [
   {
     title: "Design to code",
-    tone: "text-sky",
+    tone: "text-blue",
     prompts: [
       "implement the selected Figma frame",
       "implement this frame as a Flutter screen and match the spacing exactly",
@@ -14,7 +14,7 @@ const groups: { title: string; tone: string; prompts: string[] }[] = [
   },
   {
     title: "Design in Figma",
-    tone: "text-ok",
+    tone: "text-coral",
     prompts: [
       "design a settings screen for a 390x844 phone in Figma",
       "add a dark mode version of the selected frame next to it",
@@ -23,7 +23,7 @@ const groups: { title: string; tone: string; prompts: string[] }[] = [
   },
   {
     title: "Components and tokens",
-    tone: "text-warn",
+    tone: "text-sun",
     prompts: [
       "map the selected button to AppButton in lib/widgets/app_button.dart",
       "which components in this frame are not mapped yet?",

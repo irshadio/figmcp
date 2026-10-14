@@ -8,7 +8,7 @@ const clients: Item[] = [
   { label: "Claude Code", href: "/docs/configuration#claude-code", icon: "claude", color: "#D97757" },
   { label: "Cursor", href: "/docs/configuration#cursor", icon: "cursor", color: "#FFFFFF" },
   { label: "Claude Desktop", href: "/docs/configuration#claude-desktop", icon: "claude", color: "#D97757" },
-  { label: "Any MCP client", href: "/docs/configuration#other-clients", icon: "mcp", color: "#B3E5FC" },
+  { label: "Any MCP client", href: "/docs/configuration#other-clients", icon: "mcp", color: "#FFC93C" },
 ];
 
 const outputs: Item[] = [
@@ -41,7 +41,7 @@ function Tile({ item, delay }: { item: Item; delay: number }) {
         className={`relative grid size-16 place-items-center rounded-2xl border transition duration-300 ${
           item.soon
             ? "border-line bg-white/[0.015] opacity-45 grayscale"
-            : "border-line-2 bg-white/[0.03] group-hover:-translate-y-0.5 group-hover:border-sky/40 group-hover:shadow-[0_10px_40px_-10px_#54c5f855]"
+            : "border-line-2 bg-white/[0.03] group-hover:-translate-y-0.5 group-hover:border-sky/40 group-hover:shadow-[0_10px_40px_-10px_#3b82f655]"
         }`}
       >
         <Glyph item={item} />

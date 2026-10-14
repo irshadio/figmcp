@@ -78,8 +78,8 @@ export function HeroDemo() {
 
   return (
     <div className="relative">
-      <div className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 -z-10 rounded-[40px] bg-[radial-gradient(60%_60%_at_50%_30%,#0553b155,transparent_70%)] blur-2xl" />
-      <div className="overflow-hidden rounded-2xl border border-line-2 bg-[#070a11]/90 shadow-[0_40px_120px_-20px_#000,0_0_0_1px_#ffffff08_inset] backdrop-blur">
+      <div className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 -z-10 rounded-[40px] bg-[radial-gradient(60%_60%_at_50%_30%,#ff5a4e40,transparent_70%)] blur-2xl" />
+      <div className="overflow-hidden rounded-2xl border border-line-2 bg-[#0a0b10]/90 shadow-[0_40px_120px_-20px_#000,0_0_0_1px_#ffffff08_inset] backdrop-blur">
         <div className="flex h-11 items-center gap-3 border-b border-line bg-white/[0.02] px-4">
           <div className="flex gap-1.5">
             <i className="size-3 rounded-full bg-white/10" />
@@ -220,7 +220,7 @@ function Canvas({ scene, step }: { scene: Scene["key"]; step: number }) {
           )}
         </div>
         {read && step >= 2 && (
-          <div className="absolute top-1/2 right-5 w-[200px] -translate-y-1/2 animate-[fadeUp_.5s_ease-out_both] rounded-xl border border-line-2 bg-[#070a11]/95 p-3 font-mono text-[10px] leading-[1.6] shadow-2xl backdrop-blur max-sm:hidden">
+          <div className="absolute top-1/2 right-5 w-[200px] -translate-y-1/2 animate-[fadeUp_.5s_ease-out_both] rounded-xl border border-line-2 bg-[#0a0b10]/95 p-3 font-mono text-[10px] leading-[1.6] shadow-2xl backdrop-blur max-sm:hidden">
             <div className="mb-1.5 text-warn">onboarding_screen.dart</div>
             <div>
               <span className="text-[#c792ea]">class</span> <span className="text-sky">OnboardingScreen</span>
@@ -252,7 +252,7 @@ function OnboardingScreen({ step }: { step: number }) {
         <span className={`size-4 rounded-full bg-[#0a1f44]/10 ${box(asset)}`} />
         <span className="h-2 w-8 rounded bg-[#0a1f44]/10" />
       </div>
-      <div className={`mt-4 h-[110px] rounded-2xl bg-gradient-to-br from-[#54c5f8] to-[#0553b1] sm:h-[128px] ${box(asset)}`}>
+      <div className={`mt-4 h-[110px] rounded-2xl bg-gradient-to-br from-[#ffc93c] via-[#ff5a4e] to-[#3b82f6] sm:h-[128px] ${box(asset)}`}>
         <div className="flex h-full items-end gap-1.5 p-3">
           <span className={`size-6 rounded-lg bg-white/30 ${box(asset)}`} />
           <span className={`size-6 rounded-lg bg-white/20 ${box(asset)}`} />
@@ -262,11 +262,11 @@ function OnboardingScreen({ step }: { step: number }) {
       <div className="mt-2.5 h-2 w-full rounded bg-[#dce6f2]" />
       <div className="mt-1.5 h-2 w-3/5 rounded bg-[#dce6f2]" />
       <div className="mt-3 flex gap-1">
-        <span className="h-1.5 w-4 rounded-full bg-[#0553b1]" />
+        <span className="h-1.5 w-4 rounded-full bg-[#3b82f6]" />
         <span className="size-1.5 rounded-full bg-[#dce6f2]" />
         <span className="size-1.5 rounded-full bg-[#dce6f2]" />
       </div>
-      <div className="mt-auto h-9 rounded-xl bg-[#0553b1]" />
+      <div className="mt-auto h-9 rounded-xl bg-[#3b82f6]" />
     </div>
   );
 }
@@ -277,7 +277,7 @@ function LoginScreen({ step }: { step: number }) {
   return (
     <div className={`flex h-full flex-col p-4 transition-all duration-500 ${tight ? "gap-2.5" : "gap-3.5"}`}>
       <div className={on(1)}>
-        <span className="block size-7 rounded-xl bg-gradient-to-br from-[#54c5f8] to-[#0553b1]" />
+        <span className="block size-7 rounded-xl bg-gradient-to-br from-[#ffc93c] via-[#ff5a4e] to-[#3b82f6]" />
         <div className="mt-4 h-3 w-3/4 rounded bg-[#0a1f44]" />
         <div className="mt-2 h-2 w-full rounded bg-[#dce6f2]" />
       </div>
@@ -289,7 +289,7 @@ function LoginScreen({ step }: { step: number }) {
         <div className="h-1.5 w-10 rounded bg-[#9fb0c6]" />
         <div className="h-8 rounded-lg border border-[#dce6f2]" />
       </div>
-      <div className={`${on(1)} mt-auto h-9 bg-[#0553b1] transition-all duration-500 ${tight ? "rounded-xl" : "rounded-sm"}`} />
+      <div className={`${on(1)} mt-auto h-9 bg-[#3b82f6] transition-all duration-500 ${tight ? "rounded-xl" : "rounded-sm"}`} />
       <div className={`${on(1)} mx-auto h-1.5 w-16 rounded bg-[#dce6f2]`} />
     </div>
   );

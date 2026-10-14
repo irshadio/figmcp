@@ -72,7 +72,7 @@ export function Code({
       </pre>
     );
   return (
-    <div className={`not-prose my-5 overflow-hidden rounded-xl border border-line bg-[#070a11] ${className}`}>
+    <div className={`not-prose my-5 overflow-hidden rounded-xl border border-line bg-[#0a0b10] ${className}`}>
       {(title || copy) && (
         <div className="flex h-10 items-center justify-between border-b border-line pr-1 pl-4">
           <span className="min-w-0 truncate font-mono text-xs text-dim">{title ?? lang}</span>

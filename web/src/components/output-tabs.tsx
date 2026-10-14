@@ -5,7 +5,7 @@ import { useState } from "react";
 export function OutputTabs({ tabs }: { tabs: { label: string; file: string; body: React.ReactNode }[] }) {
   const [active, setActive] = useState(0);
   return (
-    <div className="overflow-hidden rounded-2xl border border-line-2 bg-[#070a11]">
+    <div className="overflow-hidden rounded-2xl border border-line-2 bg-[#0a0b10]">
       <div className="flex items-center gap-1 border-b border-line px-2 py-2">
         {tabs.map((t, i) => (
           <button

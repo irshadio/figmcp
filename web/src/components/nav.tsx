@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { site } from "@/lib/site";
 import { GitHubIcon, MenuIcon, NpmIcon } from "./icons";
-import { LogoMark } from "./logo";
+import { Logo } from "./logo";
 import { Search } from "./search";
 
 const links = [
@@ -40,8 +40,7 @@ export function Nav() {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 font-medium tracking-tight">
-          <LogoMark size={26} />
-          <span>{site.name}</span>
+          <Logo height={24} />
         </Link>
         <nav className="hidden items-center gap-1 md:flex">
           {links.map((l) => (
@@ -84,7 +83,7 @@ export function Nav() {
             href="/docs/installation"
             data-track="click_get_started"
             data-track-location="nav"
-            className="hidden rounded-lg bg-fg px-3.5 py-1.5 text-sm font-medium text-bg transition hover:bg-white sm:inline-block"
+            className="hidden rounded-lg bg-coral px-3.5 py-1.5 text-sm font-medium text-white transition hover:bg-[#ff6f64] sm:inline-block"
           >
             Get started
           </Link>
