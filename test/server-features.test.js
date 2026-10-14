@@ -104,8 +104,19 @@ test('Flutter projects get Flutter code with their asset folders', async () => {
   assert.match(ctx, /reference Flutter code/);
   assert.doesNotMatch(ctx, /http:\/\/localhost/, 'no server URLs in Dart code');
 
+  assert.doesNotMatch(ctx, /flutter_screenutil/);
+
   const react = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true, framework: 'react' } }));
   assert.match(react, /export default function SampleScreen\(\)/);
+
+  // A project using flutter_screenutil gets scaled lengths, unless it asks not to.
+  fs.writeFileSync(path.join(dir, 'pubspec.yaml'), 'name: app\ndependencies:\n  flutter_screenutil: ^5.9.3\nflutter:\n  assets:\n    - assets/svg/\n');
+  const scaled = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true } }));
+  assert.match(scaled, /import 'package:flutter_screenutil\/flutter_screenutil.dart';/);
+  assert.match(scaled, /\d\.w,/);
+  assert.match(scaled, /Lengths use flutter_screenutil/);
+  const plain = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true, screenUtil: false } }));
+  assert.doesNotMatch(plain, /flutter_screenutil/);
   plugin.stop();
 });
 

@@ -13,6 +13,7 @@ import {
 import {
   alignment, blendMode, blurSigma, blurs, border, borderRadius, boxShadows, composite, gradient, HELPERS,
 } from './paint.js';
+import { screenUtil } from './scale.js';
 import { fontWeight, runGradient, textWidget } from './text.js';
 
 const WRAPPING_PARENTS = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -76,8 +77,9 @@ function edgeInsets([top, right, bottom, left]) {
 }
 
 class FlutterWriter {
-  constructor(assets, { connect = null, keys = false, assetDirs = {} } = {}) {
+  constructor(assets, { connect = null, keys = false, assetDirs = {}, screenUtil = false } = {}) {
     this.assets = assets;
+    this.screenUtil = screenUtil;
     this.connect = connect;
     this.keys = keys;
     this.dirs = { svg: assetDirs.svg || 'assets/figma', image: assetDirs.image || 'assets/figma' };
@@ -94,6 +96,11 @@ class FlutterWriter {
     this.ratios = null;
     this.screen = null;
     this.scrolls = false;
+  }
+
+  /** Dart code for a length in design pixels: scaled by flutter_screenutil when it is on. */
+  length(v, unit) {
+    return this.screenUtil ? `${dNum(v)}.${unit}` : dNum(v);
   }
 
   warn(node, message) {
@@ -773,7 +780,7 @@ class FlutterWriter {
     const page = (child) => call('LayoutBuilder', {
       builder: lambda(['context', 'constraints'], call('SingleChildScrollView', {
         child: call('SizedBox', {
-          height: raw(`constraints.hasBoundedHeight && constraints.maxHeight > ${dNum(H)} ? constraints.maxHeight : ${dNum(H)}`, false),
+          height: raw(`constraints.hasBoundedHeight && constraints.maxHeight > ${this.length(H, 'h')} ? constraints.maxHeight : ${this.length(H, 'h')}`, false),
           child,
         }),
       })),
@@ -958,7 +965,8 @@ class FlutterWriter {
  * layer's widget (used to measure the result). [assetDirs] sets the folders
  * of the asset paths: { svg, image }. [screen] draws the root as a phone
  * screen (it fills the screen and tall frames scroll); by default portrait
- * frames of a phone's width are screens.
+ * frames of a phone's width are screens. [screenUtil] writes lengths with
+ * flutter_screenutil's .w, .h, .r and .sp.
  */
 export function toFlutter(root, assets, options = {}) {
   const writer = new FlutterWriter(assets, options);
@@ -976,6 +984,10 @@ export function toFlutter(root, assets, options = {}) {
     }
   }
   tree = tree || writer.node(rootNode, { kind: 'root' }) || call('SizedBox', {});
+  if (options.screenUtil) {
+    tree = screenUtil(tree);
+    writer.imports.add('package:flutter_screenutil/flutter_screenutil.dart');
+  }
   const className = options.className || dType(root.name, 'Design');
   const body = print(tree, 2);
   // dart: imports first, then packages, each sorted by URI.

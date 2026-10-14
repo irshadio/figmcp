@@ -7,7 +7,7 @@ import { toFlutter } from '../codegen/flutter/index.js';
 import { toMetadataXml } from '../codegen/metadata.js';
 import { countNodes, toReactTailwind } from '../codegen/react.js';
 import { systemUi } from '../codegen/system-ui.js';
-import { detectFramework, flutterAssetDirs, FRAMEWORKS } from '../project.js';
+import { detectFramework, flutterAssetDirs, FRAMEWORKS, usesScreenUtil } from '../project.js';
 import { ASSETS, imageExt, saveAsset, snapshotSummary } from '../store.js';
 import {
   assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, resolver, selectionBlock,
@@ -119,6 +119,9 @@ export function registerDesignTools(server, bridge, source) {
         'Flutter: draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
       assetsDir: z.string().optional().describe(
         'Flutter: folder of the asset paths in the code (default: the svg/png/images folders of the project\'s pubspec.yaml, else assets/figma).'),
+      screenUtil: z.boolean().optional().describe(
+        'Flutter: write lengths with flutter_screenutil (.w, .h, .r, .sp) so the layout scales from the design size ' +
+        '(default: when the project\'s pubspec.yaml depends on flutter_screenutil).'),
       excludeScreenshot: z.boolean().optional().describe('Leave the screenshot out of the response.'),
       forceCode: z.boolean().optional().describe('Always return code, even for very large nodes.'),
       disableCodeConnect: z.boolean().optional().describe('Draw mapped components from their layers instead of naming the code component.'),
@@ -126,6 +129,7 @@ export function registerDesignTools(server, bridge, source) {
     },
   }, guard(async (args) => {
     const { nodeId, excludeScreenshot, forceCode, disableCodeConnect, assetsDir, screen } = args;
+    const scaled = args.screenUtil ?? usesScreenUtil();
     const { id } = await source.resolveId(nodeId);
     // Variables and the screenshot are read while the layers are.
     const varsRead = source.variables(id).catch(() => null);
@@ -153,8 +157,13 @@ export function registerDesignTools(server, bridge, source) {
     try {
       if (framework === 'flutter') {
         const dirs = assetsDir ? { svg: assetsDir.replace(/\/+$/, ''), image: assetsDir.replace(/\/+$/, '') } : flutterAssetDirs();
-        const result = toFlutter(node.tree, fileResolver(node.images), { connect, assetDirs: dirs, screen });
+        const result = toFlutter(node.tree, fileResolver(node.images), { connect, assetDirs: dirs, screen, screenUtil: scaled });
         out = [text(result.code), ...flutterDetails(result, node.tree)];
+        if (scaled) {
+          out.push(text(`Lengths use flutter_screenutil: .w and .h scale from a ${node.tree.width}x${node.tree.height} ` +
+            'design, .r takes the smaller scale and .sp scales text. Keep the app\'s ScreenUtilInit designSize; ' +
+            'when it differs from this frame, the frame\'s numbers still scale against it.'));
+        }
       } else {
         const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });
         out = [text(result.code)];

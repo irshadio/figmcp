@@ -89,15 +89,14 @@ export function registerVerifyTools(server, bridge, source) {
       file: z.string().optional().describe('The .dart file with the widget, under the project\'s lib/ (absolute, or relative to the project).'),
       widget: z.string().optional().describe('The widget class in `file` (default: its first widget class).'),
       viewport: z.string().regex(/^\d+(\.\d+)?x\d+(\.\d+)?$/).optional().describe(
-        'Lay the generated code out on a screen of this size, e.g. "360x780", and report runtime errors ' +
-        'and layers pushed off screen instead of comparing (only without `file`).'),
+        'Lay the code out on a screen of this size, e.g. "360x780", and report runtime errors ' +
+        '(overflows) and layers pushed off screen instead of comparing.'),
       fonts: z.array(z.string()).optional().describe('Folders with font files (default: the project\'s assets/fonts and the system fonts).'),
       flutter: z.string().optional().describe('Path of the flutter tool, when it is not on PATH.'),
     },
   }, guard(async ({ nodeId, file, widget, viewport, fonts = [], flutter }) => {
     const tool = flutterTool(flutter);
     if (!tool) throw new Error('The flutter tool was not found: pass `flutter` with its path, or set FLUTTER.');
-    if (file && viewport) throw new Error('`viewport` checks the generated code; leave out `file` to use it.');
     if (viewport && viewport.split('x').some((v) => Number(v) < 1 || Number(v) > 10000)) {
       throw new Error('Each side of `viewport` must be between 1 and 10000.');
     }
@@ -136,8 +135,12 @@ export function registerVerifyTools(server, bridge, source) {
       renderedSize: report.renderedSize,
     };
     if (report.viewport) {
-      Object.assign(summary, { viewport: report.viewport, offscreenLayers: brief(report.offscreenLayers) });
-      return [text(summary)];
+      Object.assign(summary, { viewport: report.viewport, offscreenLayers: brief(report.offscreenLayers), files: report.files });
+      return [
+        text(summary),
+        text(`Rendered at ${report.viewport.width}x${report.viewport.height}:`),
+        image(fs.readFileSync(report.files.rendered)),
+      ];
     }
     Object.assign(summary, {
       pixels: report.pixels,

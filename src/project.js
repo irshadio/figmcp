@@ -21,6 +21,15 @@ export function detectFramework({ framework, clientFrameworks, clientLanguages }
   return fs.existsSync(path.join(cwd, 'pubspec.yaml')) ? 'flutter' : 'react';
 }
 
+/** Whether the project's pubspec.yaml depends on flutter_screenutil. */
+export function usesScreenUtil(cwd = process.cwd()) {
+  try {
+    return /^\s+flutter_screenutil:/m.test(fs.readFileSync(path.join(cwd, 'pubspec.yaml'), 'utf8'));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Folders for SVGs and images: those the project's pubspec.yaml declares
  * under flutter: assets: (assets/svg, assets/png, assets/images, ...), else

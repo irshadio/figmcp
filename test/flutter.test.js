@@ -296,3 +296,27 @@ test('inner shadows lie on the fills and blend modes blend', () => {
   const burn = dart(frame([{ id: '2:1', name: 'Burn', type: 'RECTANGLE', x: 0, y: 0, width: 40, height: 40, fills: [solid()], blendMode: 'LINEAR_BURN' }]));
   assert.match(JSON.stringify(burn.warnings), /linear_burn blend of the layer is drawn normal/);
 });
+
+test('screenutil output scales lengths by axis and keeps ratios', () => {
+  const root = frame([
+    { id: '2:1', name: 'Card', type: 'FRAME', x: 16, y: 24, width: 120, height: 48, cornerRadius: 12,
+      layoutMode: 'HORIZONTAL', itemSpacing: 8, paddingLeft: 10, paddingRight: 10, paddingTop: 6, paddingBottom: 6,
+      primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED', fills: [solid()],
+      strokes: [solid()], strokeWeight: 1,
+      effects: [{ type: 'DROP_SHADOW', visible: true, radius: 8, offset: { x: 0, y: 2 }, color: { r: 0, g: 0, b: 0, a: 0.2 } }],
+      children: [text('Hi', { id: '2:2', x: 26, y: 30 }, { letterSpacing: { unit: 'PIXELS', value: 0.5 } })] },
+  ]);
+  const { code } = dart(root, { screenUtil: true });
+  assert.match(code, /import 'package:flutter_screenutil\/flutter_screenutil.dart';/);
+  assert.match(code, /left: 16.w,\s+top: 24.h,/);
+  assert.match(code, /width: 120.w,\s+height: 48.h,/);
+  assert.match(code, /EdgeInsets.symmetric\(horizontal: 10.w, vertical: 6.h\)|EdgeInsets.fromLTRB\(10.w, 6.h, 10.w, 6.h\)/);
+  assert.match(code, /BorderRadius.circular\(12.r\)/);
+  assert.match(code, /spacing: 8.w,/);
+  assert.match(code, /fontSize: 16.sp,/);
+  assert.match(code, /height: 1.25,/, 'line height stays a ratio');
+  assert.match(code, /letterSpacing: 0.5,/);
+  assert.match(code, /blurRadius: [\d.]+,/, 'shadows are not scaled');
+  assert.match(code, /width: 1[,)]/, 'stroke widths are not scaled');
+  assert.doesNotMatch(dart(root).code, /\.w\b|\.sp\b/);
+});
