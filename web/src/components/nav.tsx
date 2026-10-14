@@ -12,8 +12,13 @@ const links = [
   { href: "/#features", label: "Features" },
   { href: "/#how", label: "How it works" },
   { href: "/#tools", label: "Tools" },
+  { href: "/showcase", label: "Showcase", highlight: true },
   { href: "/docs", label: "Docs" },
 ];
+
+function Highlighted({ label }: { label: string }) {
+  return <span className="text-rainbow font-medium">{label}</span>;
+}
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false);
@@ -44,10 +49,10 @@ export function Nav() {
               key={l.href}
               href={l.href}
               className={`rounded-lg px-3 py-1.5 text-sm transition hover:text-fg ${
-                pathname.startsWith("/docs") && l.href === "/docs" ? "text-fg" : "text-muted"
+                (pathname.startsWith("/docs") && l.href === "/docs") || (pathname === "/showcase" && l.href === "/showcase") ? "text-fg" : "text-muted"
               }`}
             >
-              {l.label}
+              {l.highlight ? <Highlighted label={l.label} /> : l.label}
             </Link>
           ))}
         </nav>
@@ -98,7 +103,7 @@ export function Nav() {
         <nav className="border-t border-line px-4 pt-2 pb-4 md:hidden">
           {links.map((l) => (
             <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="block rounded-lg px-2 py-2.5 text-muted hover:text-fg">
-              {l.label}
+              {l.highlight ? <Highlighted label={l.label} /> : l.label}
             </Link>
           ))}
           <a href={site.github} target="_blank" rel="noreferrer" className="block rounded-lg px-2 py-2.5 text-muted hover:text-fg">

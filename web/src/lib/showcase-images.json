@@ -1,0 +1,360 @@
+{
+  "haven": {
+    "screens": [
+      {
+        "name": "Welcome",
+        "src": "/showcase/haven/01-welcome.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 229082
+      },
+      {
+        "name": "Home",
+        "src": "/showcase/haven/02-home.jpg",
+        "width": 780,
+        "height": 2326,
+        "bytes": 341843
+      },
+      {
+        "name": "Product detail",
+        "src": "/showcase/haven/03-product-detail.jpg",
+        "width": 780,
+        "height": 1748,
+        "bytes": 205448
+      },
+      {
+        "name": "Cart",
+        "src": "/showcase/haven/04-cart.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 149647
+      },
+      {
+        "name": "Order status",
+        "src": "/showcase/haven/05-order-status.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 120283
+      }
+    ],
+    "cover": {
+      "src": "/showcase/haven/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 308469
+    },
+    "system": {
+      "src": "/showcase/haven/design-system.jpg",
+      "width": 1200,
+      "height": 1176,
+      "bytes": 0
+    }
+  },
+  "forkful": {
+    "cover": {
+      "src": "/showcase/forkful/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 0
+    },
+    "screens": [
+      {
+        "name": "Sign in",
+        "src": "/showcase/forkful/01-sign-in.jpg",
+        "width": 720,
+        "height": 1600,
+        "bytes": 232702
+      },
+      {
+        "name": "Verify number",
+        "src": "/showcase/forkful/02-verify-number.jpg",
+        "width": 720,
+        "height": 1600,
+        "bytes": 82613
+      },
+      {
+        "name": "Delivery location",
+        "src": "/showcase/forkful/03-delivery-location.jpg",
+        "width": 720,
+        "height": 1600,
+        "bytes": 115148
+      },
+      {
+        "name": "Home",
+        "src": "/showcase/forkful/04-home.jpg",
+        "width": 720,
+        "height": 3108,
+        "bytes": 582524
+      },
+      {
+        "name": "Search",
+        "src": "/showcase/forkful/05-search.jpg",
+        "width": 720,
+        "height": 1600,
+        "bytes": 192085
+      },
+      {
+        "name": "Filters",
+        "src": "/showcase/forkful/06-filters.jpg",
+        "width": 720,
+        "height": 1600,
+        "bytes": 147647
+      },
+      {
+        "name": "Restaurant menu",
+        "src": "/showcase/forkful/07-restaurant-menu.jpg",
+        "width": 720,
+        "height": 2982,
+        "bytes": 428119
+      },
+      {
+        "name": "Customise item",
+        "src": "/showcase/forkful/08-customise-item.jpg",
+        "width": 720,
+        "height": 1884,
+        "bytes": 161030
+      },
+      {
+        "name": "Cart",
+        "src": "/showcase/forkful/09-cart.jpg",
+        "width": 720,
+        "height": 2402,
+        "bytes": 242608
+      },
+      {
+        "name": "Coupons",
+        "src": "/showcase/forkful/10-coupons.jpg",
+        "width": 720,
+        "height": 1676,
+        "bytes": 164194
+      },
+      {
+        "name": "Payment",
+        "src": "/showcase/forkful/11-payment.jpg",
+        "width": 720,
+        "height": 1896,
+        "bytes": 160903
+      },
+      {
+        "name": "Order tracking",
+        "src": "/showcase/forkful/12-order-tracking.jpg",
+        "width": 720,
+        "height": 1600,
+        "bytes": 143313
+      },
+      {
+        "name": "Rate your order",
+        "src": "/showcase/forkful/13-rate-your-order.jpg",
+        "width": 720,
+        "height": 1600,
+        "bytes": 137893
+      },
+      {
+        "name": "Your orders",
+        "src": "/showcase/forkful/14-your-orders.jpg",
+        "width": 720,
+        "height": 1876,
+        "bytes": 198169
+      },
+      {
+        "name": "Account",
+        "src": "/showcase/forkful/15-account.jpg",
+        "width": 720,
+        "height": 1788,
+        "bytes": 133503
+      },
+      {
+        "name": "Empty cart",
+        "src": "/showcase/forkful/16-empty-cart.jpg",
+        "width": 720,
+        "height": 1600,
+        "bytes": 77086
+      }
+    ],
+    "system": {
+      "src": "/showcase/forkful/design-system.jpg",
+      "width": 1500,
+      "height": 1367,
+      "bytes": 0
+    }
+  },
+  "partner": {
+    "cover": {
+      "src": "/showcase/partner/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 0
+    },
+    "screens": [
+      {
+        "name": "Sign in",
+        "src": "/showcase/partner/01-sign-in.jpg",
+        "width": 1440,
+        "height": 1024,
+        "bytes": 278082
+      },
+      {
+        "name": "Overview",
+        "src": "/showcase/partner/02-overview.jpg",
+        "width": 1440,
+        "height": 1098,
+        "bytes": 223265
+      },
+      {
+        "name": "Orders",
+        "src": "/showcase/partner/03-orders.jpg",
+        "width": 1440,
+        "height": 1024,
+        "bytes": 205309
+      },
+      {
+        "name": "Order detail",
+        "src": "/showcase/partner/04-order-detail.jpg",
+        "width": 1440,
+        "height": 1024,
+        "bytes": 201153
+      },
+      {
+        "name": "Menu",
+        "src": "/showcase/partner/05-menu.jpg",
+        "width": 1440,
+        "height": 1024,
+        "bytes": 191815
+      },
+      {
+        "name": "Edit item",
+        "src": "/showcase/partner/06-edit-item.jpg",
+        "width": 1440,
+        "height": 1024,
+        "bytes": 182052
+      },
+      {
+        "name": "Reviews",
+        "src": "/showcase/partner/07-reviews.jpg",
+        "width": 1440,
+        "height": 1024,
+        "bytes": 185777
+      },
+      {
+        "name": "Payouts",
+        "src": "/showcase/partner/08-payouts.jpg",
+        "width": 1440,
+        "height": 1024,
+        "bytes": 169472
+      },
+      {
+        "name": "Settings",
+        "src": "/showcase/partner/09-settings.jpg",
+        "width": 1440,
+        "height": 1274,
+        "bytes": 226197
+      }
+    ],
+    "system": {
+      "src": "/showcase/partner/design-system.jpg",
+      "width": 1800,
+      "height": 2075,
+      "bytes": 0
+    }
+  },
+  "tradewell": {
+    "cover": {
+      "src": "/showcase/tradewell/cover.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 0
+    },
+    "screens": [
+      {
+        "name": "Welcome",
+        "src": "/showcase/tradewell/01-welcome.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 157454
+      },
+      {
+        "name": "Account setup",
+        "src": "/showcase/tradewell/02-account-setup.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 158445
+      },
+      {
+        "name": "Explore",
+        "src": "/showcase/tradewell/03-explore.jpg",
+        "width": 780,
+        "height": 2806,
+        "bytes": 331171
+      },
+      {
+        "name": "Search",
+        "src": "/showcase/tradewell/04-search.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 171217
+      },
+      {
+        "name": "Stock detail",
+        "src": "/showcase/tradewell/05-stock-detail.jpg",
+        "width": 780,
+        "height": 3050,
+        "bytes": 324964
+      },
+      {
+        "name": "Buy order",
+        "src": "/showcase/tradewell/06-buy-order.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 166756
+      },
+      {
+        "name": "Order placed",
+        "src": "/showcase/tradewell/07-order-placed.jpg",
+        "width": 780,
+        "height": 1806,
+        "bytes": 150550
+      },
+      {
+        "name": "Mutual fund",
+        "src": "/showcase/tradewell/08-mutual-fund.jpg",
+        "width": 780,
+        "height": 2138,
+        "bytes": 195041
+      },
+      {
+        "name": "Portfolio",
+        "src": "/showcase/tradewell/09-portfolio.jpg",
+        "width": 780,
+        "height": 2424,
+        "bytes": 317113
+      },
+      {
+        "name": "Watchlist",
+        "src": "/showcase/tradewell/10-watchlist.jpg",
+        "width": 780,
+        "height": 1688,
+        "bytes": 209289
+      },
+      {
+        "name": "Orders",
+        "src": "/showcase/tradewell/11-orders.jpg",
+        "width": 780,
+        "height": 1942,
+        "bytes": 196374
+      },
+      {
+        "name": "Add money",
+        "src": "/showcase/tradewell/12-add-money.jpg",
+        "width": 780,
+        "height": 1808,
+        "bytes": 169785
+      }
+    ],
+    "system": {
+      "src": "/showcase/tradewell/design-system.jpg",
+      "width": 1425,
+      "height": 1360,
+      "bytes": 0
+    }
+  }
+}

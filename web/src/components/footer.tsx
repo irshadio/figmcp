@@ -13,6 +13,7 @@ const cols = [
       { href: "/#tools", label: "Tools" },
       { href: "/#compare", label: "Compare" },
       { href: "/#faq", label: "FAQ" },
+      { href: "/showcase", label: "Showcase" },
       { href: "/docs/changelog", label: "Changelog" },
     ],
   },

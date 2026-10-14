@@ -345,3 +345,19 @@ body {
     filter: none;
   }
 }
+
+/* Rainbow letters that drift slowly, for the nav link worth noticing. */
+.text-rainbow {
+  background: linear-gradient(90deg, #ff6b6b, #ffa94d, #ffd43b, #69db7c, #4dabf7, #9775fa, #f783ac, #ff6b6b);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: rainbow 4s linear infinite;
+}
+@keyframes rainbow {
+  to { background-position: 200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .text-rainbow { animation: none; }
+}
