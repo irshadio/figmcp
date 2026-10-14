@@ -2,8 +2,7 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
-    version: null,
-    title: "Next",
+    version: "1.5.0",
     notes: [
       { type: "new", text: "verify_code renders Flutter code with flutter test and compares it with Figma's render, inside your own project when you name the widget's file." },
       { type: "new", text: "search_design_system lists the components, styles and variables of the open file, so designs reuse them." },
