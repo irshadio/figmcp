@@ -3,9 +3,18 @@
 import { PluginUnavailable } from './bridge.js';
 import { hex, visiblePaints } from './codegen/util.js';
 import { cropPng, fitPng, pngSize } from './png.js';
-import { findSnapshotNode, saveSnapshot } from './store.js';
+import { findSnapshotNode, knownImages, rememberImages, savedImages, saveSnapshot } from './store.js';
 
 export class NotFound extends Error {}
+
+/** Hashes of the image fills under [node]. */
+function imageHashes(node, out = new Set()) {
+  for (const p of [...(Array.isArray(node.fills) ? node.fills : []), ...(Array.isArray(node.strokes) ? node.strokes : [])]) {
+    if (p && p.type === 'IMAGE' && p.imageHash) out.add(p.imageHash);
+  }
+  (node.children || []).forEach((c) => imageHashes(c, out));
+  return out;
+}
 
 /** '1-2' -> '1:2', 'I1-2;3-4' -> 'I1:2;3:4'. */
 export function normalizeId(id) {
@@ -59,8 +68,18 @@ export class DesignSource {
    * { tree, images: {hash: base64}, source, exportedAt, truncated, failures }.
    * A live read stops after [maxNodes] layers (truncated: true).
    */
-  async node(id, { images = false, svg = true, maxDepth, maxNodes } = {}) {
-    const result = await this.live('node', { id, svg, images, maxDepth, maxNodes }, 180000);
+  async node(id, { images = false, svg = true, maxDepth, maxNodes, maxVisible } = {}) {
+    const result = await this.live('node', {
+      id, svg, images, maxDepth, maxNodes, maxVisible, ...(images ? { knownImages: knownImages() } : {}),
+    }, 180000);
+    if (result && images) {
+      // The plugin leaves out images the server saved before.
+      try {
+        rememberImages(result.images || {});
+      } catch { /* the bytes are still in the result */ }
+      const missing = (result.imageHashes || []).filter((h) => !(result.images || {})[h]);
+      result.images = { ...savedImages(missing), ...(result.images || {}) };
+    }
     const extra = result ? {
       ...(result.truncated ? { truncated: true } : {}),
       ...(result.failures && result.failures.length ? { failures: result.failures } : {}),
@@ -69,21 +88,25 @@ export class DesignSource {
       return { tree: result.tree, images: result.images || {}, source: 'live', ...extra };
     }
     if (result) {
-      try {
-        saveSnapshot({
-          exportedAt: new Date().toISOString(),
-          fileName: result.fileName,
-          page: result.page ? result.page.name : null,
-          frames: [{ id: result.tree.id, name: result.tree.name, previewPng2x: null, tree: result.tree }],
-          images: result.images || {},
-        }, { live: true });
-      } catch { /* caching is best effort */ }
+      // Cached after the response; image bytes are already saved as assets.
+      const cached = {
+        exportedAt: new Date().toISOString(),
+        fileName: result.fileName,
+        page: result.page ? result.page.name : null,
+        frames: [{ id: result.tree.id, name: result.tree.name, previewPng2x: null, tree: result.tree }],
+        images: images ? {} : result.images || {},
+      };
+      setImmediate(() => {
+        try {
+          saveSnapshot(cached, { live: true });
+        } catch { /* caching is best effort */ }
+      });
       return { tree: result.tree, images: result.images || {}, source: 'live', ...extra };
     }
     const hit = this.snapshot(id);
     return {
       tree: rebase(hit.node),
-      images: hit.data.images || {},
+      images: { ...savedImages(imageHashes(hit.node)), ...(hit.data.images || {}) },
       source: 'snapshot',
       exportedAt: hit.exportedAt,
       snapshot: hit.snapshot,

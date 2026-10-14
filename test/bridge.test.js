@@ -63,3 +63,13 @@ test('an empty secret or pairing file is replaced, never trusted', async () => {
   assert.match(pairingCode(), /^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
   assert.equal(secret(), fs.readFileSync(path.join(dir, 'secret'), 'utf8'));
 });
+
+test('only the newest cached plugin reads are kept', async () => {
+  const { saveSnapshot, snapshotSummary } = await import('../src/store.js');
+  const frame = (i) => ({ frames: [{ id: `1:${i}`, name: `F${i}`, tree: { id: `1:${i}`, name: `F${i}`, type: 'FRAME' } }], images: {} });
+  saveSnapshot(frame(999));
+  for (let i = 0; i < 25; i++) saveSnapshot(frame(i), { live: true });
+  const names = snapshotSummary().map((s) => s.snapshot);
+  assert.equal(names.filter((n) => n.startsWith('live_')).length, 20);
+  assert.ok(names.includes('F999_1_999.json'), 'saved frames are kept');
+});

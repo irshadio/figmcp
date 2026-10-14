@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import WebSocket from 'ws';
 import test from 'node:test';
-import { FIXTURE, fakePlugin, nextPort, pairing, startClient, texts, tmpDir } from './helpers.js';
+import { FIXTURE, data, fakePlugin, nextPort, pairing, startClient, texts, tmpDir } from './helpers.js';
 
 test('lists the tools of the Figma MCP', async () => {
   const { client, transport } = await startClient(tmpDir(), nextPort());
@@ -143,6 +143,24 @@ test('use_figma runs a script in the plugin and reports its errors', async () =>
   const failed = await client.callTool({ name: 'use_figma', arguments: { code: 'throw 1' } });
   assert.equal(failed.isError, true);
   assert.match(texts(failed), /Error: boom/);
+  plugin.stop();
+  await transport.close();
+});
+
+test('images the server saved are not sent again', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client, transport } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  assert.equal(await plugin.ready(), true);
+  const first = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', framework: 'react' } }));
+  const second = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', framework: 'react' } }));
+  const reads = plugin.requests.filter((r) => r.method === 'node');
+  assert.deepEqual(reads[0].params.knownImages, []);
+  assert.deepEqual(reads[1].params.knownImages.sort(), Object.keys(data.images).sort());
+  assert.equal(reads[1].params.maxVisible, 801);
+  const asset = (out) => out.match(/assets\/([a-f0-9]{64}\.png)/)[1];
+  assert.equal(asset(second), asset(first), 'the cached image is used');
   plugin.stop();
   await transport.close();
 });

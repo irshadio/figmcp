@@ -54,6 +54,7 @@ export function fakePlugin(port, { origin, code, truncated = false } = {}) {
   let ws;
   let stopped = false;
   const calls = [];
+  const requests = [];
   const connect = () => new Promise((resolve) => {
     ws = new WebSocket(`ws://127.0.0.1:${port}/?code=${encodeURIComponent(code || '')}`, origin ? { origin } : {});
     ws.on('open', () => resolve(true));
@@ -65,6 +66,7 @@ export function fakePlugin(port, { origin, code, truncated = false } = {}) {
       const msg = JSON.parse(raw);
       if (msg.type !== 'request') return;
       calls.push(msg.method);
+      requests.push(msg);
       const p = msg.params;
       const reply = (result) => ws.send(JSON.stringify({ type: 'response', id: msg.id, result }));
       const tree = data.frames[0].tree;
@@ -76,9 +78,13 @@ export function fakePlugin(port, { origin, code, truncated = false } = {}) {
             selection: [{ id: '10:1', name: 'Sample Screen', type: 'FRAME' }],
           });
         case 'node':
-        case 'pageMeta':
-          return reply({ fileName: 'Sample', page: { id: '0:1', name: 'Page 1' }, tree: findNode(tree, p.id), images: data.images,
-            ...(truncated && msg.method === 'node' ? { truncated: true } : {}) });
+        case 'pageMeta': {
+          // Like the plugin: images the server already has are left out.
+          const known = new Set(p.knownImages || []);
+          const images = Object.fromEntries(Object.entries(data.images).filter(([h]) => !known.has(h)));
+          return reply({ fileName: 'Sample', page: { id: '0:1', name: 'Page 1' }, tree: findNode(tree, p.id), images,
+            imageHashes: Object.keys(data.images), ...(truncated && msg.method === 'node' ? { truncated: true } : {}) });
+        }
         case 'export':
           return reply({ format: 'png', base64: data.frames[0].previewPng2x, width: 200, height: 120, scale: 2 });
         case 'snapshot':
@@ -97,6 +103,7 @@ export function fakePlugin(port, { origin, code, truncated = false } = {}) {
   });
   return {
     calls,
+    requests,
     ready: connect,
     stop() { stopped = true; ws.close(); },
   };

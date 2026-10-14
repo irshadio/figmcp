@@ -102,6 +102,67 @@ export function validSnapshot(data) {
     data.frames.every((f) => f && f.tree && typeof f.tree.id === 'string');
 }
 
+// Figma image hash -> saved asset name, so an image already on disk is not
+// sent by the plugin again.
+const IMAGE_INDEX = path.join(DATA_DIR, 'images.json');
+let imageIndex = null;
+
+function images() {
+  if (!imageIndex) {
+    try {
+      imageIndex = JSON.parse(fs.readFileSync(IMAGE_INDEX, 'utf8'));
+    } catch {
+      imageIndex = {};
+    }
+  }
+  return imageIndex;
+}
+
+/** Saves the image bytes ({ hash: base64 }) as assets and remembers them. */
+export function rememberImages(bytesByHash) {
+  const index = images();
+  let changed = false;
+  for (const [hash, base64] of Object.entries(bytesByHash)) {
+    const buffer = Buffer.from(base64, 'base64');
+    const name = saveAsset(buffer, imageExt(buffer));
+    if (index[hash] !== name) {
+      index[hash] = name;
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  // Other instances may have added images too: keep theirs.
+  let onDisk = {};
+  try {
+    onDisk = JSON.parse(fs.readFileSync(IMAGE_INDEX, 'utf8'));
+  } catch { /* first image */ }
+  imageIndex = { ...onDisk, ...index };
+  const tmp = `${IMAGE_INDEX}.${process.pid}`;
+  fs.writeFileSync(tmp, JSON.stringify(imageIndex));
+  fs.renameSync(tmp, IMAGE_INDEX);
+}
+
+/** Hashes of the images saved as assets. */
+export function knownImages() {
+  imageIndex = null;
+  const index = images();
+  return Object.keys(index).filter((hash) => fs.existsSync(path.join(ASSETS, index[hash])));
+}
+
+/** { hash: base64 } of the saved images among [hashes]. */
+export function savedImages(hashes) {
+  const index = images();
+  const out = {};
+  for (const hash of hashes) {
+    const name = index[hash];
+    if (!name) continue;
+    try {
+      out[hash] = fs.readFileSync(path.join(ASSETS, name)).toString('base64');
+    } catch { /* removed since */ }
+  }
+  return out;
+}
+
 /**
  * Stores a snapshot; the newest copy of a node wins on lookup. [live] marks a
  * cached plugin read, kept apart so it never replaces a saved frame.
@@ -113,7 +174,19 @@ export function saveSnapshot(data, { live = false } = {}) {
   const tmp = path.join(SNAPSHOTS, '.' + name + '.' + process.pid);
   fs.writeFileSync(tmp, JSON.stringify(data));
   fs.renameSync(tmp, path.join(SNAPSHOTS, name));
+  if (live) pruneLive();
   return name;
+}
+
+// Cached plugin reads kept on disk; saved frames are never pruned.
+const MAX_LIVE = 20;
+
+function pruneLive() {
+  const live = listSnapshots().filter((s) => s.name.startsWith('live_'));
+  for (const { name } of live.slice(MAX_LIVE)) {
+    fs.rmSync(path.join(SNAPSHOTS, name), { force: true });
+    loaded.delete(name);
+  }
 }
 
 export function importFile(file) {
@@ -140,13 +213,21 @@ function listSnapshots() {
     .sort((a, b) => b.mtime - a.mtime);
 }
 
+// Parsed snapshots kept in memory, least recently used dropped first.
+const MAX_LOADED = 8;
+
 function load(name) {
   const file = path.join(SNAPSHOTS, name);
   const mtime = fs.statSync(file).mtimeMs;
   const cached = loaded.get(name);
-  if (cached && cached.mtime === mtime) return cached.data;
+  if (cached && cached.mtime === mtime) {
+    loaded.delete(name);
+    loaded.set(name, cached);
+    return cached.data;
+  }
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
   loaded.set(name, { mtime, data });
+  while (loaded.size > MAX_LOADED) loaded.delete(loaded.keys().next().value);
   return data;
 }
 
