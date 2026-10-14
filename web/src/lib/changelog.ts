@@ -2,6 +2,18 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: null,
+    title: "Next",
+    notes: [
+      { type: "new", text: "verify_code renders Flutter code with flutter test and compares it with Figma's render, inside your own project when you name the widget's file." },
+      { type: "new", text: "search_design_system lists the components, styles and variables of the open file, so designs reuse them." },
+      { type: "new", text: "place_image puts local images and SVGs into the open file." },
+      { type: "improved", text: "Flutter: inner shadows and blend modes are drawn." },
+      { type: "fixed", text: "Flutter: text no longer takes the letter spacing of the app's theme." },
+      { type: "improved", text: "A link to the website in the plugin panel." },
+    ],
+  },
+  {
     version: "1.4.2",
     notes: [{ type: "improved", text: "Listed in the official MCP Registry as io.github.irshadio/figmcp." }],
   },

@@ -90,13 +90,13 @@ export function registerWriteTools(server, bridge) {
       'node is appended to an auto-layout parent.\n' +
       '- New nodes land on the current page: place top-level frames clear of ' +
       'existing ones, and append children with parent.appendChild(node).\n' +
-      '- Reuse what the file has: local components (figma.root.findAll is slow; ' +
-      'search the current page or use figma.getLocalPaintStylesAsync, ' +
-      'figma.variables.getLocalVariablesAsync), and set bound variables with ' +
+      '- Reuse what the file has: find its components, styles and variables ' +
+      'with search_design_system first, and set bound variables with ' +
       'figma.variables.setBoundVariableForPaint.\n' +
       '- Images from the web: const img = await figma.createImageAsync(url), ' +
       'then fills = [{ type: "IMAGE", imageHash: img.hash, scaleMode: "FILL" }]. ' +
-      'fetch(url) works too (e.g. an SVG for figma.createNodeFromSvg).\n' +
+      'fetch(url) works too (e.g. an SVG for figma.createNodeFromSvg). Local ' +
+      'files go in with place_image.\n' +
       '- figma.currentPage.selection = [node] and ' +
       'figma.viewport.scrollAndZoomIntoView([node]) show the result.\n\n' +
       'Build a screen in a few calls (structure, then sections), return the ' +

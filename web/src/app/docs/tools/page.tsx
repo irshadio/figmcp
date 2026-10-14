@@ -5,7 +5,7 @@ export const metadata: Metadata = pageMeta({
   title: "Tools",
   path: "/docs/tools",
   description:
-    "Reference for every figmcp tool: get_design_context, get_screenshot, get_metadata, get_variable_defs, download_assets, use_figma, Code Connect and more.",
+    "Reference for every figmcp tool: get_design_context, verify_code, get_screenshot, get_metadata, download_assets, use_figma, search_design_system, place_image, Code Connect and more.",
 });
 
 type Arg = [name: string, desc: string];
@@ -57,6 +57,18 @@ const groups: { title: string; tools: Tool[] }[] = [
         desc: "Assets for one node: an exported render, the original image fills (up to 20) and SVGs of the vector layers (up to 20).",
         args: [node, ["defaultFormat", "png, jpg, svg or pdf (default png)."], ["defaultScale", "Export scale, 0.01 to 4 (default 1)."]],
       },
+      {
+        name: "verify_code",
+        desc: "Check Flutter code against the design: analyzes it, renders it with flutter test at 2x and compares the render with Figma's own. Returns analyzer and runtime errors, the share of differing pixels and a diff image. With file, it checks your widget inside your project, with its packages, assets and flutter_screenutil scaling; without it, the generated reference code, layer by layer.",
+        args: [
+          node,
+          ["file", "The .dart file with the widget, under the project's lib/."],
+          ["widget", "The widget class in file (default: its first widget class)."],
+          ["viewport", 'Lay the generated code out on a screen of this size, e.g. "360x780", and report overflows.'],
+          ["fonts", "Folders with font files (default: the project's assets/fonts and the system fonts)."],
+          ["flutter", "Path of the flutter tool, when it is not on PATH."],
+        ],
+      },
     ],
   },
   {
@@ -68,6 +80,28 @@ const groups: { title: string; tools: Tool[] }[] = [
         args: [
           ["code", "Body of an async function run with figma in scope."],
           ["timeoutMs", "How long to wait for the script (default 60000, max 600000)."],
+        ],
+      },
+      {
+        name: "search_design_system",
+        desc: "Local components and component sets with their properties and variant options, library components the file already uses, and local paint, text and effect styles and variables with their values. Call it before designing, so the agent reuses what the file has.",
+        args: [
+          ["query", 'Words that must all appear in the name or description, e.g. "button primary". Empty lists everything.'],
+          ["kinds", "components, styles and/or variables (default: all)."],
+          ["allPages", "Search components on every page, not just the current one."],
+          ["limit", "Most results per kind (default 50)."],
+        ],
+      },
+      {
+        name: "place_image",
+        desc: "Put an image file from your computer into the open file: a PNG, JPG or GIF becomes a layer with the image fill (or the fill of an existing layer), and an SVG becomes editable vectors.",
+        args: [
+          ["path", "The image file, absolute or relative to the project."],
+          ["nodeId", "Set the image as the fill of this layer instead of making a new one."],
+          ["parentId", "Frame or group to put the new layer in (default: the current page)."],
+          ["width, height", "Size of the new layer; one keeps the aspect ratio."],
+          ["x, y", "Position of the new layer."],
+          ["scaleMode", "FILL, FIT, CROP or TILE (default FILL)."],
         ],
       },
     ],
