@@ -63,4 +63,7 @@ test('search_design_system matches every query word and caps results', async () 
   assert.equal(capped.components.length, 1);
   assert.deepEqual(capped.truncated, ['components']);
   assert.equal(capped.styles, undefined);
+  const bounded = await search({ kinds: ['components'], maxInstances: 0 });
+  assert.equal(bounded.instancesNotScanned, true);
+  assert.deepEqual(bounded.libraryComponents, []);
 });

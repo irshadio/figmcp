@@ -276,6 +276,15 @@ test('inner shadows lie on the fills and blend modes blend', () => {
   const photo = dart(frame([], { fills: [solid(), { type: 'IMAGE', visible: true, scaleMode: 'CROP', imageHash: 'h', imageTransform: [[1, 0, 0], [0, 1, 0]] }], effects: [inner] }));
   assert.match(photo.code, /Image.asset[\s\S]*DecoratedBox\(\s+decoration: _InnerShadowDecoration\(/);
 
+  // Fill layers cover the padding; only the content is padded.
+  const padded = dart(frame([text('Hi', { x: 16, y: 16 })], {
+    layoutMode: 'VERTICAL', paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 16,
+    primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED',
+    fills: [solid(), { type: 'IMAGE', visible: true, scaleMode: 'CROP', imageHash: 'h', imageTransform: [[1, 0, 0], [0, 1, 0]] }], effects: [inner],
+  })).code;
+  assert.match(padded, /Positioned.fill\([\s\S]*Positioned.fill\([\s\S]*_InnerShadowDecoration[\s\S]*Padding\(\s+padding: EdgeInsets.all\(16\),/);
+  assert.doesNotMatch(padded, /Container\([^]*?padding: EdgeInsets.all\(16\),\s+decoration:/);
+
   const fill = dart(frame([], { fills: [solid(), solid({ r: 1, g: 0, b: 0, a: 1 }, { blendMode: 'MULTIPLY' })] }));
   assert.match(fill.code, /_Blend\(\s+mode: BlendMode.multiply,\s+child: DecoratedBox\(/);
   assert.match(fill.code, /import 'package:flutter\/rendering.dart';/);

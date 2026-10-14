@@ -37,7 +37,15 @@ const HARNESS_DIR = path.join(DATA_DIR, 'flutter-check');
 let HARNESS = HARNESS_DIR;
 const FONT_CACHE = path.join(DATA_DIR, 'fonts');
 const ASSET_DIR = 'assets/check';
-const SYSTEM_FONTS = [path.join(os.homedir(), 'Library/Fonts'), '/Library/Fonts', '/System/Library/Fonts'];
+const SYSTEM_FONTS = [
+  path.join(os.homedir(), 'Library/Fonts'), '/Library/Fonts', '/System/Library/Fonts',
+  path.join(os.homedir(), '.fonts'), path.join(os.homedir(), '.local/share/fonts'), '/usr/share/fonts',
+  path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts'),
+];
+// Windows runs flutter.bat, which needs a shell.
+const SHELL = process.platform === 'win32';
+// Below the 10 minutes verify_code waits, so the run cleans up first.
+const TEST_TIMEOUT = 540000;
 const STYLE_NAMES = {
   100: 'Thin', 200: 'ExtraLight', 300: 'Light', 400: 'Regular', 500: 'Medium',
   600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold', 900: 'Black',
@@ -121,7 +129,7 @@ async function fetchGoogleFont(family) {
 /** The flutter tool: [explicit], or the one on PATH; null when there is none. */
 export function findFlutter(explicit) {
   if (explicit) return explicit;
-  const found = spawnSync('which', ['flutter'], { encoding: 'utf8' }).stdout.trim();
+  const found = spawnSync(SHELL ? 'where' : 'which', ['flutter'], { encoding: 'utf8' }).stdout.split(/\r?\n/)[0].trim();
   return found || null;
 }
 
@@ -164,9 +172,9 @@ ${assetDirs.map((d) => `    - ${d}/`).join('\n')}
   const changed = writeIfChanged(path.join(HARNESS, 'pubspec.yaml'), pubspec);
   writeIfChanged(path.join(HARNESS, 'analysis_options.yaml'), 'include: package:flutter_lints/flutter.yaml\n');
   if (changed || !fs.existsSync(path.join(HARNESS, '.dart_tool', 'package_config.json'))) {
-    const offline = spawnSync(flutter, ['pub', 'get', '--offline'], { cwd: HARNESS, encoding: 'utf8' });
+    const offline = spawnSync(flutter, ['pub', 'get', '--offline'], { cwd: HARNESS, encoding: 'utf8', shell: SHELL });
     if (offline.status !== 0) {
-      const online = spawnSync(flutter, ['pub', 'get'], { cwd: HARNESS, encoding: 'utf8' });
+      const online = spawnSync(flutter, ['pub', 'get'], { cwd: HARNESS, encoding: 'utf8', shell: SHELL });
       if (online.status !== 0) throw new Error(`flutter pub get failed:\n${online.stderr || online.stdout}`);
     }
   }
@@ -280,7 +288,7 @@ void main() {
 
 /** Analyzer issues of [file] in [dir] (default: the scratch project's lib/design.dart): [{ severity, message, line, code }]. */
 export function analyze(flutter, file = 'lib/design.dart', dir = HARNESS) {
-  const run = spawnSync(flutter, ['analyze', '--no-pub', file], { cwd: dir, encoding: 'utf8' });
+  const run = spawnSync(flutter, ['analyze', '--no-pub', file], { cwd: dir, encoding: 'utf8', shell: SHELL });
   const issues = [];
   const at = file.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
   const pattern = new RegExp(`^\\s*(error|warning|info)\\s+•\\s+(.+?)\\s+•\\s+${at}:(\\d+):(\\d+)\\s+•\\s+(\\S+)`);
@@ -393,7 +401,7 @@ async function main() {
   let issues;
   if (project) {
     if (!fs.existsSync(path.join(project.dir, '.dart_tool', 'package_config.json'))) {
-      const got = spawnSync(flutter, ['pub', 'get'], { cwd: project.dir, encoding: 'utf8' });
+      const got = spawnSync(flutter, ['pub', 'get'], { cwd: project.dir, encoding: 'utf8', shell: SHELL });
       if (got.status !== 0) throw new Error(`flutter pub get failed in ${project.dir}:\n${got.stderr || got.stdout}`);
     }
     issues = analyze(flutter, project.file, project.dir);
@@ -452,7 +460,7 @@ async function main() {
       imports: project.imports, config: configFile, file: project.file, widget: project.widget(width, height),
     }));
     try {
-      run = spawnSync(flutter, ['test', '--no-pub', PROJECT_TEST], { cwd: project.dir, encoding: 'utf8', timeout: 600000 });
+      run = spawnSync(flutter, ['test', '--no-pub', PROJECT_TEST], { cwd: project.dir, encoding: 'utf8', timeout: TEST_TIMEOUT, shell: SHELL });
     } finally {
       fs.rmSync(testFile, { force: true });
       fs.rmSync(configFile, { force: true });
@@ -463,7 +471,7 @@ async function main() {
       imports: "import 'package:figma_check/design.dart';", config: 'check_config.json',
       file: 'lib/design.dart', widget: `const ${className}()`,
     }));
-    run = spawnSync(flutter, ['test', '--no-pub', 'test/render_test.dart'], { cwd: HARNESS, encoding: 'utf8', timeout: 600000 });
+    run = spawnSync(flutter, ['test', '--no-pub', 'test/render_test.dart'], { cwd: HARNESS, encoding: 'utf8', timeout: TEST_TIMEOUT, shell: SHELL });
   }
   if (!fs.existsSync(path.join(out, 'result.json'))) {
     const errors = issues.filter((i) => i.severity === 'error');

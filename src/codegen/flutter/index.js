@@ -654,18 +654,22 @@ class FlutterWriter {
         decoration = call('_InnerShadowDecoration', { decoration: decoration || raw('null'), ...innerArgs });
       }
     }
+    let padding = content.padding;
     if (layers.length) {
+      // Fill layers cover the whole box; only the content is padded.
+      const inside = padding ? call('Padding', { padding, child: child || call('SizedBox', {}) }) : child;
+      padding = null;
       child = call('Stack', {
         fit: raw('StackFit.passthrough'),
         clipBehavior: raw('Clip.none'),
-        children: list([...layers.map((l) => call('Positioned.fill', { child: l })), child]),
+        children: list([...layers.map((l) => call('Positioned.fill', { child: l })), inside]),
       });
     }
     const clip = node.clipsContent ? (radius || shape ? raw('Clip.antiAlias') : raw('Clip.hardEdge')) : null;
     const args = {
       width: dim(size.w),
       height: dim(size.h),
-      padding: content.padding,
+      padding,
       decoration: decoration || (clip ? call('BoxDecoration', {}) : null),
       foregroundDecoration: foreground,
       clipBehavior: clip,

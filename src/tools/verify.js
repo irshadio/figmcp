@@ -4,11 +4,14 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { DATA_DIR } from '../store.js';
 import { fileKeySchema, guard, image, nodeIdSchema, text } from './common.js';
 
-const CHECK = new URL('../../tools/flutter-check.js', import.meta.url).pathname;
+const CHECK = fileURLToPath(new URL('../../tools/flutter-check.js', import.meta.url));
+// What flutter-check writes into a project for a run, and removes after.
+const PROJECT_FILES = ['test/figmcp_check_test.dart', '.dart_tool/figmcp_check.json'];
 const TIMEOUT = 600000;
 
 /** The flutter tool: [explicit], FLUTTER, PATH, or a usual install folder. */
@@ -30,7 +33,7 @@ function projectOf(file) {
   }
 }
 
-function runCheck(args) {
+function runCheck(args, project = null) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [CHECK, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
@@ -41,6 +44,7 @@ function runCheck(args) {
     child.on('error', reject);
     child.on('close', (code) => {
       clearTimeout(timer);
+      if (project) for (const f of PROJECT_FILES) fs.rmSync(path.join(project, f), { force: true });
       if (code === 0) {
         try {
           resolve(JSON.parse(out));
@@ -107,7 +111,7 @@ export function registerVerifyTools(server, bridge, source) {
       args.push('--project', project, '--file', path.relative(project, inProject));
       if (widget) args.push('--class', widget);
     }
-    const report = await runCheck(args);
+    const report = await runCheck(args, args.includes('--project') ? args[args.indexOf('--project') + 1] : null);
     const summary = {
       node: report.node,
       ...(exported.source === 'snapshot' ? { source: `snapshot saved ${exported.exportedAt || 'earlier'}` } : {}),

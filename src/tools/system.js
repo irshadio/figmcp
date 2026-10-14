@@ -29,6 +29,7 @@ if (params.kinds.includes('components')) {
   const found = [];
   const remote = new Map();
   const started = Date.now();
+  let scanned = 0;
   for (const page of pages) {
     if (Date.now() - started > params.budgetMs) {
       out.pagesSkipped = (out.pagesSkipped || 0) + 1;
@@ -58,6 +59,10 @@ if (params.kinds.includes('components')) {
     // Library components the page already uses, through their instances.
     for (const inst of page.findAllWithCriteria({ types: ['INSTANCE'] })) {
       if (remote.size >= limit * 4) break;
+      if (++scanned > params.maxInstances || Date.now() - started > params.budgetMs) {
+        out.instancesNotScanned = true;
+        break;
+      }
       let main;
       try { main = await inst.getMainComponentAsync(); } catch (e) { continue; }
       if (!main || !main.remote) continue;
@@ -120,7 +125,7 @@ return JSON.stringify(out);
 
 /** The plugin script for a search with [params]. */
 export function searchScript(params) {
-  return `const params = ${JSON.stringify({ budgetMs: 60000, ...params })};\n${SEARCH}`;
+  return `const params = ${JSON.stringify({ budgetMs: 60000, maxInstances: 3000, ...params })};\n${SEARCH}`;
 }
 
 export function registerSystemTools(server, bridge) {
@@ -136,7 +141,8 @@ export function registerSystemTools(server, bridge) {
       'figma.getNodeByIdAsync(id) then component.createInstance(), ' +
       'instance.clone() for a library component, figma.getStyleByIdAsync and ' +
       'figma.variables.getVariableByIdAsync. Libraries the file does not use ' +
-      'yet are not visible to the plugin. Needs the plugin and Design mode.',
+      'yet are not visible to the plugin; instancesNotScanned means the page ' +
+      'was too large to look through all its instances. Needs the plugin and Design mode.',
     inputSchema: {
       query: z.string().optional().describe('Words to look for, e.g. "button primary".'),
       kinds: z.array(z.enum(KINDS)).optional().describe(`What to search (default: all of ${KINDS.join(', ')}).`),
