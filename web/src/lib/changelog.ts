@@ -2,6 +2,13 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.5.1",
+    notes: [
+      { type: "improved", text: "New figmcp logo: the plugin panel opens with the wordmark, in light and dark themes." },
+      { type: "improved", text: "The README has a new banner and the tagline \"Design and code, locally.\", since figmcp now works in both directions." },
+    ],
+  },
+  {
     version: "1.5.0",
     notes: [
       { type: "new", text: "verify_code renders Flutter code with flutter test and compares it with Figma's render, inside your own project when you name the widget's file." },
