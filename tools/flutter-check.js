@@ -35,9 +35,9 @@ import { compareBoxes, expectedBoxes, families, loadDesign, pixelDiff } from './
 
 const HARNESS_DIR = path.join(DATA_DIR, 'flutter-check');
 let HARNESS = HARNESS_DIR;
-const FONT_CACHE = path.join(DATA_DIR, 'fonts');
+export const FONT_CACHE = path.join(DATA_DIR, 'fonts');
 const ASSET_DIR = 'assets/check';
-const SYSTEM_FONTS = [
+export const SYSTEM_FONTS = [
   path.join(os.homedir(), 'Library/Fonts'), '/Library/Fonts', '/System/Library/Fonts',
   path.join(os.homedir(), '.fonts'), path.join(os.homedir(), '.local/share/fonts'), '/usr/share/fonts',
   path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts'),
@@ -81,7 +81,7 @@ function norm(s) {
   return String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function fontFiles(dirs) {
+export function fontFiles(dirs) {
   const out = [];
   for (const dir of dirs) {
     if (!fs.existsSync(dir)) continue;
@@ -97,7 +97,7 @@ function fontFiles(dirs) {
  * (Inter-SemiBold.ttf, SF-Pro-Display-Medium.otf, Onest-600.ttf). Static
  * files win over variable ones, which Flutter would draw at one weight.
  */
-function familyFiles(family, files) {
+export function familyFiles(family, files) {
   const key = norm(family);
   const hits = files.filter((f) => f.stem.startsWith(key) && STYLE_TAIL.test(f.stem.slice(key.length)));
   const statics = hits.filter((f) => f.stem.slice(key.length) !== '' && !/variable|vf|wght/.test(f.stem));

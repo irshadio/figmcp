@@ -30,7 +30,8 @@ export function detectFramework({ framework, clientFrameworks, clientLanguages }
   if (FRAMEWORKS.includes(framework)) return framework;
   const said = `${clientFrameworks || ''} ${clientLanguages || ''}`.toLowerCase();
   if (/flutter|dart/.test(said)) return 'flutter';
-  if (/swiftui|swift|\bios\b|xcode|uikit/.test(said)) return 'swiftui';
+  if (/react.?native|expo/.test(said)) return 'react';
+  if (/swiftui|swift|\bios\b|xcode|uikit|objective-?c/.test(said)) return 'swiftui';
   if (/react|next|vue|svelte|angular|html|tailwind|javascript|typescript/.test(said)) return 'react';
   const env = String(process.env.FIGMA_LOCAL_MCP_FRAMEWORK || '').toLowerCase();
   if (FRAMEWORKS.includes(env)) return env;

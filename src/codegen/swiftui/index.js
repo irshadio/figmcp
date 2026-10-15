@@ -161,6 +161,7 @@ class SwiftUIWriter {
     this.containerMods = new Map();
     this.margins = new Map();
     this.stretchCells = new Set();
+    this.swaps = new Map();
   }
 
   roleOf(node) {
@@ -208,8 +209,43 @@ class SwiftUIWriter {
     if (this.inComponent) return core;
     const given = this.actions[node.id];
     if (!given && !TAPPABLE.has(kind)) return core;
+    const accessibilityLabel = kind === 'iconButton' ? role.label : null;
+    const pair = this.swaps.get(node.id);
+    if (pair && !given) return this.button(core, [`withAnimation(.snappy) { (${pair[0]}, ${pair[1]}) = (${pair[1]}, ${pair[0]}) }`], { accessibilityLabel });
     const name = this.actionCase(given || this.actionName(node, role));
-    return this.button(core, [`action(.${name})`], { accessibilityLabel: kind === 'iconButton' ? role.label : null });
+    return this.button(core, [`action(.${name})`], { accessibilityLabel });
+  }
+
+  /**
+   * Two fields whose values swap: a model of the texts that differ between
+   * them (not their labels), a state per field bound to its texts, and the
+   * swap button exchanging the two.
+   */
+  swapFields(node, role) {
+    const ends = role.fields.map((id) => visibleChildren(node).find((c) => c.id === id));
+    const values = fieldsOf(ends).filter((f) => f.kind === 'text' && !f.nodes.every((t, i) => t.characters === ends[i].name));
+    if (!values.length || this.inComponent) return;
+    const idents = new Set();
+    const roles = ['title', 'subtitle', 'detail', 'caption', 'note'];
+    values.forEach((f, i) => {
+      if (!f.name) f.role = roles[i] || `text${i + 1}`;
+    });
+    for (const f of values) {
+      let ident = sIdent(f.name || f.role, f.kind);
+      for (let i = 2; idents.has(ident); i++) ident = `${sIdent(f.name || f.role, f.kind)}${i}`;
+      idents.add(ident);
+      f.ident = ident;
+    }
+    const model = this.typeName(`${node.name} end`);
+    this.models.push([`struct ${model}: Hashable {`, ...values.map((f) => `  let ${f.ident}: String`), '}'].join('\n'));
+    const names = ends.map((end, i) => {
+      const name = this.member(end.name, i ? 'to' : 'from');
+      const init = values.map((f) => `${f.ident}: ${sString(f.values[i])}`).join(', ');
+      this.states.push(`  @State private var ${name} = ${model}(${init})`);
+      for (const f of values) this.bindings.set(f.nodes[i].id, `${name}.${f.ident}`);
+      return name;
+    });
+    this.swaps.set(role.button, names);
   }
 
   warn(node, message) {
@@ -1128,6 +1164,7 @@ class SwiftUIWriter {
     const ctx = { kind: 'flex', parent: node, axis, hugMain };
     const role = this.roles.get(node.id);
     const kind = role ? role.role : null;
+    if (kind === 'swapFields') this.swapFields(node, role);
     let v;
     let padding = this.paddingValues(node);
     if (node.layoutWrap === 'WRAP') {
@@ -1246,8 +1283,12 @@ function printProperty(p) {
 }
 
 /**
- * Reference SwiftUI code for [root]. Returns { code, structName, screen,
- * scrolls, assets, fonts, tokens, connected, rasterized, warnings }:
+ * Reference SwiftUI code for [root]. Returns { code, shared, structName,
+ * screen, scrolls, assets, fonts, tokens, connected, rasterized, warnings,
+ * structure }:
+ *   code is the screen's file; shared is DesignSystem.swift, what every
+ *   screen shares (Color(hex:), the button style, DesignTokens, AppFonts),
+ *   or null when the screen needs none of it;
  *   assets maps each asset catalog name used in the code to { source, ext,
  *   vector };
  *   fonts maps each family to the weights used ("600", "400 italic").
@@ -1309,24 +1350,25 @@ export function toSwiftUI(root, assets, options = {}) {
     ...writer.models.flatMap((m) => ['', m]),
   ];
   if (options.preview !== false) lines.push('', '#Preview {', `  ${structName}()`, '}');
+  const shared = ['import SwiftUI'];
   if (writer.textStyles.size) {
-    lines.push('', 'enum AppFonts {');
+    shared.push('', '/// The design\'s text styles, scaling with Dynamic Type.', 'enum AppFonts {');
     for (const t of writer.textStyles.values()) {
-      lines.push(`  static let ${t.ident}: Font = ${t.code} // ${t.name}`);
+      shared.push(`  static let ${t.ident}: Font = ${t.code} // ${t.name}`);
     }
-    lines.push('}');
+    shared.push('}');
   }
   if (writer.tokens.size) {
-    lines.push('', 'enum DesignTokens {');
+    shared.push('', '/// The design variables used, by their Figma names.', 'enum DesignTokens {');
     for (const t of writer.tokens.values()) {
-      lines.push(t.type === 'Color'
+      shared.push(t.type === 'Color'
         ? `  static let ${t.ident} = ${t.code} // ${t.name}`
         : `  static let ${t.ident}: CGFloat = ${t.code} // ${t.name}`);
     }
-    lines.push('}');
+    shared.push('}');
   }
   for (const name of ['color', 'flow', 'pressable']) {
-    if (writer.helpers.has(name)) lines.push('', HELPER_CODE[name]);
+    if (writer.helpers.has(name)) shared.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};
   for (const [name, info] of writer.names) assetsMap[name] = info;
@@ -1334,6 +1376,7 @@ export function toSwiftUI(root, assets, options = {}) {
   for (const [family, weights] of writer.fonts) fonts[family] = [...weights].sort();
   return {
     code: `${lines.join('\n')}\n`,
+    shared: shared.length > 1 ? `${shared.join('\n')}\n` : null,
     structName,
     screen: Boolean(writer.screen),
     scrolls: Boolean(writer.screen && writer.scrolls),

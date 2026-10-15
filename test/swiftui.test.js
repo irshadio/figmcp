@@ -8,6 +8,9 @@ import { detectRoles } from '../src/codegen/roles.js';
 import { toSwiftUI } from '../src/codegen/swiftui/index.js';
 import { assetCatalog, detectFramework } from '../src/project.js';
 
+const CHECK = new URL('../tools/swiftui-check.js', import.meta.url);
+const EXPORT = new URL('./fixtures/sample-export.json', import.meta.url);
+
 const assets = {
   svg: () => '/tmp/icon.svg',
   image: (hash) => `/tmp/${hash}.png`,
@@ -66,6 +69,15 @@ function screen() {
     fills: [{ type: 'IMAGE', visible: true, scaleMode: 'FILL', imageHash: `h${title}` }],
     children: [text(title, { x: x + 16, y: y + 16, size: 16, color: white })],
   });
+  const field = (label, value, iconName, y) => frame(label, {
+    x: 33, y, w: 324, h: 62, mode: 'HORIZONTAL', itemSpacing: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 11, paddingBottom: 11,
+    layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'HUG',
+    children: [
+      icon(iconName, 20, 20, { x: 47, y: y + 21 }),
+      frame('Text', { x: 79, y: y + 11, w: 264, h: 40, mode: 'VERTICAL', layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'HUG',
+        counterAxisAlignItems: 'MIN', children: [text(label, { x: 79, y: y + 11 }), text(value, { x: 79, y: y + 29, size: 16 })] }),
+    ],
+  });
   const tab = (label, x, selected) => frame(label, {
     x, y: 1120, w: 80, h: 50, mode: 'VERTICAL', itemSpacing: 4, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG',
     children: [
@@ -91,13 +103,14 @@ function screen() {
         x: 32, y: 260, w: 326, h: 36, mode: 'HORIZONTAL', itemSpacing: 6, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG',
         children: [chip('Regular', 32, true), chip('Student', 118, false), chip('Senior', 204, false)],
       }),
-      frame('From', {
-        x: 32, y: 320, w: 324, h: 62, mode: 'HORIZONTAL', itemSpacing: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 11, paddingBottom: 11,
-        strokes: [solid(ink)], strokeWeight: 1, cornerRadius: 14, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG',
+      frame('Route', {
+        x: 32, y: 320, w: 326, h: 127, mode: 'VERTICAL', strokes: [solid(ink)], strokeWeight: 1, cornerRadius: 14,
+        layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG', counterAxisAlignItems: 'MIN',
         children: [
-          icon('Icon/plane', 20, 20, { x: 46, y: 341 }),
-          frame('Text', { x: 78, y: 331, w: 264, h: 40, mode: 'VERTICAL', layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'HUG',
-            counterAxisAlignItems: 'MIN', children: [text('From', { x: 78, y: 331 }), text('Kochi', { x: 78, y: 349, size: 16 })] }),
+          field('From', 'Kochi', 'Icon/plane', 321),
+          { ...frame('Rectangle', { x: 33, y: 383, w: 324, h: 1, fills: [solid(ink)], layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'FIXED' }), type: 'RECTANGLE' },
+          field('To', 'Dubai', 'Icon/pin', 384),
+          { ...icon('Swap', 38, 38, { x: 304, y: 366 }), layoutPositioning: 'ABSOLUTE', constraints: { horizontal: 'MAX', vertical: 'CENTER' } },
         ],
       }),
       {
@@ -168,6 +181,10 @@ test('detectRoles names the parts of a screen', () => {
   assert.equal(byName(roles, 'Button').label, 'Search flights');
   assert.equal(role('Bell'), 'iconButton');
   assert.equal(role('From'), 'field');
+  assert.equal(role('To'), 'field');
+  assert.equal(role('Swap'), 'iconButton');
+  assert.equal(role('Route'), 'swapFields');
+  assert.equal(byName(roles, 'Route').button, byName(roles, 'Swap').id);
   assert.equal(role('Coins banner'), 'listRow');
   assert.equal(role('Header'), undefined);
 });
@@ -202,7 +219,14 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.match(code, /Button \{\n\s+action\(\.searchFlights\)\n\s+\} label: \{/);
   assert.match(code, /\.buttonStyle\(\.pressable\)/);
   assert.match(code, /\.accessibilityLabel\("Bell"\)/);
-  assert.match(code, /struct PressableButtonStyle: ButtonStyle/);
+  // The route's ends swap as state.
+  assert.match(code, /struct RouteEnd: Hashable \{\n  let title: String\n\}/);
+  assert.match(code, /@State private var from = RouteEnd\(title: "Kochi"\)/);
+  assert.match(code, /@State private var to = RouteEnd\(title: "Dubai"\)/);
+  assert.match(code, /Text\(from\.title\)/);
+  assert.match(code, /withAnimation\(\.snappy\) \{ \(from, to\) = \(to, from\) \}/);
+  assert.doesNotMatch(code, /case swap\n/);
+  assert.doesNotMatch(code, /struct PressableButtonStyle|enum DesignTokens|enum AppFonts|extension Color/);
   // Carousel, grid, header, fonts and decorative images.
   assert.match(code, /LazyHStack\(spacing: 12\)/);
   assert.match(code, /\.scrollTargetLayout\(\)/);
@@ -221,6 +245,14 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.equal(structure.find((r) => r.role === 'button').label, 'Search flights');
 });
 
+test('toSwiftUI puts what screens share in DesignSystem.swift', () => {
+  const { shared } = toSwiftUI(screen(), assets);
+  assert.match(shared, /^import SwiftUI\n/);
+  assert.match(shared, /struct PressableButtonStyle: ButtonStyle/);
+  assert.match(shared, /extension Color \{/);
+  assert.doesNotMatch(shared, /FlowLayout/);
+});
+
 test('toSwiftUI takes action names for given layers', () => {
   const root = screen();
   const bell = root.children[0].children[1];
@@ -233,6 +265,9 @@ test('detectFramework picks swiftui from the client and the project', () => {
   assert.equal(detectFramework({ clientLanguages: 'swift' }, os.tmpdir()), 'swiftui');
   assert.equal(detectFramework({ clientFrameworks: 'SwiftUI' }, os.tmpdir()), 'swiftui');
   assert.equal(detectFramework({ clientFrameworks: 'flutter', clientLanguages: 'swift' }, os.tmpdir()), 'flutter');
+  assert.equal(detectFramework({ clientFrameworks: 'react-native', clientLanguages: 'ios, typescript' }, os.tmpdir()), 'react');
+  assert.equal(detectFramework({ clientFrameworks: 'expo', clientLanguages: 'swift' }, os.tmpdir()), 'react');
+  assert.equal(detectFramework({ clientLanguages: 'objective-c' }, os.tmpdir()), 'swiftui');
   assert.equal(detectFramework({ framework: 'swiftui' }, os.tmpdir()), 'swiftui');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'figmcp-swift-'));
   try {
@@ -255,15 +290,45 @@ const xcrun = spawnSync('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-path']
 const sdk = xcrun.status === 0 ? xcrun.stdout.trim() : null;
 
 test('the generated SwiftUI type checks', { skip: sdk ? false : 'xcrun is not available' }, () => {
-  const { code } = toSwiftUI(screen(), assets, { preview: false });
+  const { code, shared } = toSwiftUI(screen(), assets, { preview: false });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'figmcp-swiftc-'));
   try {
     const file = path.join(dir, 'Home.swift');
+    const system = path.join(dir, 'DesignSystem.swift');
     fs.writeFileSync(file, code);
+    fs.writeFileSync(system, shared);
     const r = spawnSync('xcrun', ['--sdk', 'iphonesimulator', 'swiftc', '-typecheck', '-target', 'arm64-apple-ios17.0-simulator',
-      '-sdk', sdk, '-parse-as-library', file], { encoding: 'utf8' });
+      '-sdk', sdk, '-parse-as-library', file, system], { encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
     assert.doesNotMatch(r.stderr, /warning:/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('swiftui-check exits with 3 without xcrun', () => {
+  const r = spawnSync(process.execPath, [CHECK.pathname, '1:1', '--export', EXPORT.pathname], {
+    encoding: 'utf8', env: { ...process.env, PATH: path.join(os.tmpdir(), 'no-such-bin') },
+  });
+  assert.equal(r.status, 3, r.stderr);
+  assert.match(r.stderr, /Xcode/);
+});
+
+const booted = sdk && JSON.parse(spawnSync('xcrun', ['simctl', 'list', 'devices', 'booted', '-j'], { encoding: 'utf8' }).stdout).devices;
+const iphone = booted && Object.values(booted).flat().find((d) => d.state === 'Booted' && /iPhone/.test(d.name));
+
+test('swiftui-check renders the generated code in the simulator', { skip: iphone ? false : 'no booted iPhone simulator' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'figmcp-swiftui-check-'));
+  try {
+    const r = spawnSync(process.execPath, [CHECK.pathname, '1:1', '--export', EXPORT.pathname, '--out', dir, '--device', iphone.udid],
+      { encoding: 'utf8', timeout: 300000 });
+    assert.equal(r.status, 0, r.stderr);
+    const report = JSON.parse(r.stdout);
+    assert.deepEqual(report.compiler.errors, []);
+    assert.equal(report.renderedSize[0], report.node.width * 2);
+    assert.ok(report.pixels.differingPercent < 100);
+    assert.ok(fs.existsSync(report.files.diff));
+    assert.ok(fs.existsSync(report.files.rendered));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

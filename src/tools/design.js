@@ -66,18 +66,33 @@ const SWIFTUI_GUIDANCE =
   'its top bar and bottom bar stay pinned with safeAreaInset, and layers ' +
   'listed as system UI are left to the phone. Sections that span the width ' +
   'stretch; other fixed sizes stay as designed, so check narrow phones. Add ' +
-  'the listed assets to the asset catalog and the fonts to the target, keep ' +
-  'the #Preview, and compare the result with the screenshot.';
+  'the listed assets to the asset catalog and the fonts to the target. The ' +
+  'shared DesignSystem.swift block (Color(hex:), the button style, DesignTokens, ' +
+  'AppFonts) goes into the target once: merge later screens\' tokens into it ' +
+  'rather than adding copies. The code needs iOS 17 or later. Keep the ' +
+  '#Preview, and compare the result with the screenshot.';
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+const WEIGHT_NAMES = {
+  100: 'Thin', 200: 'ExtraLight', 300: 'Light', 400: 'Regular', 500: 'Medium',
+  600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold', 900: 'Black',
+};
+
+/** The usual file name of a font: Family-Style.ttf ("600 italic" -> Rubik-SemiBoldItalic.ttf). */
+function fontFileName(family, weight) {
+  const [w, italic] = String(weight).split(' ');
+  const style = `${WEIGHT_NAMES[w] || w}${italic ? 'Italic' : ''}`.replace(/^RegularItalic$/, 'Italic');
+  return `${family.replace(/\s+/g, '')}-${style}.ttf`;
 }
 
 /** The response blocks every generator shares: screen note, system UI, Code Connect, rasterized layers, approximations. */
 function sharedDetails(result, tree) {
   const out = [];
   if (result.screen) {
-    out.push(text(`${result.className} is drawn as a phone screen: it fills the screen` +
+    out.push(text(`${result.className || result.structName} is drawn as a phone screen: it fills the screen` +
       `${result.scrolls ? ' and scrolls (the design is taller than a phone)' : ', and scrolls on a phone too short for its layers'}.`));
   }
   const chrome = systemUi(tree);
@@ -147,10 +162,18 @@ function swiftuiDetails(result, tree, catalog) {
   }
   const fonts = Object.entries(result.fonts);
   if (fonts.length) {
-    out.push(text('Fonts used (add each family\'s files to the app target and list them under UIAppFonts in Info.plist, ' +
-      `e.g. <key>UIAppFonts</key><array><string>${fonts[0][0].replace(/\s+/g, '')}-Regular.ttf</string></array>):\n${
+    const files = fonts.flatMap(([family, weights]) => weights.map((w) => `<string>${fontFileName(family, w)}</string>`));
+    out.push(text('Fonts used (add each family\'s files for these weights to the app target and list them under UIAppFonts ' +
+      `in Info.plist, e.g. <key>UIAppFonts</key><array>${files.join('')}</array>):\n${
       fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
   }
+  if (result.shared) {
+    out.push(text('Shared design system (DesignSystem.swift) the screen needs: Color(hex:), the button style, DesignTokens ' +
+      'and AppFonts. Add it to the target once; when the project already has one from an earlier screen, merge the new ' +
+      `tokens and fonts into it instead of adding a second copy:\n\n${result.shared}`));
+  }
+  out.push(text('The code needs iOS 17 or later (scrollTargetBehavior, contentMargins, containerRelativeFrame, sensoryFeedback, ' +
+    'onGeometryChange): set the deployment target to 17.0 or higher.'));
   if (result.structure.length) {
     out.push(text(`Structure (what each part is, and the SwiftUI pattern the code uses for it):\n${result.structure.map((r) => {
       const facts = [r.role, r.items ? `${r.items} items` : null, r.selected ? `"${r.selected}" selected` : null,

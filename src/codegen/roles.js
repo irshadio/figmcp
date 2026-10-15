@@ -10,6 +10,7 @@ import { visiblePaints } from './util.js';
 
 const ICON_NAMES = /back|close|bell|notif|swap|edit|share|heart|like|fav|menu|search|filter|more|settings|cart|plus|add|minus|info|mic|camera|send/i;
 const DISCLOSURE = /chevron|arrow|disclosure|caret/i;
+const SWAP = /swap|exchange|reverse|switch/i;
 
 function texts(n, out = []) {
   if (!n || n.visible === false) return out;
@@ -90,7 +91,8 @@ function oddItem(items) {
  *   carousel { items } and grid { items, columns } with card items;
  *   sectionHeader { title, link } with a heading and a link; listRow
  *   (a row with a disclosure chevron); field; button { primary, label };
- *   iconButton { label }.
+ *   iconButton { label }; swapFields { fields, button } (two fields of
+ *   the same shape with a swap button between them).
  */
 export function detectRoles(root, { screenWidth = root.width, screenHeight = root.height } = {}) {
   const roles = new Map();
@@ -100,9 +102,11 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
   };
   const innerWidth = (p) => p.width - (p.paddingLeft || 0) - (p.paddingRight || 0);
   const wide = (n) => n.width >= screenWidth * 0.6;
+  const containers = [];
   const walk = (n, parent) => {
     if (!n || n.visible === false) return;
     const kids = visibleChildren(n);
+    if (parent && kids.length >= 3) containers.push(n);
     const flow = isAutoLayout(n) ? kids.filter((c) => inFlow(c, n)) : kids;
     const row = n.layoutMode === 'HORIZONTAL';
     const allSame = sameShape(flow) && flow.length === kids.length;
@@ -163,6 +167,15 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
     kids.forEach((c) => walk(c, n));
   };
   (root.children || []).forEach((c) => walk(c, root));
+  // Two fields of one shape and a swap button: their values swap.
+  for (const n of containers) {
+    const kids = visibleChildren(n);
+    const fields = kids.filter((c) => roles.get(c.id) && roles.get(c.id).role === 'field');
+    const button = kids.find((c) => roles.get(c.id) && roles.get(c.id).role === 'iconButton' && SWAP.test(c.name));
+    if (fields.length === 2 && button && sameShape(fields) && !roles.has(n.id)) {
+      set(n, 'swapFields', { fields: fields.map((c) => c.id), button: button.id });
+    }
+  }
   return roles;
 }
 
@@ -176,6 +189,7 @@ export const SWIFTUI_PATTERNS = {
   grid: 'grid: LazyVGrid with flexible columns',
   sectionHeader: 'section header: title with the header trait and a link Button',
   listRow: 'disclosure row: a Button with a press-scale style',
+  swapFields: 'swap pair: two fields whose values are state, exchanged with an animation by the swap button',
   field: 'form field: a Button that opens its picker (destination, date, travellers)',
   button: 'button: Button with a press-scale style',
   iconButton: 'icon button: Button with an accessibility label',
