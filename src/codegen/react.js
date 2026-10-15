@@ -331,7 +331,7 @@ class Writer {
     const regular = segs.filter((seg) => !scriptOf(seg));
     const perRun = (regular.length ? regular : segs).map((seg) => fontClasses(seg, node, this.ratios));
     const shared = perRun[0].filter((c) => perRun.every((classes) => classes.includes(c)));
-    const block = [...textBlockClasses(node), ...this.boxClasses(node, {}, false).classes];
+    const block = [...textBlockClasses(node), ...this.boxClasses(node, {}, false).classes, roundedHeight(node, paras)];
     const valign = verticalAlign(node);
     const spacing = node.paragraphSpacing || 0;
     const characters = paras.map((p) => p.pieces.map((x) => (x.br ? '\u2028' : x.text)).join('')).join('\n');
@@ -607,7 +607,7 @@ class Writer {
       // being cut off; its scroll starts where the design shows it.
       const when = scroll.below ? `max-[${px(scroll.below)}]:` : '';
       if (!when) classes = classes.filter((c) => c !== 'overflow-clip');
-      classes.push(...(scroll.beyond ? ['max-w-full'] : []), `${when}overflow-x-auto`, `${when}overflow-y-hidden`, ...NO_SCROLLBAR);
+      classes.push(...(scroll.beyond ? [`${when}max-w-full`] : []), `${when}overflow-x-auto`, `${when}overflow-y-hidden`, ...NO_SCROLLBAR);
       this.warn(node, scroll.below
         ? `the row scrolls sideways on screens narrower than ${num(scroll.below)}px, where its content would be cut off`
         : 'the row scrolls sideways on a phone: its content is wider than its room');
@@ -682,10 +682,10 @@ function dashedLine(node) {
 /**
  * Whether a row of a phone screen scrolls sideways: { beyond, below }.
  * [beyond] when the row runs past its column (it is then held to the
- * column's width). A row whose content overflows its own box but ends
+ * column's width), else its content overflows its own box. A row that ends
  * inside the screen shows as in the design and scrolls only on screens
- * narrower than where its content ends ([below], in px); otherwise
- * [below] is null and it always scrolls. Null when the row fits.
+ * narrower than where it ends ([below], in px); otherwise [below] is null
+ * and it always scrolls. Null when the row fits.
  */
 function scrollsSideways(node, parent, screen) {
   if (node.layoutMode !== 'HORIZONTAL' || node.layoutWrap === 'WRAP') return null;
@@ -699,8 +699,29 @@ function scrollsSideways(node, parent, screen) {
     return { beyond: false, below: end <= screen.width ? Math.ceil(end) : null };
   }
   const right = parent.x + parent.width - (isAutoLayout(parent) ? parent.paddingRight || 0 : 0);
-  if (inFlow(node, parent) && parent.layoutMode === 'VERTICAL' && node.x + node.width > right + 1) return { beyond: true, below: null };
+  if (inFlow(node, parent) && parent.layoutMode === 'VERTICAL' && node.x + node.width > right + 1) {
+    const end = node.x - screen.x + node.width;
+    return { beyond: true, below: end <= screen.width ? Math.ceil(end) : null };
+  }
   return null;
+}
+
+/**
+ * Figma rounds a hugging text box's height up to a whole pixel, as it does
+ * its width: with fractional line heights (scaled frames) the box is taller
+ * than its lines. A min-height keeps that box.
+ */
+function roundedHeight(node, paras) {
+  if (node.textAutoResize !== 'WIDTH_AND_HEIGHT' && node.textAutoResize !== 'HEIGHT') return null;
+  const segs = segmentsOf(node);
+  const lh = segs[0].lineHeight;
+  if (!lh || lh.unit !== 'PIXELS' || !lh.value || !segs.every((s) => s.lineHeight && s.lineHeight.unit === 'PIXELS' && s.lineHeight.value === lh.value)) return null;
+  const spacing = (node.paragraphSpacing || 0) * Math.max(0, paras.length - 1);
+  const lines = node.textAutoResize === 'WIDTH_AND_HEIGHT'
+    ? paras.reduce((n, p) => n + 1 + p.pieces.filter((x) => x.br).length, 0)
+    : Math.max(1, Math.round((node.height - spacing) / lh.value));
+  const extra = node.height - (lines * lh.value + spacing);
+  return extra > 0.01 && extra < 1 ? `min-h-[${px(node.height)}]` : null;
 }
 
 function hasText(node) {
@@ -735,7 +756,8 @@ function componentNameFor(root, taken) {
  */
 export function toReactTailwind(root, assets, { connect = null, screen, assetDir = null } = {}) {
   const tree = { ...root, x: root.x ?? 0, y: root.y ?? 0 };
-  const asScreen = screen ?? isPhoneScreen(tree);
+  // A root shipped as one image is a picture, not a screen to lay out.
+  const asScreen = screen ?? (isPhoneScreen(tree) && !tree.render && !drawnAsSvg(tree));
   const writer = new Writer(assets, { connect, ratios: autoLineRatios(tree), screen: asScreen ? tree : null, assetDir });
   writer.pinned = asScreen ? pinnedChildren(tree) : new Set();
   writer.node(tree, null, 2);

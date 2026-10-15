@@ -310,3 +310,22 @@ test('names read by people lose Figma\'s paste and duplicate suffixes, and gener
   };
   for (const [name, want] of Object.entries(cases)) assert.equal(readableName({ name }), want, name);
 });
+
+test('corpus findings: rounded text heights, rows over padding, picture roots', () => {
+  // Scaled frames have fractional line heights; Figma rounds the hugging box up.
+  const scaled = code(frame([text('Kochi', { height: 19 }, { lineHeight: { unit: 'PIXELS', value: 18.05 } })]));
+  assert.match(scaled, /leading-\[18.05px\][^"]*min-h-\[19px\]/);
+  assert.doesNotMatch(code(frame([text('Kochi')])), /min-h-/, 'whole-pixel line heights need nothing');
+  // A row wider than its padded column but inside the screen stays as designed there.
+  const cabin = {
+    id: '14:1', name: 'Seats', type: 'FRAME', x: 0, y: 0, width: 390, height: 844, children: [{
+      ...box('14:2', { name: 'Cabin', x: 45, width: 300, height: 400, layoutMode: 'VERTICAL', paddingLeft: 28, paddingRight: 28, counterAxisAlignItems: 'CENTER' }),
+      children: [{ ...box('14:3', { name: 'Row', x: 63, width: 264, height: 34, layoutMode: 'HORIZONTAL', itemSpacing: 6, layoutSizingHorizontal: 'HUG' }),
+        children: [box('14:4', { width: 129 }), box('14:5', { width: 129 })] }],
+    }],
+  };
+  assert.match(code(cabin), /max-\[327px\]:max-w-full max-\[327px\]:overflow-x-auto[^"]*" data-name="Row"/);
+  // A root shipped as one image is a picture, not a screen.
+  const picture = { id: '15:1', name: 'Preview', type: 'FRAME', x: 0, y: 0, width: 390, height: 722, render: { base64: 'x' }, rasterized: 'rotation', children: [] };
+  assert.match(code(picture), /className="relative w-\[390px\] h-\[722px\]"/);
+});
