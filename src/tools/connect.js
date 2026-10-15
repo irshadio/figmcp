@@ -70,7 +70,12 @@ export function registerConnectTools(server, bridge, source) {
   }));
 
   server.registerTool('remove_code_connect_map', {
-    description: 'Remove the code component mapping of a component (by instance, component or set id).',
+    description:
+      'Remove the code component mapping saved by add_code_connect_map, so ' +
+      'get_design_context stops naming that code component. Pass an instance, ' +
+      'component or component set id. Only the local mapping file changes, ' +
+      'never the design; returns how many mappings were removed (0 when none ' +
+      'existed). Add it again with add_code_connect_map to undo.',
     inputSchema: { nodeId: nodeIdSchema, fileKey: fileKeySchema },
   }, guard(async ({ nodeId }) => {
     const { id } = await source.resolveId(nodeId);

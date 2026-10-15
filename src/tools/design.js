@@ -276,7 +276,10 @@ export function registerDesignTools(server, bridge, source) {
     description:
       "Get variable definitions for a given node id. E.g. {'icon/default/secondary': #949494}. " +
       'Variables and styles are reusable values applied to colours, fonts, ' +
-      'sizes and spacings. Values resolve for the node\'s own mode.',
+      'sizes and spacings. Values resolve for the node\'s own mode. Read-only; ' +
+      'with no nodeId it uses the selection. Use it for design tokens, and ' +
+      'get_design_context for the layout. Without the plugin, a saved snapshot ' +
+      'gives the raw values only, without names.',
     inputSchema: { nodeId: nodeIdSchema.optional(), fileKey: fileKeySchema },
   }, guard(async ({ nodeId }) => {
     const { id } = await source.resolveId(nodeId);

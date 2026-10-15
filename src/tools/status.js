@@ -61,7 +61,11 @@ export function registerStatusTools(server, bridge, source) {
   server.registerTool('import_design_export', {
     description:
       'Save a design export JSON (frames with node trees, as the plugin ' +
-      'produces) as a snapshot, so its nodes can be read without the plugin.',
+      'produces) as a snapshot, so its nodes can be read without the plugin. ' +
+      'Use it for an export made earlier with save_design_export or the plugin. ' +
+      'Copies the file into the local snapshot store, replacing an earlier ' +
+      'snapshot of the same frames; the source file and the Figma file are not ' +
+      'changed. Fails if the JSON is not a design export.',
     inputSchema: { path: z.string().min(1).describe('Absolute path of the export JSON file.') },
   }, guard(async ({ path: file }) => {
     const name = importFile(file);
