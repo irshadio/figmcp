@@ -42,7 +42,7 @@ export const SWIFT_TYPE_NAMES = new Set([
   'ContentUnavailableView', 'ShareLink', 'PhotosPicker', 'Canvas', 'TimelineView', 'Item', 'Action', 'Model', 'ID',
   'Preview', 'PreviewProvider', 'SubmitLabel', 'UIKeyboardType', 'UITextContentType', 'SensoryFeedback',
   // The generator's own helpers.
-  'FlowLayout', 'PressableButtonStyle', 'DesignTokens', 'AppFonts',
+  'FlowLayout', 'PressableButtonStyle', 'DesignTokens', 'AppFonts', 'DesignLineHeight', 'UIFont',
 ]);
 
 /** A Swift number literal, rounded to 4 decimals (ratios need them; points come rounded). */
@@ -67,8 +67,10 @@ export function sString(value) {
 }
 
 function words(name) {
-  // A role tag in a layer name ("Pay [button]") is not part of the name.
-  return String(name).replace(/\[[A-Za-z-]+\]/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[^A-Za-z0-9]+/g, ' ').trim()
+  // A role tag in a layer name ("Pay [button]") is not part of the name;
+  // accents are dropped ("Größe" -> "Große") and other letters kept, as Swift allows.
+  return String(name).replace(/\[[A-Za-z-]+\]/g, ' ').normalize('NFKD').replace(/\p{M}+/gu, '')
+    .replace(/([\p{Ll}0-9])(\p{Lu})/gu, '$1 $2').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
     .split(' ').filter(Boolean);
 }
 

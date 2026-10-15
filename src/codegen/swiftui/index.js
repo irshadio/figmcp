@@ -9,7 +9,7 @@ import { sideWeights } from '../paint.js';
 import { detectRoles, SWIFTUI_PATTERNS } from '../roles.js';
 import { isPhoneScreen, TALL_SCREEN, WRAPPING_PARENTS } from '../screen.js';
 import { systemUi } from '../system-ui.js';
-import { autoLineRatios, fontWeight, segmentsOf } from '../text.js';
+import { fontWeight, segmentsOf } from '../text.js';
 import { visiblePaints } from '../util.js';
 import {
   blendMode, blurs, composite, effectsOf, gradient, HELPERS, isRectangle, sColor, shadowArgs, shapeOf, swiftBlur,
@@ -103,9 +103,12 @@ function round(v) {
   return Math.round(v * 100) / 100;
 }
 
+const visibleCounts = new WeakMap();
+
 function countVisible(node) {
   if (!node || node.visible === false) return 0;
-  return 1 + (node.children || []).reduce((n, c) => n + countVisible(c), 0);
+  if (!visibleCounts.has(node)) visibleCounts.set(node, 1 + (node.children || []).reduce((n, c) => n + countVisible(c), 0));
+  return visibleCounts.get(node);
 }
 
 /** [v] with padding [top, right, bottom, left]. */
@@ -230,7 +233,6 @@ class SwiftUIWriter {
     this.rasterized = [];
     this.connected = new Map();
     this.helpers = new Set();
-    this.ratios = null;
     this.screen = null;
     this.viewport = null;
     this.words = new Set();
@@ -490,9 +492,23 @@ class SwiftUIWriter {
     } finally {
       this.ancestors.pop();
     }
+    core = this.limits(node, size, core);
     core = this.interactive(node, core);
     if (ctx.kind !== 'root' && !this.inComponent && EXTRACT_TYPES.has(node.type) && countVisible(node) >= EXTRACT_SIZE) core = this.extract(node, core);
     return this.wrapPlace(node, ctx, core);
+  }
+
+  /** [v] kept within the layer's min and max width and height, on axes its content or parent sizes. */
+  limits(node, size, v) {
+    const args = [];
+    for (const [axis, key] of [['w', 'Width'], ['h', 'Height']]) {
+      if (typeof size[axis] === 'number' || (size[axis] && size[axis].kind === 'raw')) continue;
+      const min = node[`min${key}`];
+      const max = node[`max${key}`];
+      if (typeof min === 'number' && min > 0) args.push([`min${key}`, round(min)]);
+      if (typeof max === 'number' && max > 0 && max < 1e6) args.push([`max${key}`, round(max)]);
+    }
+    return args.length ? mod(v, 'frame', args) : v;
   }
 
   /** A member name of the screen struct, unique. */
@@ -521,7 +537,9 @@ class SwiftUIWriter {
    */
   runsOf(flow) {
     const input = (n) => this.inputs.has(n.id) || (n.children || []).some(input);
-    return runsOf(flow).filter((r) => !r.items.some(input));
+    // The ends of a swap are bound to their own states.
+    const swapped = (n) => [...this.swaps.values()].length && this.roleOf(this.parents.get(n.id)) === 'swapFields';
+    return runsOf(flow).filter((r) => !r.items.some((n) => input(n) || swapped(n)));
   }
 
   /** Whether a nested type named [name] would shadow a type the code uses. */
@@ -653,8 +671,9 @@ class SwiftUIWriter {
         const key = axis === 'x' ? 'w' : 'h';
         let mode = sizingOf(node, ctx.parent, axis);
         if (mode === 'FILL' && axis === ctx.axis && ctx.hugMain) mode = 'FIXED';
-        // A column's child as wide as the column fills it.
-        if (mode === 'FIXED' && axis === 'x' && ctx.axis === 'y' && !hugW && W >= inner - 0.5) mode = 'FILL';
+        // A column's child as wide as the column fills it, unless the column
+        // is only that wide because it hugs the child.
+        if (mode === 'FIXED' && axis === 'x' && ctx.axis === 'y' && !hugW && W >= inner - 0.5 && ownSizing(ctx.parent, 'x') !== 'HUG') mode = 'FILL';
         if (mode === 'FILL') out[key] = 'inf';
         else if (fixed || !(mode === 'HUG' && content(axis))) {
           if (!(axis === 'x' ? hugW : hugH) || fixed) out[key] = axis === 'x' ? W : H;
@@ -754,7 +773,13 @@ class SwiftUIWriter {
     }
     const dx = p.h.offset !== undefined ? round(p.h.offset) : 0;
     const dy = p.v.offset !== undefined ? round(p.v.offset) : 0;
-    if (dx || dy) out = mod(out, 'offset', [['x', dx || null], ['y', dy || null]]);
+    // A layer placed from the start takes its room in the parent (padding);
+    // one placed from the centre, or outside the start, is only moved.
+    const room = (a, d) => a.mode === 'min' && d > 0;
+    if (room(p.h, dx) || room(p.v, dy)) out = padded(out, [room(p.v, dy) ? dy : 0, 0, 0, room(p.h, dx) ? dx : 0]);
+    const mx = room(p.h, dx) ? 0 : dx;
+    const my = room(p.v, dy) ? 0 : dy;
+    if (mx || my) out = mod(out, 'offset', [['x', mx || null], ['y', my || null]]);
     return out;
   }
 
@@ -814,12 +839,12 @@ class SwiftUIWriter {
 
   textCtx(node) {
     return {
-      ratios: this.ratios,
       value: (v, name) => this.value(v, name),
       color: (c, o, name) => this.color(c, o, name),
       font: (seg) => fontOf(seg, (v, name) => this.value(v, name)),
       warn: (message) => this.warn(node, message),
       textStyle: (name, font) => this.textStyle(name, font),
+      helper: (name) => this.helpers.add(name),
     };
   }
 
@@ -833,8 +858,8 @@ class SwiftUIWriter {
     let v = textView(node, { ...this.textCtx(node), bind: this.bindings.get(node.id) || null }).view;
     const input = !this.inComponent && this.inputs.get(node.id);
     if (input) v = this.textInput(node, input, v);
-    // A control's label stays on one line and shrinks a little before it
-    // truncates; other text wraps and grows with Dynamic Type.
+    // A control's label stays on one line (a scale factor would let stacks
+    // shrink it before its siblings); other text wraps and grows with Dynamic Type.
     const roles = this.ancestors.map((a) => this.roleOf(a));
     const parent = this.ancestors[this.ancestors.length - 2];
     // A single word never breaks.
@@ -954,7 +979,7 @@ class SwiftUIWriter {
   }
 
   render(node, size) {
-    this.rasterized.push({ id: node.id, name: node.name, reason: node.rasterized });
+    if (!this.rasterized.some((r) => r.id === node.id)) this.rasterized.push({ id: node.id, name: node.name, reason: node.rasterized });
     const name = this.asset(this.assets.render(node.render), 'image', this.label(node, 'image'), 'png');
     const image = mod(mod(view('Image', [[null, str(name)]]), 'resizable'), 'accessibilityHidden', [[null, true]]);
     return this.picture(node, size, node.renderBounds, image);
@@ -1095,6 +1120,7 @@ class SwiftUIWriter {
     }).filter(Boolean);
     if (inners.length && !(fills.length && fills[fills.length - 1].paint)) this.warn(node, 'an inner shadow needs a colour fill on top and is not drawn');
     if (drops.some((e) => e.spread)) this.warn(node, 'the spread of a drop shadow is not drawn');
+    if (inners.some((e) => e.spread)) this.warn(node, 'the spread of an inner shadow is not drawn');
     let shadowed = false;
     if (fillLayers.length && drops.length) {
       // Each shadow lies under its own copy of the bottom fill, so shadows
@@ -1114,8 +1140,10 @@ class SwiftUIWriter {
     } else {
       v = content.view;
       if (content.padding) v = padded(v, content.padding);
-      // A box of text grows with it.
-      const grows = typeof size.h === 'number' && hasText(node);
+      // A box of text grows with it, unless layers pinned to its bottom or
+      // centre would then stretch it to all the room it is offered.
+      const grows = typeof size.h === 'number' && hasText(node) &&
+        (isAutoLayout(node) || visibleChildren(node).every((c) => !inFlow(c, node) || this.stackPlacement(c, node).v.mode === 'min'));
       v = this.frame(v, grows ? { ...size, h: { min: size.h } } : size, content.align);
       if (node.clipsContent) {
         // Figma clips the children, not the frame's own fills and shadows.
@@ -1186,12 +1214,15 @@ class SwiftUIWriter {
     const bottoms = kids.filter((c) => c !== topBar && wide(c) && c.height <= 160 && rel(c).bottom >= floor - 2 &&
       (filled(c) || /tab ?bar|footer|bottom|nav|input ?bar|composer|toolbar/i.test(c.name)) && (!flowRoot || c === kids[kids.length - 1]));
     const bottomBar = bottoms.sort((a, b) => rel(b).top - rel(a).top)[0] || null;
-    const fixedCount = flowRoot ? 0 : Math.max(0, Math.min(node.numberOfFixedChildren || 0, (node.children || []).length));
-    const fixed = new Set((node.children || []).slice((node.children || []).length - fixedCount).map((c) => c.id));
+    // Figma fixes the topmost layers when scrolling; in a column only absolute ones can be.
+    const fixedCount = Math.max(0, Math.min(node.numberOfFixedChildren || 0, (node.children || []).length));
+    const fixed = new Set((node.children || []).slice((node.children || []).length - fixedCount)
+      .filter((c) => !flowRoot || !inFlow(c, node)).map((c) => c.id));
     // Floating controls pinned to the bottom (a map toggle, a button) stay over the content.
-    const floating = flowRoot ? [] : all.filter((c) => c !== bottomBar && c !== topBar && !wide(c) &&
+    const loose = flowRoot ? all.filter((c) => !inFlow(c, node)) : all;
+    const floating = loose.filter((c) => c !== bottomBar && c !== topBar && !wide(c) &&
       ((c.constraints && c.constraints.vertical === 'MAX') || fixed.has(c.id)) && rel(c).top > H / 2);
-    const pinned = all.filter((c) => fixed.has(c.id) && c !== topBar && c !== bottomBar && !floating.includes(c));
+    const pinned = loose.filter((c) => fixed.has(c.id) && c !== topBar && c !== bottomBar && !floating.includes(c));
     const top = topBar ? rel(topBar).bottom : statusBottom;
     // The phone keeps its own room for the home indicator under a bottom bar that runs to the screen's edge.
     const inset = indicator || (bottomBar && rel(bottomBar).bottom >= H - 2 && bottomBar.height > 70) ? 34 : 0;
@@ -1353,7 +1384,9 @@ class SwiftUIWriter {
     const ctx = { kind: 'stack', parent: area };
     const drawDecor = (c) => {
       // A background that runs to the top edge runs on under the status bar.
-      if (c.y - node.y <= 0 && c.width >= node.width * 0.95) return this.node({ ...c, y: c.y - 200, height: c.height + 200 }, ctx);
+      // Only flat colour stretches; an image or gradient would change its crop or its stops.
+      const flat = !visibleChildren(c).length && visiblePaints(c.fills).length && visiblePaints(c.fills).every((f) => f.type === 'SOLID');
+      if (flat && c.y - node.y <= 0 && c.width >= node.width * 0.95) return this.node({ ...c, y: c.y - 200, height: c.height + 200 }, ctx);
       return this.node(c, ctx);
     };
     const under = decor.filter((c) => !behind(c) || order(c) < order(behind(c))).map(drawDecor).filter(Boolean);
@@ -1651,13 +1684,10 @@ class SwiftUIWriter {
         // Beside a Spacer or a filling item, content with text takes its width first.
         if (item && row && flexibleRow && c.type !== 'TEXT' && sizingOf(c, node, 'x') === 'HUG' && hasText(c)) item = mod(item, 'layoutPriority', [[null, 1]]);
         const extent = (row ? c.height : c.width) || 0;
-        if (!item || hugCross || sizingOf(c, node, cross) === 'FILL' || extent <= availCross + 0.5) return item;
-        // A frame of fixed size does not grow with what overflows it, unless
-        // the screen stretches it.
-        const parent = this.ancestors[this.ancestors.length - 2];
-        if (ownSizing(node, cross) === 'FIXED' && parent && !(this.screen && parent.id === this.screen.id)) return item;
+        if (!item) return item;
+        const fills = hugCross || sizingOf(c, node, cross) === 'FILL';
         // A row wider than its column scrolls sideways; a carousel snaps to its cards.
-        if (!row && c.layoutMode === 'HORIZONTAL') {
+        if (!row && c.layoutMode === 'HORIZONTAL' && (this.margins.has(c.id) || (!fills && extent > availCross + 0.5))) {
           let scroller = view('ScrollView', [[null, raw('.horizontal')]], [item]);
           if (this.margins.has(c.id)) {
             scroller = mod(scroller, 'contentMargins', [[null, raw('.horizontal')], [null, this.margins.get(c.id)], ['for', raw('.scrollContent')]]);
@@ -1665,10 +1695,16 @@ class SwiftUIWriter {
           }
           scroller = mod(mod(scroller, 'scrollIndicators', [[null, raw('.hidden')]]), 'frame', [['minHeight', round(c.height)]]);
           // A scroll view would report its content's width to the layout: it is as wide as the column.
+          if (fills) return mod(scroller, 'frame', [['maxWidth', INFINITY]]);
           return this.screen && node.width >= this.screen.width * 0.95
             ? mod(scroller, 'containerRelativeFrame', [[null, raw('.horizontal')]])
             : mod(scroller, 'frame', [['width', round(availCross)]]);
         }
+        if (fills || extent <= availCross + 0.5) return item;
+        // A frame of fixed size does not grow with what overflows it, unless
+        // the screen stretches it.
+        const parent = this.ancestors[this.ancestors.length - 2];
+        if (ownSizing(node, cross) === 'FIXED' && parent && !(this.screen && parent.id === this.screen.id)) return item;
         // Another child larger than the stack across overflows it, as in
         // Figma, instead of widening the stack.
         const box = this.frame(clear(), row ? { w: round(c.width), h: null } : { w: null, h: round(c.height) });
@@ -1766,11 +1802,9 @@ export function toSwiftUI(root, assets, options = {}) {
   const screen = options.screen ?? isPhoneScreen(rootNode);
   let structName = options.structName || sType(root.name, 'Design');
   if (SWIFT_TYPE_NAMES.has(structName)) structName = `${structName}Screen`;
-  const ratios = autoLineRatios(root);
   const roles = detectRoles(rootNode);
   const start = () => {
     const w = new SwiftUIWriter(assets, options);
-    w.ratios = ratios;
     w.structName = structName;
     w.typeNames.add(structName);
     w.roles = roles;
@@ -1844,7 +1878,7 @@ export function toSwiftUI(root, assets, options = {}) {
     }
     shared.push('}');
   }
-  for (const name of ['color', 'flow', 'pressable']) {
+  for (const name of ['color', 'designLineHeight', 'flow', 'pressable']) {
     if (writer.helpers.has(name)) shared.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};
@@ -1877,14 +1911,14 @@ function actionEnum(cases) {
 
 /** The roles with a SwiftUI pattern, for the response: [{ id, name, role, pattern, items?, selected? }]. */
 function structureOf(roles, root) {
+  const byId = new Map();
+  const index = (n) => {
+    byId.set(n.id, n);
+    (n.children || []).forEach(index);
+  };
+  index(root);
   const nameOf = (id) => {
-    let found = null;
-    const walk = (n) => {
-      if (found || !n) return;
-      if (n.id === id) found = n;
-      else (n.children || []).forEach(walk);
-    };
-    walk(root);
+    const found = byId.get(id);
     if (!found) return id;
     // An item reads as its label ("Regular"), not its layer name ("Chip").
     const label = findText(found);

@@ -156,6 +156,49 @@ export function composite(bottom, top) {
 
 // Helpers added to the code when it uses them.
 export const HELPERS = {
+  designLineHeight: `/// Figma's line height: lines [height] points apart with the glyphs centred
+/// in each, set against the face's own line height on the device and scaled
+/// with Dynamic Type like the font.
+struct DesignLineHeight: ViewModifier {
+  private let height: CGFloat
+  private let font: UIFont
+  private let scales: Bool
+  @ScaledMetric private var scale: CGFloat
+  @Environment(\\.displayScale) private var displayScale
+
+  init(_ height: CGFloat, font name: String?, size: CGFloat, relativeTo style: Font.TextStyle?) {
+    self.height = height
+    font = name.flatMap { UIFont(name: $0, size: size) } ?? .systemFont(ofSize: size)
+    scales = style != nil
+    _scale = ScaledMetric(wrappedValue: 1, relativeTo: style ?? .body)
+  }
+
+  func body(content: Content) -> some View {
+    let factor = scales ? scale : 1
+    let natural = font.lineHeight * factor
+    let extra = height * factor - natural
+    if extra >= 0 {
+      // Text takes its height rounded up to whole pixels; the padding makes up the rest.
+      let rounded = (natural * displayScale).rounded(.up) / displayScale
+      content
+        .lineSpacing(extra)
+        .padding(.vertical, max(0, height * factor - rounded) / 2)
+    } else {
+      // Line spacing cannot be negative: each line is scaled down instead,
+      // which takes the room from above the glyphs, so they move back down.
+      content
+        .environment(\\._lineHeightMultiple, (natural + extra) / natural)
+        .offset(y: -extra / 2)
+    }
+  }
+}
+
+extension View {
+  /// Lines [height] points apart, as the design sets them (see DesignLineHeight).
+  func designLineHeight(_ height: CGFloat, font name: String?, size: CGFloat, relativeTo style: Font.TextStyle?) -> some View {
+    modifier(DesignLineHeight(height, font: name, size: size, relativeTo: style))
+  }
+}`,
   color: `extension Color {
   /// A colour from a 0xRRGGBB value.
   init(hex: UInt32, opacity: Double = 1) {

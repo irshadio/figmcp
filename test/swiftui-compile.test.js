@@ -202,3 +202,70 @@ test('text inputs in a run each stay a text field', { skip }, () => {
   assert.equal((r.code.match(/TextField\(/g) || []).length, 3);
   assert.equal(typecheck([r]), '');
 });
+
+test('text names its face by PostScript name and sets explicit line heights on the device', { skip }, () => {
+  const tight = { ...text('Welcome to the app', { size: 32, w: 200 }), textAutoResize: 'HEIGHT', layoutSizingHorizontal: 'FIXED' };
+  tight.segments = [{ ...tight.segments[0], fontName: { family: 'Onest', style: 'Semi Bold' }, lineHeight: { unit: 'PIXELS', value: 34 } }];
+  const auto = text('Caption');
+  auto.segments = [{ ...auto.segments[0], lineHeight: { unit: 'AUTO' } }];
+  const r = generate(column('Card', [tight, auto], { h: 120 }));
+  assert.match(r.code, /\.custom\("Onest-SemiBold", size: 32, relativeTo: \.largeTitle\)/);
+  assert.doesNotMatch(r.code, /\.weight\(/);
+  assert.match(r.code, /\.designLineHeight\(34, font: "Onest-SemiBold", size: 32, relativeTo: \.largeTitle\)/);
+  assert.equal((r.code.match(/designLineHeight/g) || []).length, 1);
+  assert.match(r.shared, /struct DesignLineHeight: ViewModifier/);
+  assert.equal(typecheck([r]), '');
+});
+
+test('min and max sizes bound layers sized by their content or parent', { skip }, () => {
+  const bubble = frame('Bubble', { w: 200, h: 40, mode: 'VERTICAL', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', maxWidth: 280, minWidth: 80,
+    children: [text('Hello there')] });
+  const r = generate(column('Chat', [bubble]));
+  assert.match(r.code, /\.frame\(minWidth: 80, maxWidth: 280\)/);
+  assert.equal(typecheck([r]), '');
+});
+
+test('a fixed child of a hugging column keeps its width', () => {
+  const body = { ...text('Hi Rahul, welcome to support! How can we help?', { w: 270 }), textAutoResize: 'HEIGHT', layoutSizingHorizontal: 'FIXED' };
+  const bubble = frame('Bubble', { w: 287, h: 60, mode: 'VERTICAL', paddingLeft: 9, paddingRight: 8, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    children: [body] });
+  const r = generate(column('Chat', [bubble]));
+  assert.match(r.code, /\.frame\(width: 270(, alignment: \.leading)?\)/);
+  assert.doesNotMatch(r.code, /maxWidth: \.infinity, alignment: \.leading/);
+});
+
+test('a clipping frame keeps its shadow; layers placed from the start take their room', { skip }, () => {
+  const shadow = { type: 'DROP_SHADOW', visible: true, color: { r: 0, g: 0, b: 0, a: 0.2 }, offset: { x: 0, y: 4 }, radius: 12, spread: 0 };
+  const card = frame('Card', { w: 200, h: 100, fills: [solid(white)], cornerRadius: 12, clipsContent: true, effects: [shadow],
+    children: [text('Hello', { x: 10, y: 10 })] });
+  const r = generate(column('Cards', [card], { h: 200 }));
+  const body = r.code.slice(r.code.indexOf('Text("Hello")'));
+  assert.ok(body.indexOf('.clipShape(') < body.indexOf('.shadow('), 'clipped before the shadowed fill');
+  assert.match(r.code, /\.padding\(\.leading, 10\)\n\s*\.padding\(\.top, 10\)|\.padding\(EdgeInsets\(top: 10, leading: 10/);
+  assert.equal(typecheck([r]), '');
+});
+
+test('a carousel in a fixed column still scrolls with its insets', { skip }, () => {
+  const card = (t, x) => frame(t, { x, y: 30, w: 280, h: 120, cornerRadius: 20, fills: [solid(ink)], layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [text(t, { x: x + 16, y: 46 })] });
+  const offers = frame('Offers', { w: 390, h: 154, mode: 'VERTICAL', itemSpacing: 10, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG', counterAxisAlignItems: 'MIN',
+    children: [text('Offers for you', { size: 18 }), frame('Row', { y: 30, w: 604, h: 120, mode: 'HORIZONTAL', itemSpacing: 12, paddingLeft: 16, paddingRight: 16,
+      layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [card('Gulf', 16), card('Asia', 308)] })] });
+  const r = generate(column('Deals', [offers], { w: 390, h: 300 }));
+  assert.match(r.code, /ScrollView\(\.horizontal\)/);
+  assert.match(r.code, /\.contentMargins\(\.horizontal, 16, for: \.scrollContent\)/);
+  assert.equal(typecheck([r]), '');
+});
+
+test('a floating button on an auto-layout screen stays pinned', { skip }, () => {
+  const fab = { ...frame('Add', { x: 310, y: 760, w: 56, h: 56, cornerRadius: 28, fills: [solid(ink)] }), layoutPositioning: 'ABSOLUTE',
+    constraints: { horizontal: 'MAX', vertical: 'MAX' } };
+  const root = frame('Inbox', { w: 390, h: 844, mode: 'VERTICAL', itemSpacing: 12, paddingTop: 60, paddingLeft: 16, paddingRight: 16, fills: [solid(white)],
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', children: [text('Message one', { x: 16, y: 60, w: 200 }), text('Message two', { x: 16, y: 90, w: 200 }), fab] });
+  const r = toSwiftUI(root, assets, { preview: false });
+  const scroll = r.code.indexOf('ScrollView {');
+  const end = r.code.indexOf('.scrollBounceBehavior');
+  const pinned = r.code.indexOf('.overlay(alignment: .topLeading)', end);
+  assert.ok(scroll >= 0 && pinned > end, 'drawn over the scroll view, not in it');
+  assert.equal(typecheck([r]), '');
+});

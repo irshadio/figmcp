@@ -1,5 +1,5 @@
-// Text nodes as Text views: a font, colour and tracking per styled run, and
-// Figma's line height as line spacing plus half-leading.
+// Text nodes as Text views: a font face, colour and tracking per styled
+// run, and Figma's line height, set against the face's own on the device.
 import { boxLineHeight, casedRuns, fontWeight, paragraphs, segmentsOf, SOFT_BREAK, topPaint } from '../text.js';
 import { effectsOf, gradient, shadowArgs } from './paint.js';
 import { textStyleFor } from './patterns.js';
@@ -10,8 +10,6 @@ const WEIGHTS = {
   600: 'semibold', 700: 'bold', 800: 'heavy', 900: 'black',
 };
 const ALIGN = { CENTER: '.center', RIGHT: '.trailing' };
-// Line height over font size of a font with no measured AUTO line.
-const DEFAULT_RATIO = 1.21;
 const SYSTEM_FAMILY = /^(\.?SF Pro( (Text|Display|Rounded))?|SF Compact.*|\.?SF UI.*|San Francisco|System)$/i;
 // What a string literal would read as Markdown or a link.
 const MARKDOWN = /[*_~`[\]\\]|\S@\S|:\/\/|www\./;
@@ -22,43 +20,45 @@ export function isSystemFamily(family) {
 }
 
 /**
- * The Font of a run, with weight and italic: .custom(family, size:,
- * relativeTo:) scales with Dynamic Type from the nearest text style;
- * .system(size:) keeps its size.
+ * The PostScript name of a font face by the usual naming ("Inter" "Semi
+ * Bold Italic" -> "Inter-SemiBoldItalic"): iOS finds a custom face by it,
+ * while a family name alone may pick any face of the family.
+ */
+export function postScriptName(fontName) {
+  const family = String(fontName.family || '').replace(/[^A-Za-z0-9]+/g, '');
+  let style = String(fontName.style || 'Regular').replace(/[^A-Za-z0-9]+/g, '');
+  if (/^RegularItalic$/i.test(style)) style = 'Italic';
+  return `${family}-${style || 'Regular'}`;
+}
+
+/**
+ * The Font of a run: .custom(face, size:, relativeTo:) scales with Dynamic
+ * Type from the nearest text style, its face giving weight and italic;
+ * .system(size:weight:) keeps its size.
  */
 export function fontOf(seg, value) {
   const family = seg.fontName && seg.fontName.family;
   const size = typeof seg.fontSize === 'number' ? seg.fontSize : 17;
   const vars = seg.vars || {};
   const sizeValue = value(size, vars.fontSize);
-  const weight = WEIGHTS[fontWeight(seg)];
-  const italic = /italic|oblique/i.test((seg.fontName && seg.fontName.style) || '');
-  let font;
-  if (!family || isSystemFamily(family)) {
-    font = call('.system', [['size', sizeValue], ['weight', raw(`.${weight}`)]]);
-  } else {
-    font = call('.custom', [[null, str(family)], ['size', sizeValue], ['relativeTo', raw(textStyleFor(size))]]);
-    if (weight !== 'regular') font = mod(font, 'weight', [[null, raw(`.${weight}`)]]);
+  if (family && !isSystemFamily(family)) {
+    return call('.custom', [[null, str(postScriptName(seg.fontName))], ['size', sizeValue], ['relativeTo', raw(textStyleFor(size))]]);
   }
-  return italic ? mod(font, 'italic') : font;
+  const font = call('.system', [['size', sizeValue], ['weight', raw(`.${WEIGHTS[fontWeight(seg)]}`)]]);
+  return /italic|oblique/i.test((seg.fontName && seg.fontName.style) || '') ? mod(font, 'italic') : font;
 }
 
-/** The line height of a run in points, or null when Figma's default applies. */
-function lineHeightOf(seg, node, ratios) {
+/**
+ * The line height of a run in points, or null for Figma's default: the
+ * face's own, which iOS lays out the same.
+ */
+function lineHeightOf(seg, node) {
   const lh = seg.lineHeight;
   const size = seg.fontSize;
-  if (typeof size !== 'number') return null;
-  if (lh && lh.unit === 'PIXELS') return lh.value;
-  const fromBox = boxLineHeight(node, ratios);
-  if (fromBox) return fromBox;
-  if (lh && lh.unit === 'PERCENT') return (size * lh.value) / 100;
-  return null;
-}
-
-/** The font's own line height over its size, as iOS lays out the text. */
-export function naturalRatio(seg, ratios) {
-  const font = seg.fontName ? `${seg.fontName.family}:${seg.fontName.style}` : null;
-  return (ratios && font && ratios.get(font)) || DEFAULT_RATIO;
+  if (typeof size !== 'number' || !lh || lh.unit === 'AUTO') return null;
+  if (lh.unit === 'PIXELS') return lh.value;
+  // Figma rounds percent line heights to whole pixels; its box tells.
+  return boxLineHeight(node) || (size * lh.value) / 100;
 }
 
 /**
@@ -113,7 +113,7 @@ function literal(text) {
  * The text of [node] as a view, without its frame: a Text, styled runs
  * interpolated into one Text, or a VStack of them when paragraphs are
  * spaced or listed. Returns
- * { view, lineHeight, natural } with the line height the text keeps.
+ * { view, lineHeight } with the line height the text keeps.
  */
 export function textView(node, ctx) {
   const segs = segmentsOf(node);
@@ -146,7 +146,8 @@ export function textView(node, ctx) {
       if (runs.length) runs[0].text = prefix + runs[0].text;
       else runs.push({ index: 0, text: prefix });
     }
-    if (!runs.length) runs.push({ index: 0, text: '' });
+    // An empty paragraph keeps a line's height, as in Figma.
+    if (!runs.length || runs.every((r) => r.text === '')) runs.splice(0, runs.length, { index: runs.length ? runs[0].index : 0, text: ' ' });
     if (ctx.bind) return applied(view('', [[null, applied(call('Text', [[null, raw(ctx.bind)]]), own[0])]]), shared);
     if (runs.length === 1) return applied(view('', [[null, applied(literal(runs[0].text), own[runs[0].index])]]), shared);
     // Runs are interpolated into one Text: a chain of Text + Text slows the
@@ -156,10 +157,10 @@ export function textView(node, ctx) {
   };
 
   const seg = segs[0];
-  const lh = lineHeightOf(seg, node, ctx.ratios);
-  const natural = (seg.fontSize || 17) * naturalRatio(seg, ctx.ratios);
+  const lh = lineHeightOf(seg, node);
   let out;
-  if (listed || (spacing && paras.length > 1)) {
+  // Text drawn from data is one value, whatever paragraphs the first item has.
+  if (!ctx.bind && (listed || (spacing && paras.length > 1))) {
     let n = 0;
     const children = paras.map((p) => {
       n = p.list === 'ORDERED' ? n + 1 : 0;
@@ -183,14 +184,18 @@ export function textView(node, ctx) {
   const maxLines = node.maxLines || (truncate && hug ? 1 : null);
   if (maxLines) out = mod(out, 'lineLimit', [[null, maxLines]]);
   if (lh) {
-    // Figma centres the glyphs in each line box; iOS lays lines out at the
-    // font's own height, so the rest is added between and around them.
-    const extra = Math.round((lh - natural) * 100) / 100;
-    if (Math.abs(extra) >= 0.01) {
-      if (extra > 0) out = mod(out, 'lineSpacing', [[null, extra]]);
-      out = mod(out, 'padding', [[null, raw('.vertical')], [null, Math.round((extra / 2) * 100) / 100]]);
-    }
+    // Figma centres the glyphs in each line box; the helper sets the room
+    // against the face's own line height, read on the device.
+    if (ctx.helper) ctx.helper('designLineHeight');
+    const family = seg.fontName && seg.fontName.family;
+    const custom = family && !isSystemFamily(family);
+    out = mod(out, 'designLineHeight', [
+      [null, Math.round(lh * 100) / 100],
+      ['font', custom ? str(postScriptName(seg.fontName)) : raw('nil')],
+      ['size', seg.fontSize || 17],
+      ['relativeTo', custom ? raw(textStyleFor(seg.fontSize || 17)) : raw('nil')],
+    ]);
   }
   for (const e of effectsOf(node, 'DROP_SHADOW')) out = mod(out, 'shadow', shadowArgs(e, ctx.color));
-  return { view: out, lineHeight: lh, natural };
+  return { view: out, lineHeight: lh };
 }

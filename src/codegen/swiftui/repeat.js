@@ -17,8 +17,15 @@ export function isGenericName(name) {
 }
 
 /** A key that equal layers share whatever their texts, images and colours. */
+const shapeKeys = new WeakMap();
+
 export function shapeKey(n) {
   if (!n || n.visible === false) return '';
+  if (!shapeKeys.has(n)) shapeKeys.set(n, ownShapeKey(n));
+  return shapeKeys.get(n);
+}
+
+function ownShapeKey(n) {
   const fixed = (axis) => {
     const sizing = axis === 'x' ? n.layoutSizingHorizontal : n.layoutSizingVertical;
     if (n.type === 'TEXT' || sizing === 'HUG' || sizing === 'FILL') return '';
@@ -105,7 +112,30 @@ export function baseName(items, ancestors, label = null) {
   let word = named ? named.name : label || 'Item';
   // Items of a bar or a menu are its items, not bars.
   if (/(bar|menu|nav|navigation|toolbar)$/i.test(word)) word = `${word} item`;
-  return word.replace(/(ch|sh|ss|x)es$/i, '$1').replace(/ies$/i, 'y').replace(/([^s])s$/i, '$1');
+  return word.replace(/[A-Za-z]+$/, singular);
+}
+
+// Words whose plural is themselves, or that end in s as singulars.
+const UNCOUNTED = new Set(['news', 'series', 'species', 'status', 'bus', 'canvas', 'plus', 'gas', 'campus', 'bonus', 'virus',
+  'focus', 'corpus', 'atlas', 'alias', 'analysis', 'basis', 'axis', 'crisis', 'thesis', 'chassis', 'lens', 'data', 'info',
+  'settings', 'details', 'analytics', 'statistics', 'physics', 'maths', 'economics', 'sms', 'gps', 'ios', 'faqs']);
+// Plurals in -ies whose singular ends in -ie.
+const IE_WORDS = new Set(['movies', 'cookies', 'selfies', 'calories', 'zombies', 'rookies', 'goalies', 'hoodies', 'smoothies',
+  'pies', 'ties', 'lies', 'freebies', 'brownies', 'newbies', 'genies', 'aunties', 'veggies', 'techies', 'sweeties', 'boogies']);
+// Plurals in -uses or -oes that drop -es.
+const ES_WORDS = /^(statuses|buses|bonuses|campuses|viruses|focuses|heroes|potatoes|tomatoes|echoes|vetoes|torpedoes)$/i;
+
+/** The singular of an English word ("Categories" -> "Category", "Movies" -> "Movie", "News" -> "News"). */
+export function singular(word) {
+  const w = word.toLowerCase();
+  const keep = (s) => word.slice(0, s.length);
+  if (UNCOUNTED.has(w) || /(ss|us|is)$/.test(w) || w.length < 3) return word;
+  if (IE_WORDS.has(w)) return keep(w.slice(0, -1));
+  if (ES_WORDS.test(w)) return keep(w.slice(0, -2));
+  if (/[^aeiou]ies$/.test(w)) return `${keep(w.slice(0, -3))}${word[word.length - 3] === 'I' ? 'Y' : 'y'}`;
+  if (/(ch|sh|x|zz|sses)es$/.test(w) || /sses$/.test(w)) return keep(w.slice(0, -2));
+  if (/s$/.test(w) && !/'s$/.test(w)) return keep(w.slice(0, -1));
+  return word;
 }
 
 /** The plural of an identifier ('chip' -> 'chips', 'search' -> 'searches'). */

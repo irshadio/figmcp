@@ -242,7 +242,7 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.match(code, /@Environment\(\\\.dynamicTypeSize\) private var dynamicTypeSize/);
   assert.doesNotMatch(code, /FlowLayout/);
   assert.match(code, /Text\("Offers for you"\)[\s\S]*?\.accessibilityAddTraits\(\.isHeader\)/);
-  assert.match(code, /\.custom\("Rubik", size: 13, relativeTo: \.footnote\)/);
+  assert.match(code, /\.custom\("Rubik-Regular", size: 13, relativeTo: \.footnote\)/);
   assert.match(code, /\.accessibilityHidden\(true\)/);
   assert.match(code, /\.safeAreaInset\(edge: \.bottom, spacing: 0\)/);
   // The structure lists what each part is.
@@ -612,4 +612,15 @@ test('swiftui-check prints its usage and rejects what is not a node id', () => {
   const bad = spawnSync(process.execPath, [CHECK.pathname, 'home'], { encoding: 'utf8' });
   assert.equal(bad.status, 2);
   assert.match(bad.stderr, /not a node id/);
+});
+
+test('names are singular, Unicode letters are kept and accents dropped', async () => {
+  const { singular } = await import('../src/codegen/swiftui/repeat.js');
+  const { sIdent } = await import('../src/codegen/swiftui/swift.js');
+  const cases = { Status: 'Status', News: 'News', Movies: 'Movie', Series: 'Series', Bus: 'Bus', Categories: 'Category', Searches: 'Search',
+    Addresses: 'Address', Courses: 'Course', Cities: 'City', Chips: 'Chip', Settings: 'Settings' };
+  for (const [plural, one] of Object.entries(cases)) assert.equal(singular(plural), one, plural);
+  assert.equal(sIdent('Größe'), 'große');
+  assert.equal(sIdent('价格'), '价格');
+  assert.equal(sIdent('café price'), 'cafePrice');
 });
