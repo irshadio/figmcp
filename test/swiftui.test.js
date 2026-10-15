@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -536,4 +537,77 @@ test('swiftui-check compiles a project view with its DesignSystem.swift', { skip
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+/** An export of a red frame with a blue box, and Figma's 2x render of it drawn by hand. */
+function boxesExport(dir) {
+  const { PNG } = createRequire(import.meta.url)('pngjs');
+  const [W, H] = [200, 120];
+  const png = new PNG({ width: W * 2, height: H * 2 });
+  for (let y = 0; y < H * 2; y++) {
+    for (let x = 0; x < W * 2; x++) {
+      const inside = x >= 100 && x < 300 && y >= 60 && y < 180;
+      png.data.set(inside ? [0, 0, 255, 255] : [255, 0, 0, 255], (y * W * 2 + x) * 4);
+    }
+  }
+  const tree = {
+    id: '5:1', name: 'Boxes', type: 'FRAME', x: 0, y: 0, width: W, height: H, fills: [solid({ r: 1, g: 0, b: 0, a: 1 })],
+    children: [{ id: '5:2', name: 'Box', type: 'RECTANGLE', x: 50, y: 30, width: 100, height: 60, fills: [solid({ r: 0, g: 0, b: 1, a: 1 })] }],
+  };
+  const file = path.join(dir, 'boxes.json');
+  fs.writeFileSync(file, JSON.stringify({ frames: [{ id: '5:1', name: 'Boxes', previewPng2x: PNG.sync.write(png).toString('base64'), tree }], images: {} }));
+  return file;
+}
+
+test('swiftui-check renders a plain design pixel for pixel', { skip: iphone ? false : 'no booted iPhone simulator' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'figmcp-swiftui-boxes-'));
+  try {
+    const r = spawnSync(process.execPath, [CHECK.pathname, '5:1', '--export', boxesExport(dir), '--out', path.join(dir, 'out'), '--device', iphone.udid],
+      { encoding: 'utf8', timeout: 300000 });
+    assert.equal(r.status, 0, r.stderr);
+    const report = JSON.parse(r.stdout);
+    assert.deepEqual(report.compiler.errors, []);
+    assert.ok(report.pixels.differingPercent < 0.5, JSON.stringify(report.pixels));
+    assert.equal(report.pixels.sizeMismatch, undefined);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('swiftui-check reports a view that crashes, in light mode, with materials drawn', { skip: iphone ? false : 'no booted iPhone simulator' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'figmcp-swiftui-crash-'));
+  try {
+    const exportFile = boxesExport(dir);
+    const view = (name, body) => {
+      const file = path.join(dir, `${name}.swift`);
+      fs.writeFileSync(file, `import SwiftUI\n\nstruct ${name}: View {\n  var body: some View {\n    ${body}\n  }\n}\n`);
+      const r = spawnSync(process.execPath, [CHECK.pathname, '5:1', '--export', exportFile, '--out', path.join(dir, name), '--device', iphone.udid,
+        '--code', file], { encoding: 'utf8', timeout: 300000 });
+      assert.equal(r.status, 0, r.stderr);
+      return JSON.parse(r.stdout);
+    };
+    const crash = view('Crash', 'let a: [Int] = []\n    return Text("\\(a[1])")');
+    assert.equal(crash.failedAt, 'render');
+    assert.match(crash.renderError, /Index out of range/);
+    const { PNG } = createRequire(import.meta.url)('pngjs');
+    const pixel = (report, x, y) => {
+      const png = PNG.sync.read(fs.readFileSync(report.files.rendered));
+      return [...png.data.subarray((y * png.width + x) * 4, (y * png.width + x) * 4 + 3)];
+    };
+    const light = view('Light', 'Color(uiColor: .systemBackground)');
+    assert.deepEqual(pixel(light, 200, 120), [255, 255, 255]);
+    const frosted = view('Frosted', 'ZStack { Color.red; Rectangle().fill(.ultraThinMaterial) }');
+    assert.notDeepEqual(pixel(frosted, 200, 120), [255, 0, 0]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('swiftui-check prints its usage and rejects what is not a node id', () => {
+  const help = spawnSync(process.execPath, [CHECK.pathname, '--help'], { encoding: 'utf8' });
+  assert.equal(help.status, 0);
+  assert.match(help.stdout, /^Usage:/);
+  const bad = spawnSync(process.execPath, [CHECK.pathname, 'home'], { encoding: 'utf8' });
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /not a node id/);
 });
