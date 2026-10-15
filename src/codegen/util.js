@@ -55,10 +55,13 @@ export function attr(value) {
     .replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** A CSS custom property name for a variable ('primary/900' -> 'primary\/900'). */
-function varIdent(name) {
-  return String(name).trim().replace(/\s+/g, '-')
-    .replace(/[^A-Za-z0-9_-]/g, (c) => `\\${c}`);
+/**
+ * A CSS custom property name for a variable ('primary/900' -> 'primary-900'):
+ * characters an identifier would have to escape become dashes, so classes
+ * carry no backslashes.
+ */
+export function varIdent(name) {
+  return String(name).trim().replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'var';
 }
 
 /** 'var(--name,fallback)' when a variable is bound, else the fallback. */

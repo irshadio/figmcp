@@ -137,13 +137,14 @@ const THEME_NAMESPACE = {
 
 /**
  * The stylesheet for the design variables [code] uses: each declared on
- * :root with its value, and for Tailwind 4 an @theme that turns them into
- * utilities (--color-brand-600 gives bg-brand-600). Empty when none is used.
+ * :root with its value (and its Figma name from [names], ident -> name),
+ * and for Tailwind 4 an @theme that turns them into utilities
+ * (--color-brand-600 gives bg-brand-600). Empty when none is used.
  */
-export function tokensCss(code) {
-  const vars = usedVariables(code);
+export function tokensCss(code, names = new Map()) {
+  const vars = usedVariables(code).map((v) => ({ ...v, name: names.get(v.ident) || v.name }));
   if (!vars.length) return '';
-  const root = vars.map((v) => `  --${v.ident}: ${v.value};`);
+  const root = vars.map((v) => `  --${v.ident}: ${v.value};${v.name !== v.ident ? ` /* ${v.name} */` : ''}`);
   const keys = new Set();
   const theme = [];
   for (const v of vars) {

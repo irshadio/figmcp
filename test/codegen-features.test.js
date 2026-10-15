@@ -37,10 +37,12 @@ test('bound variables become var() with the exact value as fallback', () => {
   }]));
   assert.match(out, /gap-\[var\(--padding-16,16px\)\]/);
   assert.match(out, /px-\[var\(--padding-8,8px\)\]/);
-  assert.match(out, /rounded-\[var\(--r\\\/12,12px\)\]/);
-  assert.match(out, /bg-\[var\(--primary\\\/900,#09122d\)\]/);
-  assert.match(out, /text-\[var\(--black\\\/900,#000000\)\]/);
-  assert.match(out, /text-\[length:var\(--body\\\/size,14px\)\]/);
+  // Characters a CSS name would escape become dashes: no backslashes in classes.
+  assert.match(out, /rounded-\[var\(--r-12,12px\)\]/);
+  assert.match(out, /bg-\[var\(--primary-900,#09122d\)\]/);
+  assert.match(out, /text-\[var\(--black-900,#000000\)\]/);
+  assert.match(out, /text-\[length:var\(--body-size,14px\)\]/);
+  assert.doesNotMatch(out, /\\/);
   assert.match(out, /data-text-style="Body\/Medium"/);
 });
 

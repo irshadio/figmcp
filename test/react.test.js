@@ -167,14 +167,14 @@ test('design variables are declared, with Tailwind 4 theme names', () => {
     vars: { 'fill.0': 'Brand/600', topLeftRadius: 'radius/card', topRightRadius: 'radius/card', bottomLeftRadius: 'radius/card',
       bottomRightRadius: 'radius/card', paddingLeft: 'space/md' },
   })]));
-  assert.match(out.code, /bg-\[var\(--Brand\\\/600,#3d3bd9\)\]/);
-  for (const line of ['--Brand\\/600: #3d3bd9;', '--radius\\/card: 12px;', '--space\\/md: 16px;',
-    '--color-brand-600: var(--Brand\\/600);', '--radius-radius-card: var(--radius\\/card);', '--spacing-space-md: var(--space\\/md);']) {
+  assert.match(out.code, /bg-\[var\(--Brand-600,#3d3bd9\)\]/);
+  for (const line of ['--Brand-600: #3d3bd9; /* Brand/600 */', '--radius-card: 12px; /* radius/card */', '--space-md: 16px; /* space/md */',
+    '--color-brand-600: var(--Brand-600);', '--radius-radius-card: var(--radius-card);', '--spacing-space-md: var(--space-md);']) {
     assert.ok(out.css.includes(`  ${line}\n`), line);
   }
   assert.ok(out.css.indexOf(':root {') < out.css.indexOf('@theme inline {'));
   assert.equal(gen(frame([])).css, '');
-  assert.deepEqual(usedVariables('shadow-[0px_2px_var(--s\\/1,rgba(0,0,0,0.25))]').map((v) => [v.name, v.value, v.kind]), [['s/1', 'rgba(0,0,0,0.25)', 'color']]);
+  assert.deepEqual(usedVariables('shadow-[0px_2px_var(--s-1,rgba(0,0,0,0.25))]').map((v) => [v.name, v.value, v.kind]), [['s-1', 'rgba(0,0,0,0.25)', 'color']]);
   assert.equal(tokensCss('text-[length:var(--size,14px)]').includes('--text-size: var(--size);'), true);
 });
 
@@ -328,4 +328,23 @@ test('corpus findings: rounded text heights, rows over padding, picture roots', 
   // A root shipped as one image is a picture, not a screen.
   const picture = { id: '15:1', name: 'Preview', type: 'FRAME', x: 0, y: 0, width: 390, height: 722, render: { base64: 'x' }, rasterized: 'rotation', children: [] };
   assert.match(code(picture), /className="relative w-\[390px\] h-\[722px\]"/);
+});
+
+test('three or more siblings that differ only in content become data and a .map()', () => {
+  const tab = (id, label, width, active = false) => ({
+    ...box(id, { name: label, width: 66, height: 60, layoutMode: 'VERTICAL', itemSpacing: 6, counterAxisAlignItems: 'CENTER' }),
+    children: [{ ...box(`${id}a`, { name: 'Icon', width: 24, height: 24 }), type: 'VECTOR', svg: `<svg id="${id}"/>` },
+      text(label, { id: `${id}b`, name: label, width }, active ? { fills: [solid({ r: 1, g: 0, b: 0, a: 1 })] } : {})],
+  });
+  const row = (kids) => frame(kids, { name: 'Tab bar', width: 360, height: 60, layoutMode: 'HORIZONTAL', primaryAxisAlignItems: 'SPACE_BETWEEN' });
+  let n = 0;
+  const files = { ...assets, svg: () => `/disk/${n++}.svg` };
+  const out = toReactTailwind(row([tab('20:1', 'Home', 34, true), tab('20:2', 'Trips', 29), tab('20:3', 'Offers', 37), tab('20:4', 'Account', 52)]), files).code;
+  assert.match(out, /^const tabBarItems = \[\n {2}\{ name: "Trips", id: "20:2", id2: "20:2a", image: imgIcon2, minW: "min-w-\[29px\]", id3: "20:2b" \},/m);
+  assert.match(out, /\{tabBarItems\.map\(\(item\) => \(\n\s+<div key=\{item\.id\} className="[^"]*" data-name=\{item\.name\} data-node-id=\{item\.id\}>/);
+  assert.match(out, /<p className=\{`relative shrink-0 \$\{item\.minW\} whitespace-nowrap[^`]*`\} data-name=\{item\.name\} data-node-id=\{item\.id3\}>\n\s+\{item\.name\}/);
+  assert.match(out, /data-name="Home" data-node-id="20:1"/, 'the active tab differs in style and stays as it is');
+  // Two alike are not a run; repeats: false writes every item.
+  assert.doesNotMatch(code(row([tab('20:2', 'Trips', 29), tab('20:3', 'Offers', 37)])), /\.map\(/);
+  assert.doesNotMatch(toReactTailwind(row([tab('20:2', 'Trips', 29), tab('20:3', 'Offers', 37), tab('20:4', 'Account', 52)]), files, { repeats: false }).code, /\.map\(/);
 });

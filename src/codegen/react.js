@@ -16,12 +16,13 @@ import {
 import {
   altText, containerElement, fieldPlaceholder, headingTag, isGenericName, readableName,
 } from './semantics.js';
+import { collapseRuns } from './runs.js';
 import { mergeEdges, snapClass, tokensCss } from './tailwind.js';
 import {
   autoLineRatios, cssWeight, fontClasses, jsxText, paragraphs, scriptOf, segmentsOf, textBlockClasses,
   verticalAlign,
 } from './text.js';
-import { camel, num, pascal, px, tw, withVar } from './util.js';
+import { camel, num, pascal, px, tw, varIdent, withVar } from './util.js';
 
 const CSS_BLENDS = new Set(['NORMAL', 'PASS_THROUGH', 'MULTIPLY', 'SCREEN', 'OVERLAY', 'DARKEN', 'LIGHTEN',
   'COLOR_DODGE', 'COLOR_BURN', 'HARD_LIGHT', 'SOFT_LIGHT', 'DIFFERENCE', 'EXCLUSION', 'HUE', 'SATURATION',
@@ -174,6 +175,8 @@ class Writer {
     this.fonts = new Map();
     this.textStyles = new Map();
     this.inputs = new Map();
+    this.arrays = [];
+    this.runs = false;
     this.stack = [];
   }
 
@@ -526,6 +529,22 @@ class Writer {
     }
   }
 
+  /** Repeated children from line [starts[0]] on become data and a .map(). */
+  collapse(node, starts, depth) {
+    const chunks = starts.map((start, i) => this.lines.slice(start, i + 1 < starts.length ? starts[i + 1] : this.lines.length));
+    const base = camel(readableName(node) || 'items', 'items');
+    const nameFor = () => {
+      let name = /s$/.test(base) ? base : `${base}Items`;
+      for (let i = 2; this.names.has(name); i++) name = `${/s$/.test(base) ? base : `${base}Items`}${i}`;
+      this.names.add(name);
+      return name;
+    };
+    const out = collapseRuns(chunks, depth * 2, nameFor);
+    if (!out.arrays.length) return;
+    this.lines.splice(starts[0], this.lines.length - starts[0], ...out.lines);
+    this.arrays.push(...out.arrays);
+  }
+
   /** Screen-mode placement options for a child of [parent]. */
   screenOpts(node, parent, siblings, scroller = false) {
     if (!this.screen || !parent) return {};
@@ -637,10 +656,13 @@ class Writer {
     const pinned = parent ? new Set() : this.pinned;
     const flowChildren = children.filter((c) => inFlow(c, node));
     let flow = 0;
+    const starts = [];
     children.filter((c) => !pinned.has(c.id)).forEach((child) => {
       const index = inFlow(child, node) ? flow++ : undefined;
+      starts.push(this.lines.length);
       this.node(child, node, depth + 1, { index, count: flowChildren.length, ...this.screenOpts(child, node, flowChildren, Boolean(scroll)) });
     });
+    if (this.runs && starts.length >= 3) this.collapse(node, starts, depth + 1);
     if (pinned.size) {
       // Layers Figma keeps in place while the page scrolls: a box over the
       // screen holds them where the design has them.
@@ -724,6 +746,21 @@ function roundedHeight(node, paras) {
   return extra > 0.01 && extra < 1 ? `min-h-[${px(node.height)}]` : null;
 }
 
+/** The design variables bound in [tree]: CSS identifier -> Figma name. */
+function variableNames(tree) {
+  const out = new Map();
+  const add = (vars) => vars && typeof vars === 'object' &&
+    Object.values(vars).forEach((name) => typeof name === 'string' && out.set(varIdent(name), name));
+  const walk = (n) => {
+    if (!n || typeof n !== 'object' || n.visible === false) return;
+    add(n.vars);
+    if (Array.isArray(n.segments)) n.segments.forEach((s) => s && add(s.vars));
+    if (Array.isArray(n.children)) n.children.forEach(walk);
+  };
+  walk(tree);
+  return out;
+}
+
 function hasText(node) {
   if (!node || node.visible === false) return false;
   return node.type === 'TEXT' || (node.children || []).some(hasText);
@@ -752,18 +789,21 @@ function componentNameFor(root, taken) {
  *   { svg(text), image(hash), imageSize?(hash), render?({ base64 }) }.
  * [connect] returns a mapping ({ componentName, source, label }) for an
  * instance, or null. [screen] draws a phone-sized frame as a screen that
- * fills the viewport (default: portrait frames 300-480 wide).
+ * fills the viewport (default: portrait frames 300-480 wide). [repeats]
+ * writes runs of repeated siblings as a data array and a .map().
  */
-export function toReactTailwind(root, assets, { connect = null, screen, assetDir = null } = {}) {
+export function toReactTailwind(root, assets, { connect = null, screen, assetDir = null, repeats = true } = {}) {
   const tree = { ...root, x: root.x ?? 0, y: root.y ?? 0 };
   // A root shipped as one image is a picture, not a screen to lay out.
   const asScreen = screen ?? (isPhoneScreen(tree) && !tree.render && !drawnAsSvg(tree));
   const writer = new Writer(assets, { connect, ratios: autoLineRatios(tree), screen: asScreen ? tree : null, assetDir });
   writer.pinned = asScreen ? pinnedChildren(tree) : new Set();
+  writer.runs = repeats;
   writer.node(tree, null, 2);
   const header = [...writer.connected.values()].map((m) =>
     `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`);
   const consts = [...writer.consts.values()].map(({ id, url }) => `const ${id} = ${JSON.stringify(url)};`);
+  for (const data of writer.arrays) consts.push(...(consts.length ? [''] : []), ...data);
   const componentName = componentNameFor(tree, new Set(writer.connected.keys()));
   const code = [
     ...header,
@@ -784,7 +824,7 @@ export function toReactTailwind(root, assets, { connect = null, screen, assetDir
   }
   return {
     code,
-    css: tokensCss(code),
+    css: tokensCss(code, variableNames(tree)),
     componentName,
     assets: map,
     files: Object.fromEntries(writer.files),
