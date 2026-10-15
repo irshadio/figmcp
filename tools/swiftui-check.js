@@ -390,8 +390,15 @@ function render(device, app, out, { w, h, top, bottom }) {
   const started = Date.now();
   try {
     // With --console the launch waits for the app to exit, so a crash is seen at once.
-    const launch = run('xcrun', ['simctl', 'launch', '--console', '--terminate-running-process', device, BUNDLE_ID,
+    const launchApp = () => run('xcrun', ['simctl', 'launch', '--console', '--terminate-running-process', device, BUNDLE_ID,
       '-out', out, '-w', String(w), '-h', String(h), '-top', String(top), '-bottom', String(bottom)], { timeout: RENDER_TIMEOUT });
+    let launch = launchApp();
+    // A console pipe left by a stopped run blocks a launch whose simctl got the same pid.
+    const stale = /Unable to establish FIFO at (\S+launch_console-\S+?): Error 17/.exec(`${launch.stderr || ''}`);
+    if (stale) {
+      fs.rmSync(stale[1], { force: true });
+      launch = launchApp();
+    }
     if (fs.existsSync(out) && launch.status === 0) return;
     const log = `${launch.stdout || ''}\n${launch.stderr || ''}`.split('\n')
       .filter((l) => l.trim() && !/^dev\.figmcp\.swiftui-check/.test(l)).slice(-12).join('\n').trim();

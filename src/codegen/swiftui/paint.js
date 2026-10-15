@@ -156,6 +156,20 @@ export function composite(bottom, top) {
 
 // Helpers added to the code when it uses them.
 export const HELPERS = {
+  layerStack: `/// A frame's layers over each other, as Figma lays them out: each is offered
+/// the stack's own size and placed from its top leading corner, and none of
+/// them sizes the stack (a ZStack would grow to the union of its layers).
+struct LayerStack: Layout {
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    proposal.replacingUnspecifiedDimensions()
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    for subview in subviews {
+      subview.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(bounds.size))
+    }
+  }
+}`,
   designLineHeight: `/// Figma's line height: lines [height] points apart with the glyphs centred
 /// in each, set against the face's own line height on the device and scaled
 /// with Dynamic Type like the font.

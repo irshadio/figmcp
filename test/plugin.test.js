@@ -148,3 +148,38 @@ test('run reports syntax errors, thrown errors with logs, and Dev Mode', async (
   const dev = loadPlugin(makeNode({ id: '1:1', type: 'FRAME' }), { editorType: 'dev' });
   await assert.rejects(dev.request('run', { code: 'return 1' }), /Design mode/);
 });
+
+test('colour variables of a collection with light and dark modes carry both values', async () => {
+  const light = { r: 1, g: 1, b: 1, a: 1 };
+  const dark = { r: 0.1, g: 0.1, b: 0.1, a: 1 };
+  const variables = {
+    'V:base': { id: 'V:base', name: 'base/white', resolvedType: 'COLOR', variableCollectionId: 'C:base', valuesByMode: { b1: light } },
+    'V:bg': { id: 'V:bg', name: 'bg/surface', resolvedType: 'COLOR', variableCollectionId: 'C:theme',
+      valuesByMode: { m1: { type: 'VARIABLE_ALIAS', id: 'V:base' }, m2: dark } },
+  };
+  const collections = {
+    'C:base': { id: 'C:base', modes: [{ modeId: 'b1', name: 'Value' }], defaultModeId: 'b1' },
+    'C:theme': { id: 'C:theme', modes: [{ modeId: 'm1', name: 'Light' }, { modeId: 'm2', name: 'Dark' }], defaultModeId: 'm1' },
+  };
+  const paint = { ...solid, color: { r: 1, g: 1, b: 1 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'V:bg' } } };
+  const root = makeNode({ id: '1:1', type: 'FRAME', box: [0, 0, 100, 100], fills: [paint] });
+  const { request } = loadPlugin(root, { variables, collections });
+  const result = await request('node', { id: '1:1' });
+  assert.equal(result.tree.vars['fill.0'], 'bg/surface');
+  assert.deepEqual(result.variableModes, { 'bg/surface': { Light: light, Dark: dark } });
+});
+
+test('a frame of many vectors and nothing else is exported as one SVG', async () => {
+  const vectors = Array.from({ length: 45 }, (_, i) => ({ id: `2:${i}`, type: 'VECTOR', box: [i * 10, 0, 8, 8], fills: [solid] }));
+  const root = makeNode({ id: '1:1', type: 'FRAME', box: [0, 0, 390, 600], children: [
+    { id: '1:2', type: 'FRAME', name: 'Map', box: [0, 0, 390, 600], fills: [], children: vectors },
+    { id: '1:3', type: 'FRAME', name: 'Few', box: [0, 0, 390, 600], fills: [], children: vectors.slice(0, 3).map((v) => ({ ...v, id: `3:${v.id}` })) },
+    { id: '1:4', type: 'TEXT', name: 'Title', box: [0, 0, 100, 20], characters: 'Title' },
+  ] });
+  const { request } = loadPlugin(root);
+  const { tree } = await request('node', { id: '1:1', svg: true });
+  const map = find(tree, '1:2');
+  assert.match(map.svg, /^<svg id="1:2"/);
+  assert.equal((map.children || []).length, 0);
+  assert.equal(find(tree, '1:3').svg, undefined, 'a few vectors stay layers');
+});

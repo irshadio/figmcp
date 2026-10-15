@@ -136,6 +136,83 @@ function svgBody(svg) {
   return String(svg).replace(/^\s*(<\?xml[^>]*\?>|<!DOCTYPE[^>]*>|<!--[\s\S]*?-->|\s)*/i, '');
 }
 
+// A frame of shapes alone with this many vector layers is an illustration (a map, a scene).
+const ILLUSTRATION_SIZE = 40;
+const CONTAINERS = new Set(['FRAME', 'GROUP', 'INSTANCE', 'COMPONENT']);
+
+function hex6(c) {
+  const b = (v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0');
+  return `#${b(c.r)}${b(c.g)}${b(c.b)}`;
+}
+
+/** [svg] placed at [b] (a box relative to the canvas). */
+function placedSvg(svg, b) {
+  const r = (v) => Math.round(v * 100) / 100;
+  const body = svgBody(svg);
+  const open = SVG_OPEN.exec(body)[0];
+  return open.replace(/\s(width|height|x|y)="[^"]*"/g, '')
+    .replace(/^<svg/, `<svg x="${r(b.x)}" y="${r(b.y)}" width="${r(b.width)}" height="${r(b.height)}"`) + body.slice(open.length);
+}
+
+/** A plain rectangle or ellipse with one solid fill and nothing else, as an SVG element at [x], [y]; else null. */
+function shapeSvg(n, x, y) {
+  const fills = visiblePaints(n.fills);
+  if (!['RECTANGLE', 'ELLIPSE'].includes(n.type) || fills.length !== 1 || fills[0].type !== 'SOLID' ||
+      visiblePaints(n.strokes).length || n.rotation || (n.effects || []).some((e) => e.visible !== false)) return null;
+  const r = (v) => Math.round(v * 100) / 100;
+  const p = fills[0];
+  const alpha = (p.color.a ?? 1) * (p.opacity ?? 1) * (typeof n.opacity === 'number' ? n.opacity : 1);
+  const fill = `fill="${hex6(p.color)}"${alpha < 1 ? ` fill-opacity="${r(alpha)}"` : ''}`;
+  if (n.type === 'ELLIPSE') {
+    return `<ellipse cx="${r(x + n.width / 2)}" cy="${r(y + n.height / 2)}" rx="${r(n.width / 2)}" ry="${r(n.height / 2)}" ${fill}/>`;
+  }
+  const radius = typeof n.cornerRadius === 'number' && n.cornerRadius > 0 ? ` rx="${r(Math.min(n.cornerRadius, n.width / 2, n.height / 2))}"` : '';
+  return `<rect x="${r(x)}" y="${r(y)}" width="${r(n.width)}" height="${r(n.height)}"${radius} ${fill}/>`;
+}
+
+/**
+ * [node] with each illustration in it (a frame of shapes alone, no text or
+ * images, holding many vector layers: a map, a scene) drawn as one SVG of
+ * the frame's size: one image instead of hundreds of views. Layers that
+ * came without their SVG are listed in `illustrationGaps`.
+ */
+function withIllustrations(node) {
+  if (!node || !node.children || node.svg || node.visible === false) return node;
+  const leaves = [];
+  let images = false;
+  const walk = (n) => {
+    if (n.visible === false) return;
+    if (n.type === 'TEXT' || hasImageFill(n) || n.render) images = true;
+    if (n.svg || !(n.children || []).length) leaves.push(n);
+    else n.children.forEach(walk);
+  };
+  node.children.forEach(walk);
+  const vectors = leaves.filter((n) => n.svg && SVG_OPEN.test(svgBody(n.svg))).length;
+  if (!CONTAINERS.has(node.type) || images || vectors < ILLUSTRATION_SIZE) {
+    const children = node.children.map(withIllustrations);
+    return children.some((c, i) => c !== node.children[i]) ? { ...node, children } : node;
+  }
+  const r = (v) => Math.round(v * 100) / 100;
+  const parts = [];
+  const gaps = [];
+  const own = visiblePaints(node.fills);
+  if (own.length === 1 && own[0].type === 'SOLID') parts.push(shapeSvg({ ...node, type: 'RECTANGLE', children: [], opacity: 1, rotation: 0, effects: [] }, 0, 0));
+  for (const n of leaves) {
+    if (n.svg && SVG_OPEN.test(svgBody(n.svg))) {
+      const b = n.svgBounds || n;
+      parts.push(placedSvg(n.svg, { x: b.x - node.x, y: b.y - node.y, width: b.width, height: b.height }));
+    } else {
+      const shape = shapeSvg(n, n.x - node.x, n.y - node.y);
+      if (shape) parts.push(shape);
+      else gaps.push({ id: n.id, name: n.name });
+    }
+  }
+  const svg = `<svg width="${r(node.width)}" height="${r(node.height)}" viewBox="0 0 ${r(node.width)} ${r(node.height)}" fill="none" ` +
+    `xmlns="http://www.w3.org/2000/svg">\n${parts.filter(Boolean).join('\n')}\n</svg>`;
+  return { ...node, children: [], fills: [], strokes: node.strokes, svg, svgBounds: { x: node.x, y: node.y, width: node.width, height: node.height },
+    ...(gaps.length ? { illustrationGaps: gaps } : {}) };
+}
+
 /**
  * [node] with each decorative pattern in it (a frame of many small vector
  * layers, no text: a doodle wallpaper) drawn as one SVG, so it is one
@@ -553,6 +630,33 @@ class SwiftUIWriter {
     return runsOf(flow).filter((r) => !r.items.some((n) => input(n) || swapped(n)));
   }
 
+  /**
+   * A clear box of a frame's size for its layers to lie over: a fixed size
+   * as it is, a filling one with the design's size as its ideal, so it keeps
+   * that size where it is offered none (in a hugging stack) and fills otherwise.
+   */
+  layerBox(node, size) {
+    const args = [];
+    for (const [axis, key, design] of [['w', 'Width', node.width], ['h', 'Height', node.height]]) {
+      const s = size[axis] ?? design;
+      if (s === 'inf') args.push([`ideal${key}`, round(design)], [`max${key}`, INFINITY]);
+      else args.push([key.toLowerCase(), typeof s === 'number' ? round(s) : s]);
+    }
+    const fixed = args.filter(([k]) => k === 'width' || k === 'height');
+    const flexible = args.filter(([k]) => !fixed.includes(args.find((a) => a[0] === k)));
+    let box = clear();
+    if (fixed.length) box = mod(box, 'frame', fixed);
+    if (flexible.length) box = mod(box, 'frame', flexible);
+    return box;
+  }
+
+  /** [box] with [items] laid over it: one item as an overlay, several in a LayerStack of the box's size. */
+  layers(box, items) {
+    if (items.length === 1) return mod(box, 'overlay', [['alignment', raw('.topLeading')]], items);
+    this.helpers.add('layerStack');
+    return mod(box, 'overlay', [['alignment', raw('.topLeading')]], [view('LayerStack', [], items)]);
+  }
+
   /** Whether [node] is part of a logo or wordmark, whose text keeps its size at every text size. */
   brand(node) {
     return [...this.ancestors, node].some((n) => /\b(logo|logotype|wordmark|brand)\b/i.test(String(n.name || '')));
@@ -850,7 +954,7 @@ class SwiftUIWriter {
     if (mapping) return this.component(node, size, mapping);
     const line = straightLine(node);
     if (isTurned(node) && !node.svg && !node.render && !line) return this.turned(node, size);
-    if (isText(node)) return this.text(node, size);
+    if (isText(node)) return this.text(node, size, ctx);
     if (line) return this.line(node, size, line);
     if (drawnAsSvg(node)) return this.svg(node, size);
     if (node.render && this.assets.render) return this.render(node, size);
@@ -910,7 +1014,7 @@ class SwiftUIWriter {
     };
   }
 
-  text(node, size) {
+  text(node, size, ctx = {}) {
     const segs = segmentsOf(node);
     segs.forEach((seg) => this.font(seg));
     if (visiblePaints(node.strokes).length && typeof node.strokeWeight === 'number' && node.strokeWeight > 0) {
@@ -929,7 +1033,10 @@ class SwiftUIWriter {
     const control = roles.some((r) => CONTROLS.has(r));
     // Items drawn from data share one view: a value is one word when every item's is.
     const single = this.bindings.has(node.id) ? this.words.has(node.id) : word;
-    if (size.w === null && size.h === null && single && !control) v = mod(v, 'lineLimit', [[null, 1]]);
+    // A layer placed freely is never offered its room by its frame, and a
+    // text hugging its width never wraps in Figma: it takes its own size.
+    if (ctx.kind === 'stack' && hugsWidth(node)) v = mod(v, 'fixedSize');
+    else if (size.w === null && size.h === null && single && !control) v = mod(v, 'lineLimit', [[null, 1]]);
     else if (size.w === null && control && !/\n/.test(node.characters || '')) {
       v = mod(v, 'lineLimit', [[null, 1]]);
     } else if (size.h === null) {
@@ -1015,6 +1122,10 @@ class SwiftUIWriter {
   }
 
   svg(node, size) {
+    if (node.illustrationGaps) {
+      this.warn(node, `drawn as one image; ${node.illustrationGaps.length} of its layers came without their SVG and are missing ` +
+        '(run the plugin again to export the illustration whole)');
+    }
     const bound = this.bindings.get(node.id);
     const { tile } = this.svgSource(node);
     const name = bound ? raw(bound) : str(this.svgAsset(node));
@@ -1208,11 +1319,10 @@ class SwiftUIWriter {
       const grows = typeof size.h === 'number' && hasText(node) && placed.every((c) => this.stackPlacement(c, node).v.mode === 'min') &&
         this.fitsHeight(node);
       if (!isAutoLayout(node) && !grows && !content.padding && v.name === 'ZStack' && Array.isArray(v.body)) {
-        // Children never size a frame without auto layout: each layer lies
+        // Children never size a frame without auto layout: its layers lie
         // over a box of its size, so a large or far one cannot stretch the
-        // layers that fill (a ZStack would offer them the union of all).
-        const box = this.frame(clear(), { w: size.w ?? node.width, h: size.h ?? node.height });
-        v = v.body.reduce((out, item) => mod(out, 'overlay', [['alignment', raw('.topLeading')]], [item]), box);
+        // layers that fill.
+        v = this.layers(this.layerBox(node, size), v.body);
       } else v = this.frame(v, grows ? { ...size, h: { min: size.h } } : size, content.align);
       if (node.clipsContent) {
         // Figma clips the children, not the frame's own fills and shadows.
@@ -1462,8 +1572,7 @@ class SwiftUIWriter {
     const above = decor.filter((c) => behind(c) && order(c) > order(behind(c))).map(drawDecor).filter(Boolean);
     // Decor lies over a clear box of the page's size, so a layer reaching
     // past the page's edge does not widen what fills it.
-    // Each its own overlay: a ZStack would stretch layers that fill to the union of all.
-    const layer = (items) => items.reduce((v, item) => mod(v, 'overlay', [['alignment', raw('.topLeading')]], [item]), clear());
+    const layer = (items) => this.layers(clear(), items);
     if (under.length) page = mod(page, 'background', [['alignment', raw('.topLeading')]], [layer(under)]);
     if (above.length) page = mod(page, 'overlay', [['alignment', raw('.topLeading')]], [mod(layer(above), 'allowsHitTesting', [[null, false]])]);
     return page;
@@ -1882,7 +1991,7 @@ function printProperty(p) {
  * pattern the code uses for it.
  */
 export function toSwiftUI(root, assets, options = {}) {
-  const rootNode = withPatterns({ ...root, x: root.x ?? 0, y: root.y ?? 0 });
+  const rootNode = withPatterns(withIllustrations({ ...root, x: root.x ?? 0, y: root.y ?? 0 }));
   const screen = options.screen ?? isPhoneScreen(rootNode);
   let structName = options.structName || sType(root.name, 'Design');
   if (SWIFT_TYPE_NAMES.has(structName)) structName = `${structName}Screen`;
@@ -1964,7 +2073,7 @@ export function toSwiftUI(root, assets, options = {}) {
     }
     shared.push('}');
   }
-  for (const name of ['color', 'designLineHeight', 'flow', 'pressable']) {
+  for (const name of ['color', 'designLineHeight', 'layerStack', 'flow', 'pressable']) {
     if (writer.helpers.has(name)) shared.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};

@@ -42,7 +42,7 @@ export const SWIFT_TYPE_NAMES = new Set([
   'ContentUnavailableView', 'ShareLink', 'PhotosPicker', 'Canvas', 'TimelineView', 'Item', 'Action', 'Model', 'ID',
   'Preview', 'PreviewProvider', 'SubmitLabel', 'UIKeyboardType', 'UITextContentType', 'SensoryFeedback',
   // The generator's own helpers.
-  'FlowLayout', 'PressableButtonStyle', 'DesignTokens', 'AppFonts', 'DesignLineHeight', 'UIFont', 'Field', 'FocusState',
+  'FlowLayout', 'PressableButtonStyle', 'DesignTokens', 'AppFonts', 'DesignLineHeight', 'LayerStack', 'UIFont', 'Field', 'FocusState',
 ]);
 
 /** A Swift number literal, rounded to 4 decimals (ratios need them; points come rounded). */

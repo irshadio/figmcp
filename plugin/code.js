@@ -129,6 +129,8 @@ function newContext(options) {
     truncated: false,
     failures: [],
     variables: new Map(),
+    // Colour variables of collections with more than one mode: name -> { mode name: colour }.
+    variableModes: {},
     styles: new Map(),
     nodeNames: new Map(),
   };
@@ -141,9 +143,34 @@ async function variableName(ctx, alias) {
   try {
     const variable = await figma.variables.getVariableByIdAsync(alias.id);
     name = variable ? variable.name : null;
+    if (variable && variable.resolvedType === 'COLOR') {
+      const modes = await colourModes(variable);
+      if (modes) ctx.variableModes[name] = modes;
+    }
   } catch (e) { /* remote or deleted variable */ }
   ctx.variables.set(alias.id, name);
   return name;
+}
+
+// A colour variable's value in each mode of its collection ({ Light: {r, g,
+// b, a}, Dark: ... }), following aliases into the same-named mode; null
+// when the collection has one mode.
+async function colourModes(variable) {
+  const collection = await figma.variables.getVariableCollectionByIdAsync(variable.variableCollectionId);
+  if (!collection || collection.modes.length < 2) return null;
+  const out = {};
+  for (const mode of collection.modes) {
+    let value = variable.valuesByMode[mode.modeId];
+    for (let hops = 0; value && value.type === 'VARIABLE_ALIAS' && hops < 10; hops++) {
+      const target = await figma.variables.getVariableByIdAsync(value.id);
+      if (!target) break;
+      const owner = await figma.variables.getVariableCollectionByIdAsync(target.variableCollectionId);
+      const same = owner && owner.modes.find(function (m) { return m.name === mode.name; });
+      value = target.valuesByMode[same ? same.modeId : owner ? owner.defaultModeId : Object.keys(target.valuesByMode)[0]];
+    }
+    if (value && typeof value.r === 'number') out[mode.name] = { r: value.r, g: value.g, b: value.b, a: value.a === undefined ? 1 : value.a };
+  }
+  return Object.keys(out).length > 1 ? out : null;
 }
 
 async function styleName(ctx, id) {
@@ -231,6 +258,28 @@ function isIcon(node) {
   if (!('children' in node) || node.children.length === 0) return false;
   if (node.width > ICON_MAX || node.height > ICON_MAX) return false;
   return onlyShapes(node) && hasVector(node);
+}
+
+// A container of shapes alone with this many vector layers is an
+// illustration (a map, a scene): one SVG export instead of one per layer.
+const ILLUSTRATION_MIN = 40;
+
+function vectorCount(node, limit) {
+  if (node.visible === false) return 0;
+  if (needsSvg(node)) return 1;
+  let n = 0;
+  if ('children' in node) {
+    for (const c of node.children) {
+      n += vectorCount(c, limit - n);
+      if (n >= limit) break;
+    }
+  }
+  return n;
+}
+
+function isIllustration(node) {
+  if (!('children' in node) || node.children.length === 0) return false;
+  return onlyShapes(node) && vectorCount(node, ILLUSTRATION_MIN) >= ILLUSTRATION_MIN;
 }
 
 function nonSolidStroke(node) {
@@ -518,7 +567,8 @@ async function serialize(node, origin, ctx, depth) {
     if (interactions) out.reactions = interactions;
 
     const visible = node.visible !== false && !ctx.hidden;
-    const vectorLike = isIcon(node) || needsSvg(node);
+    const whole = isIcon(node) || isIllustration(node);
+    const vectorLike = whole || needsSvg(node);
     const imageFilled = hasImageFill(node);
     const exportsSvg = ctx.svg && visible && vectorLike && !imageFilled;
     if (exportsSvg) {
@@ -530,7 +580,7 @@ async function serialize(node, origin, ctx, depth) {
       track(ctx, node, node.exportAsync({ format: 'SVG_STRING' }), function (svg) {
         out.svg = svg;
       }, function () { delete out.svgBounds; });
-      if (isIcon(node)) return out;
+      if (whole) return out;
     }
     // Masked groups, rotated or mirrored containers and image-filled vectors
     // cannot be rebuilt exactly from boxes: ship their render and stop.
@@ -651,6 +701,7 @@ async function node(params) {
   };
   if (ctx.truncated) result.truncated = true;
   if (ctx.failures.length) result.failures = ctx.failures;
+  if (Object.keys(ctx.variableModes).length) result.variableModes = ctx.variableModes;
   if (params.images) {
     result.images = await timed(ctx, 'images', function () { return imageBytes(ctx.imageHashes, params.knownImages); });
   }
@@ -851,13 +902,15 @@ async function snapshot(params) {
     } catch (e) { /* too large to render */ }
     frames.push({ id: n.id, name: n.name, previewPng2x: preview, tree: tree });
   }
-  return {
+  const result = {
     exportedAt: new Date().toISOString(),
     fileName: figma.root.name,
     page: figma.currentPage.name,
     frames: frames,
     images: await imageBytes(ctx.imageHashes),
   };
+  if (Object.keys(ctx.variableModes).length) result.variableModes = ctx.variableModes;
+  return result;
 }
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
