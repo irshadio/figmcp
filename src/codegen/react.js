@@ -7,7 +7,7 @@ import {
 } from './layout.js';
 import { drawnAsSvg, hasImageFill, isTurned, straightLine, visibleChildren } from './nodes.js';
 import {
-  isPhoneScreen, minPageHeight, pinnedChildren, scrollsOnScreen, stretchesOnScreen,
+  isPhoneScreen, isWebPage, minPageHeight, pinnedChildren, scrollsOnScreen, spansPage, stretchesOnScreen,
 } from './page.js';
 import {
   backgroundClasses, blendClass, effectClasses, fillLayers, imagePlacement,
@@ -163,6 +163,9 @@ class Writer {
     this.connect = connect;
     this.ratios = ratios;
     this.screen = screen;
+    this.page = null;
+    this.sections = new Set();
+    this.columns = new Set();
     this.assetDir = assetDir ? assetDir.replace(/^\/+|\/+$/g, '') : null;
     this.lines = [];
     this.consts = new Map();
@@ -548,6 +551,7 @@ class Writer {
 
   /** Screen-mode placement options for a child of [parent]. */
   screenOpts(node, parent, siblings, scroller = false) {
+    if (this.page && this.sections.has(parent) && !inFlow(node, parent)) return this.pageOpts(node, parent);
     if (!this.screen || !parent) return {};
     const out = {};
     if (parent === this.screen && !inFlow(node, parent)) {
@@ -607,7 +611,9 @@ class Writer {
     }
     if (drawnAsSvg(node)) {
       // The SVG already carries the node's own paints, effects and opacity.
-      this.image(depth, node, pos, this.assets.svg(node.svg), 'Vector', {}, node.svgBounds);
+      // A vector stretched across a page fills its box instead of keeping its proportions.
+      const svg = this.page && opts.stretch ? node.svg.replace(/<svg\b(?![^>]*preserveAspectRatio)/, '<svg preserveAspectRatio="none"') : node.svg;
+      this.image(depth, node, pos, this.assets.svg(svg), 'Vector', {}, node.svgBounds);
       return;
     }
     if (node.render && this.assets.render) {
@@ -621,6 +627,7 @@ class Writer {
     const box = this.boxClasses(node, style, true);
     const strokes = strokeLayers(node, { clip: Boolean(node.clipsContent), radius: (grow) => radiusClasses(node, grow) });
     let classes = [...pos, ...containerClasses(node), ...box.classes, ...strokes.classes];
+    if (this.columns.has(node)) classes = columnPadding(classes, node, this.page.width);
     const scroll = this.screen && parent ? scrollsSideways(node, parent, this.screen) : null;
     if (scroll) {
       // On a phone a row wider than its room scrolls sideways instead of
@@ -632,7 +639,12 @@ class Writer {
         ? `the row scrolls sideways on screens narrower than ${num(scroll.below)}px, where its content would be cut off`
         : 'the row scrolls sideways on a phone: its content is wider than its room');
     }
-    const children = visibleChildren(node);
+    let children = visibleChildren(node);
+    if (node === this.page && node.clipsContent) {
+      // Layers wholly outside a clipping page never show; on a wider screen they would.
+      children = children.filter((c) => c.x + c.width > node.x && c.x < node.x + node.width &&
+        c.y + c.height > node.y && c.y < node.y + node.height);
+    }
     const element = parent ? containerElement(node, this.inside()) : null;
     const tag = element ? element.tag : 'div';
     if (element && (tag === 'button' || tag === 'a')) {
@@ -667,7 +679,8 @@ class Writer {
     if (pinned.size) {
       // Layers Figma keeps in place while the page scrolls: a box over the
       // screen holds them where the design has them.
-      this.raw(depth + 1, `<div className="${classList(['fixed', 'inset-x-0', 'top-0', 'z-10', 'mx-auto', 'w-full', `max-w-[${px(PHONE_MAX)}]`, 'h-dvh', 'pointer-events-none', '[&>*]:pointer-events-auto'])}">`);
+      this.raw(depth + 1, `<div className="${classList(['fixed', 'inset-x-0', 'top-0', 'z-10', 'mx-auto', 'w-full',
+        this.page ? `min-w-[${px(node.width)}]` : `max-w-[${px(PHONE_MAX)}]`, 'h-dvh', 'pointer-events-none', '[&>*]:pointer-events-auto'])}">`);
       this.stack.push('div');
       for (const child of children.filter((c) => pinned.has(c.id))) {
         this.node(child, node, depth + 2, { ...this.screenOpts(child, node, flowChildren) });
@@ -683,7 +696,29 @@ class Writer {
   }
 
   /** The root's box: the design's size, or on a phone screen the screen's. */
+  /**
+   * Where a layer of a web page goes: across the page when it spans the
+   * design's width (and the same inside it), else in the centred column,
+   * whatever its constraints: the column is the design.
+   */
+  pageOpts(node, section) {
+    if (spansPage(node, section) && !(node.type === 'TEXT' && node.textAutoResize === 'WIDTH_AND_HEIGHT')) {
+      // A full-width layer stretches, and so do the layers spanning it; a
+      // full-width layout keeps its content in the column with its padding.
+      if (!isAutoLayout(node) && !isGrid(node)) this.sections.add(node);
+      else this.columns.add(node);
+      return { stretch: true };
+    }
+    return { center: true };
+  }
+
   rootClasses(node) {
+    if (this.page) {
+      // The page fills the viewport and is never narrower than the design.
+      const vars = node.vars || {};
+      return ['relative', 'w-full', `min-w-[${px(node.width)}]`, `h-[${px(node.height)}]`,
+        ...['minHeight', 'maxHeight'].filter((k) => typeof node[k] === 'number').map((k) => `${k === 'minHeight' ? 'min-h' : 'max-h'}-[${tw(withVar(vars[k], px(node[k])))}]`)];
+    }
     if (!this.screen) return positionClasses(node, null);
     // The page fills the screen, and on a screen too short for its layers
     // keeps the shortest height they fit and scrolls.
@@ -762,6 +797,18 @@ function variableNames(tree) {
   return out;
 }
 
+/**
+ * A full-width layout's side padding, widened on a wider screen so its
+ * content stays in the page's centred column: the design's padding at the
+ * design width.
+ */
+function columnPadding(classes, node, width) {
+  const half = width / 2;
+  const side = (v) => `[max(${px(v)},calc(50%-${px(half - v)}))]`;
+  const kept = classes.filter((c) => !/^(px|pl|pr)-/.test(c));
+  return [...kept, `pl-${side(node.paddingLeft || 0)}`, `pr-${side(node.paddingRight || 0)}`];
+}
+
 function hasText(node) {
   if (!node || node.visible === false) return false;
   return node.type === 'TEXT' || (node.children || []).some(hasText);
@@ -790,18 +837,24 @@ function componentNameFor(root, taken) {
  *   { svg(text), image(hash), imageSize?(hash), render?({ base64 }) }.
  * [connect] returns a mapping ({ componentName, source, label }) for an
  * instance, or null. [screen] draws a phone-sized frame as a screen that
- * fills the viewport (default: portrait frames 300-480 wide). [repeats]
+ * fills the viewport (default: portrait frames 300-480 wide); [page] draws
+ * a frame 768 or more wide as a web page: it fills the viewport, never
+ * narrower than the design, its full-width sections stretch and the rest
+ * stays in a centred column (default: on). [repeats]
  * writes runs of repeated siblings as a data array and a .map();
  * [textStyles] names the classes of Figma text styles used more than once.
  */
 export function toReactTailwind(root, assets, {
-  connect = null, screen, assetDir = null, repeats = true, textStyles = true,
+  connect = null, screen, page, assetDir = null, repeats = true, textStyles = true,
 } = {}) {
   const tree = { ...root, x: root.x ?? 0, y: root.y ?? 0 };
   // A root shipped as one image is a picture, not a screen to lay out.
   const asScreen = screen ?? (isPhoneScreen(tree) && !tree.render && !drawnAsSvg(tree));
+  const asPage = !asScreen && (page ?? (isWebPage(tree) && !tree.render && !drawnAsSvg(tree)));
   const writer = new Writer(assets, { connect, ratios: autoLineRatios(tree), screen: asScreen ? tree : null, assetDir });
-  writer.pinned = asScreen ? pinnedChildren(tree) : new Set();
+  writer.page = asPage ? tree : null;
+  if (asPage) writer.sections.add(tree);
+  writer.pinned = asScreen || asPage ? pinnedChildren(tree) : new Set();
   writer.runs = repeats;
   writer.node(tree, null, 2);
   const header = [...writer.connected.values()].map((m) =>
@@ -837,6 +890,7 @@ export function toReactTailwind(root, assets, {
     fonts,
     textStyles: [...writer.textStyles].map(([name, classes]) => ({ name, classes: classList(classes) })),
     screen: asScreen,
+    page: asPage,
     scrolls: Boolean(asScreen && scrollsOnScreen(tree)),
     connected: [...writer.connected.values()],
     rasterized: writer.rasterized,

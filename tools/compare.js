@@ -54,8 +54,11 @@ export function families(n, out = new Set()) {
 /** Every node the code draws, with its box relative to the root. */
 export function expectedBoxes(tree, { skip = () => false } = {}) {
   const out = [];
+  // A layer wholly outside a clipping root never shows.
+  const outside = (n) => tree.clipsContent && n !== tree && (n.x + n.width <= tree.x || n.x >= tree.x + tree.width ||
+    n.y + n.height <= tree.y || n.y >= tree.y + tree.height);
   const walk = (n, depth) => {
-    if (!n || n.visible === false || n.isMask || skip(n)) return;
+    if (!n || n.visible === false || n.isMask || skip(n) || (depth === 1 && outside(n))) return;
     out.push({ id: n.id, name: n.name, type: n.type, x: n.x - tree.x, y: n.y - tree.y, width: n.width, height: n.height, depth,
       text: n.type === 'TEXT', families: [...families(n)] });
     if (n.svg || n.render) return;

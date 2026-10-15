@@ -17,6 +17,24 @@ export function isPhoneScreen(node) {
     node.height >= node.width * 1.5;
 }
 
+// Wide enough to be a tablet or desktop page.
+const PAGE_MIN_WIDTH = 768;
+
+/** A frame of a tablet's width or wider, drawn as a web page. */
+export function isWebPage(node) {
+  return Boolean(node) && SCREEN_TYPES.has(node.type) && node.width >= PAGE_MIN_WIDTH && !isPhoneScreen(node);
+}
+
+/**
+ * Whether a child of a web page spans the page's width (a bar, a banner, a
+ * footer): it stretches with the viewport. A child within a pixel of both
+ * sides counts.
+ */
+export function spansPage(node, page) {
+  const x = node.x - page.x;
+  return x <= 1 && x + node.width >= page.width - 1;
+}
+
 /** Whether the screen's page scrolls: Figma says so, or it is taller than a phone. */
 export function scrollsOnScreen(node) {
   return ['VERTICAL', 'BOTH'].includes(node.overflowDirection) || node.height > TALL_SCREEN;

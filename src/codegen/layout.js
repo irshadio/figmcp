@@ -72,7 +72,8 @@ export function gridAnchor(node, parent, key) {
  * siblings the layout places, [opts.count] their number. On a phone screen,
  * [opts.stretch] stretches a positioned child across the width,
  * [opts.narrow] lets a fixed width shrink to the column and [opts.shrink]
- * lets a child of a row shrink when the row is too narrow.
+ * lets a child of a row shrink when the row is too narrow. On a web page,
+ * [opts.center] keeps a positioned child in the page's centred column.
  */
 export function positionClasses(node, parent, opts = {}) {
   const vars = node.vars || {};
@@ -139,6 +140,7 @@ export function positionClasses(node, parent, opts = {}) {
   let cons = !WRAPPING_PARENTS.has(parent.type) && node.constraints
     ? node.constraints : { horizontal: 'MIN', vertical: 'MIN' };
   if (opts.stretch) cons = { ...cons, horizontal: 'STRETCH' };
+  else if (opts.center) cons = { ...cons, horizontal: 'CENTER' };
 
   switch (cons.horizontal) {
     case 'MAX':

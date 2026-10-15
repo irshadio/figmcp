@@ -222,8 +222,8 @@ test('phone frames are screens: they fill the viewport, stretch their sections a
   assert.match(rows.code, /[^:]overflow-x-auto overflow-y-hidden \[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden" data-name="Wide chips"/);
   assert.equal(rows.warnings.length, 3);
   assert.doesNotMatch(code({ ...phone, width: 1440, height: 1024, children: phone.children.slice(2, 3) }), /overflow-x-auto/, 'only phones scroll rows');
-  // Desktop frames keep their size; screen: false turns the mode off.
-  assert.match(code({ ...phone, width: 1440, height: 1024 }), /className="relative w-\[1440px\] h-\[1024px\]"/);
+  // screen: false turns the mode off; desktop frames are web pages.
+  assert.match(code({ ...phone, width: 1440, height: 1024 }), /className="relative w-full min-w-\[1440px\] h-\[1024px\]"/);
   assert.match(code(phone, { screen: false }), /className="relative w-\[390px\] h-\[844px\]"/);
 });
 
@@ -379,4 +379,31 @@ test('HTML + Tailwind is the same markup as a static page', () => {
     box('17:1', { strokeWeight: 2, strokes: [{ type: 'GRADIENT_LINEAR', visible: true, gradientTransform: [[1, 0, 0], [0, 1, 0]], gradientStops: [{ position: 0, color: black }, { position: 1, color: black }] }] })]), assets).code;
   assert.match(lines, />A &amp; B\nC &lt;d&gt;<\/p>/);
   assert.match(lines, /style="padding: 2px; background: linear-gradient\(90deg,#000000 0%,#000000 100%\); -webkit-mask: [^"]+; -webkit-mask-composite: xor; mask-composite: exclude"/);
+});
+
+test('desktop frames are web pages: full-width sections stretch, the rest stays in a centred column', () => {
+  const page = {
+    id: '18:1', name: 'Landing', type: 'FRAME', x: 0, y: 0, width: 1440, height: 900, clipsContent: true,
+    children: [
+      { ...box('18:2', { name: 'Hero', x: 0, y: 0, width: 1440, height: 400, type: 'GROUP' }), children: [
+        { ...box('18:3', { name: 'Backdrop', x: 0, y: 0, width: 1440, height: 400 }), type: 'VECTOR', svg: '<svg width="1440"/>' },
+        text('Headline', { id: '18:4', x: 120, y: 80 }),
+      ] },
+      { ...box('18:5', { name: 'Nav', x: 0, y: 400, width: 1440, height: 60, layoutMode: 'HORIZONTAL', paddingLeft: 120, paddingRight: 120 }), children: [] },
+      box('18:6', { name: 'Card', x: 120, y: 500, width: 300, height: 200, constraints: { horizontal: 'SCALE', vertical: 'MIN' } }),
+      box('18:7', { name: 'Off canvas', x: -200, y: 100, width: 50, height: 50 }),
+    ],
+  };
+  let svg = '';
+  const out = toReactTailwind(page, { ...assets, svg: (s) => { svg = s; return '/disk/a.svg'; } });
+  assert.equal(out.page, true);
+  assert.match(out.code, /className="relative w-full min-w-\[1440px\] h-\[900px\] overflow-clip" data-name="Landing"/);
+  assert.match(out.code, /className="absolute left-0 right-0 top-0 h-\[400px\]" data-name="Hero"/);
+  assert.match(out.code, /className="absolute left-0 right-0 top-0 h-\[400px\]" data-name="Backdrop"/, 'a layer spanning a stretched section stretches');
+  assert.match(svg, /^<svg preserveAspectRatio="none" width="1440"\/>/, 'and its vector fills the box');
+  assert.match(out.code, /left-\[calc\(50%-600px\)\] top-20[^"]*" data-name="T"/, 'the rest keeps its place in the centred column');
+  assert.match(out.code, /pl-\[max\(120px,calc\(50%-600px\)\)\] pr-\[max\(120px,calc\(50%-600px\)\)\][^"]*" data-name="Nav"/);
+  assert.match(out.code, /left-\[calc\(50%-600px\)\] w-\[300px\][^"]*" data-name="Card"/, 'scale constraints join the column too');
+  assert.doesNotMatch(out.code, /Off canvas/, 'a layer outside a clipping page never shows');
+  assert.match(code(page, { page: false }), /className="relative w-\[1440px\] h-\[900px\] overflow-clip"/);
 });
