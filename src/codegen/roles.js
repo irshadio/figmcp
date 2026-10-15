@@ -10,6 +10,7 @@ import { visiblePaints } from './util.js';
 
 const ICON_NAMES = /back|close|bell|notif|swap|edit|share|heart|like|fav|menu|search|filter|more|settings|cart|plus|add|minus|info|mic|camera|send/i;
 const DISCLOSURE = /chevron|arrow|disclosure|caret/i;
+const CLOSE = /close|dismiss|cross|^x$/i;
 const SWAP = /swap|exchange|reverse|switch/i;
 
 function texts(n, out = []) {
@@ -152,8 +153,13 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
       const ts = texts(n);
       const small = n.width <= 52 && n.height <= 52;
       const last = flow[flow.length - 1];
+      const pFlow = isAutoLayout(parent) ? visibleChildren(parent).filter((c) => inFlow(c, parent)) : [];
+      const topBar = parent.layoutMode === 'HORIZONTAL' && wide(parent) && parent.height <= 72 && parent.y - ry <= 160;
       if (small && isIcon(n) && ICON_NAMES.test(n.name)) {
         set(n, 'iconButton', { label: n.name.split('/').pop().trim() });
+      } else if (small && isIcon(n) && topBar && (pFlow[0] === n || (pFlow[pFlow.length - 1] === n && CLOSE.test(n.name)))) {
+        // The leading icon of a top bar goes back; a trailing cross closes.
+        set(n, 'iconButton', { label: CLOSE.test(n.name) ? 'Close' : 'Back' });
       } else if (isAutoLayout(n) && ts.length === 1 && n.height >= 36 && n.height <= 64 && (filled(n) || stroked(n)) &&
           radius(n) > 0 && kids.every((c) => c.type === 'TEXT' || isIcon(c))) {
         set(n, 'button', { primary: filled(n), label: ts[0].characters });

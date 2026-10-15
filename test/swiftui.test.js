@@ -245,6 +245,74 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.equal(structure.find((r) => r.role === 'button').label, 'Search flights');
 });
 
+/** An onboarding screen: a header drawn with the status bar, a hero image, a title and a sheet anchored to the bottom. */
+function onboarding() {
+  const status = frame('Navigation', {
+    y: 0, w: 393, h: 64, mode: 'HORIZONTAL', layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'FIXED',
+    children: [text('9:41', { x: 30, y: 20, size: 17 })],
+  });
+  const row = frame('Top bar', {
+    y: 64, w: 393, h: 56, mode: 'HORIZONTAL', paddingLeft: 16, paddingRight: 16, primaryAxisAlignItems: 'SPACE_BETWEEN',
+    layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'FIXED', fills: [solid(white)],
+    children: [icon('Component 6', 38, 38, { x: 16, y: 73 }), text('Skip', { x: 340, y: 82 })],
+  });
+  return frame('Onboarding', {
+    w: 393, h: 852, fills: [solid(white)],
+    children: [
+      { ...frame('Hero', { x: 10, y: 105, w: 376, h: 460, fills: [{ type: 'IMAGE', visible: true, scaleMode: 'FILL', imageHash: 'hero' }] }),
+        type: 'RECTANGLE', constraints: { horizontal: 'CENTER', vertical: 'CENTER' } },
+      frame('Header', {
+        y: 0, w: 393, h: 120, mode: 'VERTICAL', layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG', fills: [solid(white)],
+        children: [status, row],
+      }),
+      { ...frame('Sheet', {
+        y: 539, w: 393, h: 313, mode: 'VERTICAL', itemSpacing: 24, paddingTop: 18, paddingBottom: 34, paddingLeft: 16, paddingRight: 16,
+        layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG', counterAxisAlignItems: 'CENTER',
+        children: [
+          { ...text('Welcome to the app', { x: 16, y: 557, size: 32, w: 361 }), layoutSizingHorizontal: 'FILL', textAutoResize: 'HEIGHT' },
+          text('Organised wherever you are.', { x: 100, y: 626, size: 14, w: 190 }),
+        ],
+      }), constraints: { horizontal: 'STRETCH', vertical: 'MAX' } },
+    ],
+  });
+}
+
+test('toSwiftUI leaves the status bar to the phone and pins the header drawn with it', () => {
+  const { code } = toSwiftUI(onboarding(), assets);
+  assert.doesNotMatch(code, /9:41/);
+  assert.doesNotMatch(code, /\.offset\(y: -64\)/);
+  const header = code.slice(code.indexOf('.safeAreaInset(edge: .top'));
+  assert.match(header, /^\.safeAreaInset\(edge: \.top, spacing: 0\) \{\n\s+VStack/);
+  // Its fill runs on under the status bar.
+  assert.match(header, /\.ignoresSafeArea\(edges: \.top\)/);
+  // The leading icon of the top bar is a back button.
+  assert.match(header, /Button \{\n\s+action\(\.back\)\n\s+\} label: \{[\s\S]*?\.accessibilityLabel\("Back"\)/);
+  const o = onboarding();
+  const back = detectRoles(o).get(o.children[1].children[1].children[0].id);
+  assert.deepEqual([back.role, back.label], ['iconButton', 'Back']);
+});
+
+test('toSwiftUI lays a freely placed screen out as a column that reflows', () => {
+  const { code } = toSwiftUI(onboarding(), assets);
+  // The hero lies behind the page; the sheet stays at the bottom of a taller phone.
+  assert.match(code, /GeometryReader \{ proxy in\n\s+ScrollView \{\n\s+VStack\(alignment: \.leading, spacing: 0\) \{\n\s+Spacer\(minLength: 419\)/);
+  assert.match(code, /\.frame\(maxWidth: \.infinity, minHeight: proxy\.size\.height, alignment: \.topLeading\)\n\s+\.background\(alignment: \.topLeading\)/);
+  // Text wraps and grows instead of keeping one line.
+  assert.match(code, /Text\("Organised wherever you are\."\)[\s\S]*?\.fixedSize\(horizontal: false, vertical: true\)/);
+  assert.doesNotMatch(code, /\.fixedSize\(\)/);
+
+  const home = toSwiftUI(screen(), assets).code;
+  const body = home.slice(home.indexOf('var body'), home.indexOf('.safeAreaInset'));
+  assert.match(body, /ScrollView \{\n\s+VStack\(alignment: \.leading, spacing: \d+\) \{/);
+  assert.doesNotMatch(body, /\.offset\(y: \d/);
+  assert.match(body, /\.padding\(\.top, \d+\)/);
+  // Section heights grow from the design's.
+  assert.match(body, /\.frame\(minHeight: \d+, alignment: \.top\)/);
+  // Tab bar items show the large content viewer; control labels keep one line.
+  assert.match(home, /\.accessibilityShowsLargeContentViewer\(\)/);
+  assert.match(home, /Text\(item\.title\)[\s\S]*?\.lineLimit\(1\)/);
+});
+
 test('toSwiftUI puts what screens share in DesignSystem.swift', () => {
   const { shared } = toSwiftUI(screen(), assets);
   assert.match(shared, /^import SwiftUI\n/);

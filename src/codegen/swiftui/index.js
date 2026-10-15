@@ -7,7 +7,7 @@ import { inFlow, isAutoLayout, isGrid, sizingOf } from '../layout.js';
 import { drawnAsSvg, hasImageFill, isTurned, straightLine, visibleChildren } from '../nodes.js';
 import { sideWeights } from '../paint.js';
 import { detectRoles, SWIFTUI_PATTERNS } from '../roles.js';
-import { isPhoneScreen, minPageHeight, TALL_SCREEN, WRAPPING_PARENTS } from '../screen.js';
+import { isPhoneScreen, TALL_SCREEN, WRAPPING_PARENTS } from '../screen.js';
 import { systemUi } from '../system-ui.js';
 import { autoLineRatios, fontWeight, segmentsOf } from '../text.js';
 import { visiblePaints } from '../util.js';
@@ -41,6 +41,8 @@ const SWIFTUI_TYPES = new Set([
 const NAMED_COLORS = { white: 'FFFFFF', black: '000000' };
 // Roles whose layer is a Button calling the screen's action, and roles whose
 // items select on tap.
+// Roles whose text is a label.
+const CONTROLS = new Set(['tabBar', 'tabs', 'segmented', 'chips', 'button', 'iconButton']);
 const TAPPABLE = new Set(['button', 'iconButton', 'field', 'link', 'listRow']);
 const SELECTABLE = new Set(['tabBar', 'tabs', 'segmented', 'chips']);
 const TAPPABLE_ITEMS = new Set(['card', 'field', 'button', 'listRow', 'iconButton', 'tab']);
@@ -119,6 +121,44 @@ function padded(v, [top, right, bottom, left]) {
   return mod(v, 'padding', [[null, call('EdgeInsets', [['top', top], ['leading', left], ['bottom', bottom], ['trailing', right]])]]);
 }
 
+function holds(node, id) {
+  return (node.children || []).some((c) => c.id === id || holds(c, id));
+}
+
+/**
+ * [c], a layer of [screen], without the room of the phone's own UI drawn
+ * inside it: a header holding the status bar starts below it, a layer
+ * holding the home indicator ends above it. A column's padding is set so
+ * its first and last remaining children keep their places.
+ */
+function withoutSystemUi(c, screen, chrome) {
+  let out = c;
+  const column = isAutoLayout(c) && c.layoutMode === 'VERTICAL';
+  const remaining = (skip) => visibleChildren(c).filter((k) => inFlow(k, c) && k.id !== skip.id && !holds(k, skip.id));
+  const status = chrome.find((s) => s.kind === 'status bar' && holds(c, s.id));
+  if (status && c.y - screen.y <= status.box[1] + 1) {
+    const cut = status.box[1] + status.box[3] - (c.y - screen.y);
+    if (cut > 0 && cut < c.height) {
+      out = { ...out, y: c.y + cut, height: c.height - cut };
+      if (column) {
+        const next = remaining(status)[0];
+        out.paddingTop = next ? Math.max(0, next.y - out.y) : 0;
+      }
+    }
+  }
+  const home = chrome.find((s) => s.kind === 'home indicator' && holds(c, s.id));
+  if (home) {
+    const cut = c.y - screen.y + c.height - home.box[1];
+    if (cut > 0 && cut < out.height) {
+      out = { ...out, height: out.height - cut };
+      const list = column ? remaining(home) : [];
+      const prev = list[list.length - 1];
+      if (prev && visibleChildren(c).some((k) => k.id === home.id)) out.paddingBottom = Math.max(0, out.y + out.height - (prev.y + prev.height));
+    }
+  }
+  return out;
+}
+
 class SwiftUIWriter {
   constructor(assets, { connect = null, actions = null } = {}) {
     this.assets = assets;
@@ -140,6 +180,7 @@ class SwiftUIWriter {
     this.helpers = new Set();
     this.ratios = null;
     this.screen = null;
+    this.viewport = null;
     this.scrolls = false;
     // Layers left out (system UI, bars drawn apart), text and image
     // bindings of a repeated item, and what repeated items need.
@@ -436,6 +477,13 @@ class SwiftUIWriter {
       const own = (a, hug, S) => (a.mode === 'stretch' ? 'inf' : hug && !fixed ? null : S);
       return { w: own(p.h, hugW || content('x'), W), h: own(p.v, hugH || content('y'), H) };
     }
+    if (ctx.kind === 'page') {
+      const p = this.stackPlacement(node, ctx.parent);
+      return {
+        w: p.h.mode === 'stretch' ? 'inf' : (hugW || content('x')) && !fixed ? null : W,
+        h: (hugH || content('y')) && !fixed ? null : H,
+      };
+    }
     return {
       w: !fixed && (hugW || content('x')) ? null : W,
       h: !fixed && (hugH || content('y')) ? null : H,
@@ -444,7 +492,27 @@ class SwiftUIWriter {
 
   wrapPlace(node, ctx, v) {
     if (ctx.kind === 'stack') return this.positioned(node, ctx.parent, v);
+    if (ctx.kind === 'page') return this.pagePlace(node, ctx.parent, v);
     return v;
+  }
+
+  /** A section of a page column placed across the page by its constraints; the column places it down the page. */
+  pagePlace(node, parent, v) {
+    const p = this.stackPlacement(node, parent).h;
+    // A section sized by its content keeps at least the design's height, and grows with its text.
+    if (hugsHeight(node) || (isAutoLayout(node) && ownSizing(node, 'y') === 'HUG')) {
+      v = mod(v, 'frame', [['minHeight', round(node.height)], ['alignment', raw('.top')]]);
+    }
+    const across = (alignment) => mod(v, 'frame', [['maxWidth', INFINITY], ['alignment', raw(alignment)]]);
+    switch (p.mode) {
+      case 'stretch': return padded(v, [0, round(p.end), 0, round(p.start)]);
+      case 'max': v = padded(v, [0, round(p.end), 0, 0]); return across('.trailing');
+      case 'center': {
+        const out = mod(v, 'frame', [['maxWidth', INFINITY]]);
+        return round(p.offset) ? mod(out, 'offset', [['x', round(p.offset)]]) : out;
+      }
+      default: v = padded(v, [0, 0, 0, round(p.offset)]); return across('.leading');
+    }
   }
 
   /**
@@ -565,8 +633,20 @@ class SwiftUIWriter {
     }
     if (node.leadingTrim === 'CAP_HEIGHT') this.warn(node, 'the cap height trim is drawn as a centred line box');
     let v = textView(node, { ...this.textCtx(node), bind: this.bindings.get(node.id) || null }).view;
-    if (size.w === null && size.h === null) v = mod(v, 'fixedSize');
-    else if (size.h === null) v = mod(v, 'fixedSize', [['horizontal', false], ['vertical', true]]);
+    // A control's label stays on one line and shrinks a little before it
+    // truncates; other text wraps and grows with Dynamic Type.
+    const roles = this.ancestors.map((a) => this.roleOf(a));
+    const parent = this.ancestors[this.ancestors.length - 2];
+    // A label wider than its control in the design overflows it there too.
+    const inner = parent && parent.width - (parent.paddingLeft || 0) - (parent.paddingRight || 0);
+    if (size.w === null && size.h === null && inner && node.width > inner + 0.5) v = mod(v, 'fixedSize');
+    else if (size.w === null && roles.some((r) => CONTROLS.has(r)) && !/\n/.test(node.characters || '')) {
+      v = mod(v, 'lineLimit', [[null, 1]]);
+    } else if (size.h === null) {
+      v = mod(v, 'fixedSize', [['horizontal', false], ['vertical', true]]);
+      // In a row, text takes its width before the other items.
+      if (size.w === null && parent && parent.layoutMode === 'HORIZONTAL') v = mod(v, 'layoutPriority', [[null, 1]]);
+    }
     const fixedBox = node.textAutoResize === 'NONE' || node.textAutoResize === 'TRUNCATE';
     const align = alignmentOf(TEXT_X[node.textAlignHorizontal] ?? 'leading', fixedBox ? TEXT_Y[node.textAlignVertical] ?? 'top' : '');
     v = this.frame(v, size, align);
@@ -855,9 +935,9 @@ class SwiftUIWriter {
   /**
    * A phone screen as an app screen: the design's status bar and home
    * indicator are left to the phone, a top bar and a bottom bar (tab bar,
-   * action footer) stay put while the rest scrolls, and layers Figma keeps
-   * fixed when scrolling float over it. On a screen shorter than the
-   * design, the page keeps the shortest height its layers fit.
+   * action footer, input bar) stay put while the rest scrolls, and layers
+   * Figma keeps fixed when scrolling float over it. Freely placed layers
+   * become a column (see page).
    */
   screenRoot(node) {
     this.scrolls = ['VERTICAL', 'BOTH'].includes(node.overflowDirection) || node.height > TALL_SCREEN;
@@ -865,9 +945,11 @@ class SwiftUIWriter {
     chrome.forEach((c) => this.skip.add(c.id));
     const statusBottom = Math.max(0, ...chrome.filter((c) => c.kind === 'status bar').map((c) => c.box[1] + c.box[3]));
     const indicator = chrome.some((c) => c.kind === 'home indicator');
-    const all = (node.children || []).filter((c) => c.visible !== false && !this.skip.has(c.id));
     const W = node.width;
     const H = node.height;
+    // Where the app's own layers end: above a home indicator layer of its own.
+    const floor = Math.min(H, ...chrome.filter((c) => c.kind === 'home indicator' && c.box[1] + c.box[3] >= H - 2).map((c) => c.box[1]));
+    const all = (node.children || []).filter((c) => c.visible !== false && !this.skip.has(c.id)).map((c) => withoutSystemUi(c, node, chrome));
     const rel = (c) => ({ top: c.y - node.y, bottom: c.y - node.y + c.height });
     const filled = (c) => visiblePaints(c.fills).length > 0;
     const wide = (c) => c.width >= W * 0.95;
@@ -881,8 +963,8 @@ class SwiftUIWriter {
     const hero = topBar && !filled(topBar)
       ? all.find((c) => c !== topBar && wide(c) && rel(c).top <= rel(topBar).top && rel(c).bottom >= rel(topBar).bottom && filled(c))
       : null;
-    const bottoms = kids.filter((c) => c !== topBar && wide(c) && c.height <= 160 && rel(c).bottom >= H - 2 &&
-      (filled(c) || /tab ?bar|footer|bottom|nav/i.test(c.name)) && (!flowRoot || c === kids[kids.length - 1]));
+    const bottoms = kids.filter((c) => c !== topBar && wide(c) && c.height <= 160 && rel(c).bottom >= floor - 2 &&
+      (filled(c) || /tab ?bar|footer|bottom|nav|input ?bar|composer|toolbar/i.test(c.name)) && (!flowRoot || c === kids[kids.length - 1]));
     const bottomBar = bottoms.sort((a, b) => rel(b).top - rel(a).top)[0] || null;
     const fixedCount = flowRoot ? 0 : Math.max(0, Math.min(node.numberOfFixedChildren || 0, (node.children || []).length));
     const fixed = new Set((node.children || []).slice((node.children || []).length - fixedCount).map((c) => c.id));
@@ -891,9 +973,9 @@ class SwiftUIWriter {
       ((c.constraints && c.constraints.vertical === 'MAX') || fixed.has(c.id)) && rel(c).top > H / 2);
     const pinned = all.filter((c) => fixed.has(c.id) && c !== topBar && c !== bottomBar && !floating.includes(c));
     const top = topBar ? rel(topBar).bottom : statusBottom;
-    // The phone keeps its own room for the home indicator under the bottom bar.
+    // The phone keeps its own room for the home indicator under a bottom bar that runs to the screen's edge.
     const inset = indicator || (bottomBar && rel(bottomBar).bottom >= H - 2 && bottomBar.height > 70) ? 34 : 0;
-    const bottom = bottomBar ? H - rel(bottomBar).top : inset;
+    const bottom = bottomBar ? H - rel(bottomBar).top : H - floor + (floor < H ? 0 : inset);
     // Layers drawn apart from the page: skipped there, drawn here.
     const apart = (c, ctx) => {
       this.skip.delete(c.id);
@@ -915,24 +997,15 @@ class SwiftUIWriter {
       const inner = { ...node, paddingTop: Math.max(0, (node.paddingTop || 0) - statusBottom), paddingBottom: 0 };
       page = this.box({ ...inner, fills: [], effects: [], strokes: [] }, { w: 'inf', h: null });
     } else {
-      // Positions are kept relative to the content area between the bars.
-      const area = { ...node, y: node.y + top, height: Math.max(1, H - top - bottom), fills: [], children: node.children };
-      this.screen = area;
-      const content = all.filter((c) => !this.skip.has(c.id));
-      const ctx = { kind: 'stack', parent: area };
-      const items = content.map((c) => {
-        // A background that runs to the top edge runs on under the status bar.
-        if (rel(c).top <= 0 && wide(c) && !visibleChildren(c).length) {
-          return this.node({ ...c, y: c.y - 200, height: c.height + 200 }, ctx);
-        }
-        return this.node(c, ctx);
-      }).filter(Boolean);
-      const minH = minPageHeight(area, content.map((c) => ({ ...c, y: c.y })));
-      // Layers are laid over a page of the screen's width, so none can widen it.
-      page = mod(mod(clear(), 'frame', [['maxWidth', INFINITY], ['minHeight', round(minH)]]), 'overlay', [['alignment', raw('.topLeading')]],
-        [view('ZStack', [['alignment', raw('.topLeading')]], items)]);
+      page = this.page(node, all.filter((c) => !this.skip.has(c.id)), top, H - bottom);
     }
     let header = topBar ? bar(topBar, 0) : null;
+    const topPaint = topBar && filled(topBar) && this.fillItems(topBar).find((f) => f.paint);
+    if (topPaint && topBar.y > (node.children || []).find((c) => c.id === topBar.id).y) {
+      // A header drawn with the status bar runs on under it.
+      header = mod(header, 'background', [], [mod(view('', [[null, mod(view('Rectangle'), 'fill', [[null, topPaint.paint]])]]),
+        'ignoresSafeArea', [['edges', raw('.top')]])]);
+    }
     if (topBar && !filled(topBar)) {
       // Like a pinned sliver app bar: clear over the hero, then filled once scrolled.
       const scrolled = this.member('scrolled', 'scrolled');
@@ -948,14 +1021,121 @@ class SwiftUIWriter {
       }
     }
     let out = mod(view('ScrollView', [], [page]), 'scrollBounceBehavior', [[null, raw('.basedOnSize')]]);
+    // The visible height, for a page whose bottom layers stay at the bottom.
+    if (this.viewport) out = view('GeometryReader', [], [out], 'proxy');
     if (header) out = mod(out, 'safeAreaInset', [['edge', raw('.top')], ['spacing', 0]], [header]);
-    if (bottomBar) out = mod(out, 'safeAreaInset', [['edge', raw('.bottom')], ['spacing', 0]], [bar(bottomBar, inset)]);
+    if (bottomBar) out = mod(out, 'safeAreaInset', [['edge', raw('.bottom')], ['spacing', 0]], [bar(bottomBar, rel(bottomBar).bottom >= H - 2 ? inset : 0)]);
     const over = [...floating, ...pinned].map((c) => apart(c, { kind: 'stack', parent: { ...node, height: H - inset } })).filter(Boolean);
     this.skip = new Set(chrome.map((c) => c.id));
     if (over.length) out = mod(out, 'overlay', [['alignment', raw('.topLeading')]], [view('ZStack', [['alignment', raw('.topLeading')]], over)]);
     const fill = this.fillItems(node).find((f) => f.paint);
     if (fill) out = mod(out, 'background', [[null, fill.paint]]);
     return out;
+  }
+
+  /**
+   * The page of a screen whose layers are placed freely, between [top] and
+   * [end] (from the screen's top), as a column: the sections down the page
+   * follow each other with the design's gaps, so text that grows pushes
+   * what is below it down. Leaf layers lying behind sections (a hero, a
+   * glow) are the page's background, a small layer on a section is that
+   * section's overlay, layers side by side or overlapping keep their places
+   * in a ZStack, and on a screen that does not scroll, sections anchored to
+   * the bottom stay at the bottom of a taller phone.
+   */
+  page(node, layers, top, end) {
+    const area = { ...node, y: node.y + top, height: Math.max(1, end - top), fills: [], children: node.children };
+    this.screen = area;
+    const box = (c) => ({ top: c.y - area.y, bottom: c.y - area.y + c.height, left: c.x - node.x, right: c.x - node.x + c.width });
+    const overlapsY = (a, b) => box(a).top < box(b).bottom - 0.5 && box(b).top < box(a).bottom - 0.5;
+    const overlapsX = (a, b) => box(a).left < box(b).right - 0.5 && box(b).left < box(a).right - 0.5;
+    const leaf = (c) => !isText(c) && !visibleChildren(c).length;
+    const order = (c) => (node.children || []).findIndex((k) => k.id === c.id);
+    const behind = (c) => layers.find((o) => o !== c && !leaf(o) && overlapsY(c, o) && overlapsX(c, o));
+    const decor = layers.filter((c) => leaf(c) && (box(c).top < 0 || behind(c)));
+    // Biggest first, so a layer's host is placed before it.
+    const rest = layers.filter((c) => !decor.includes(c)).sort((a, b) => b.width * b.height - a.width * a.height);
+    const floats = new Map();
+    const sections = [];
+    for (const c of rest) {
+      const host = sections.find((o) => box(o).top <= box(c).top + 0.5 && box(o).bottom >= box(c).bottom - 0.5 && overlapsX(c, o) &&
+        o.width * o.height > 2 * c.width * c.height);
+      if (host) floats.set(host.id, [...(floats.get(host.id) || []), c]);
+      else sections.push(c);
+    }
+    sections.sort((a, b) => box(a).top - box(b).top || order(a) - order(b));
+    // Sections that overlap more than a little share a band.
+    const bands = [];
+    const bandTop = (b) => Math.min(...b.map((c) => box(c).top));
+    const bandBottom = (b) => Math.max(...b.map((c) => box(c).bottom));
+    for (const c of sections) {
+      const last = bands[bands.length - 1];
+      if (last && bandBottom(last) - box(c).top > Math.min(16, 0.25 * Math.min(c.height, ...last.map((x) => x.height)))) last.push(c);
+      else bands.push([c]);
+    }
+    const drawBand = (band) => {
+      if (band.length === 1) {
+        const [c] = band;
+        let v = this.node(c, { kind: 'page', parent: area });
+        const over = (floats.get(c.id) || []).sort((a, b) => order(a) - order(b))
+          .map((f) => this.node(f, { kind: 'stack', parent: { ...area, y: c.y, height: c.height } })).filter(Boolean);
+        if (v && over.length) v = mod(v, 'overlay', [['alignment', raw('.topLeading')]], [view('ZStack', [['alignment', raw('.topLeading')]], over)]);
+        return v;
+      }
+      const parent = { ...area, y: area.y + bandTop(band), height: bandBottom(band) - bandTop(band) };
+      const members = [...band, ...band.flatMap((c) => floats.get(c.id) || [])].sort((a, b) => order(a) - order(b));
+      const items = members.map((c) => this.node(c, { kind: 'stack', parent })).filter(Boolean);
+      return mod(view('ZStack', [['alignment', raw('.topLeading')]], items), 'frame', [
+        ['maxWidth', INFINITY], ['minHeight', round(parent.height)], ['alignment', raw('.topLeading')],
+      ]);
+    };
+    // On a screen that does not scroll, the last sections anchored to the bottom stay there.
+    let split = bands.length;
+    if (!this.scrolls) {
+      while (split > 0 && bands[split - 1].every((c) => c.constraints && c.constraints.vertical === 'MAX' && box(c).top > area.height / 2)) split--;
+    }
+    const gaps = bands.map((b, i) => round(i ? bandTop(b) - bandBottom(bands[i - 1]) : bandTop(b)));
+    const between = gaps.slice(1).filter((g, i) => i + 1 !== split);
+    const count = (g) => between.filter((x) => x === g).length;
+    const common = between.length ? between.reduce((a, b) => (count(b) > count(a) || (count(b) === count(a) && b < a) ? b : a)) : 0;
+    const spacing = Math.max(0, between.some((g) => g < common) ? Math.min(...between) : common);
+    const items = [];
+    bands.forEach((band, i) => {
+      let v = drawBand(band);
+      if (!v) return;
+      let gap = i ? gaps[i] - spacing : gaps[i];
+      if (i === split) {
+        this.viewport = 'proxy.size.height';
+        // The column's spacing lies on both sides of the spacer.
+        const room = gaps[i] - (i ? 2 : 1) * spacing;
+        items.push(view('Spacer', [['minLength', Math.max(0, room)]]));
+        gap = Math.min(0, room);
+      }
+      if (gap) v = mod(v, 'padding', [[null, raw('.top')], [null, gap]]);
+      items.push(v);
+    });
+    const last = bands.length ? round(area.height - bandBottom(bands[bands.length - 1])) : 0;
+    let page = view('VStack', [['alignment', raw('.leading')], ['spacing', spacing]], items);
+    if (last > 0) page = mod(page, 'padding', [[null, raw('.bottom')], [null, last]]);
+    page = this.viewport
+      ? mod(page, 'frame', [['maxWidth', INFINITY], ['minHeight', raw(this.viewport)], ['alignment', raw('.topLeading')]])
+      : mod(page, 'frame', [['maxWidth', INFINITY], ['alignment', raw('.topLeading')]]);
+    // Decor before the sections it lies on is drawn behind them, the rest over them.
+    const ctx = { kind: 'stack', parent: area };
+    const drawDecor = (c) => {
+      // A background that runs to the top edge runs on under the status bar.
+      if (c.y - node.y <= 0 && c.width >= node.width * 0.95) return this.node({ ...c, y: c.y - 200, height: c.height + 200 }, ctx);
+      return this.node(c, ctx);
+    };
+    const under = decor.filter((c) => !behind(c) || order(c) < order(behind(c))).map(drawDecor).filter(Boolean);
+    const above = decor.filter((c) => behind(c) && order(c) > order(behind(c))).map(drawDecor).filter(Boolean);
+    if (under.length) page = mod(page, 'background', [['alignment', raw('.topLeading')]], [view('ZStack', [['alignment', raw('.topLeading')]], under)]);
+    if (above.length) {
+      page = mod(page, 'overlay', [['alignment', raw('.topLeading')]], [
+        mod(view('ZStack', [['alignment', raw('.topLeading')]], above), 'allowsHitTesting', [[null, false]]),
+      ]);
+    }
+    return page;
   }
 
   /** The children's layout: { view, padding, align, overlay } for the box to frame. */
@@ -1121,6 +1301,8 @@ class SwiftUIWriter {
     if (statements.length) {
       item = this.button(item, statements, { style: SELECTABLE.has(kind) ? 'plain' : 'pressable' });
       if (state) item = mod(item, 'accessibilityAddTraits', [[null, raw(`index == ${state} ? .isSelected : []`)]]);
+      // At accessibility text sizes a long press shows the item enlarged, as in the system tab bar.
+      if (kind === 'tabBar') item = mod(item, 'accessibilityShowsLargeContentViewer');
     }
     const indexed = state || spread || (fires && !model);
     const body_ = [...(spread ? [raw('if index > 0 { Spacer(minLength: 0) }')] : []), item];
@@ -1198,6 +1380,10 @@ class SwiftUIWriter {
       const crossAt = { CENTER: '', MAX: row ? 'bottom' : 'trailing' }[node.counterAxisAlignItems] ?? (row ? 'top' : 'leading');
       const spread = between && !hugMain && flow.length > 1;
       const one = (c) => {
+        // An empty layer named Spacer in a stack that does not hug: the room between items.
+        if (!hugMain && /^spacer$/i.test(c.name) && !visibleChildren(c).length && !visiblePaints(c.fills).length) {
+          return view('Spacer', [['minLength', 0]]);
+        }
         const item = this.node(c, ctx);
         const extent = (row ? c.height : c.width) || 0;
         if (!item || hugCross || sizingOf(c, node, cross) === 'FILL' || extent <= availCross + 0.5) return item;
