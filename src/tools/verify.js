@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { detectFramework } from '../project.js';
+import { fitPng } from '../png.js';
 import { DATA_DIR } from '../store.js';
 import { fileKeySchema, guard, image, nodeIdSchema, text } from './common.js';
 
@@ -16,6 +17,8 @@ const NO_XCODE = 3;
 // What flutter-check writes into a project for a run, and removes after.
 const PROJECT_FILES = ['test/figmcp_check_test.dart', '.dart_tool/figmcp_check.json'];
 const TIMEOUT = 600000;
+// The longest edge of a diff image in a response.
+const DIFF_MAX = 1600;
 
 /** The flutter tool: [explicit], FLUTTER, PATH, or a usual install folder. */
 export function flutterTool(explicit) {
@@ -47,15 +50,28 @@ function hasXcode() {
 
 function runCheck(args, project = null, script = CHECK) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [script, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    // Its own process group, so a timeout also stops the tools it runs.
+    const child = spawn(process.execPath, [script, ...args], { stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
     let out = '';
     let err = '';
+    let timedOut = false;
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { err += d; });
-    const timer = setTimeout(() => child.kill(), TIMEOUT);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        child.kill('SIGKILL');
+      }
+    }, TIMEOUT);
     child.on('error', reject);
     child.on('close', (code) => {
       clearTimeout(timer);
+      if (timedOut) {
+        reject(new Error(`The check did not finish within ${TIMEOUT / 60000} minutes and was stopped.`));
+        return;
+      }
       if (project && script === CHECK) for (const f of PROJECT_FILES) fs.rmSync(path.join(project, f), { force: true });
       if (code === 0) {
         try {
@@ -82,45 +98,93 @@ function oneAtATime(task) {
 
 const brief = (list, n = 15) => (list.length > n ? [...list.slice(0, n), `… ${list.length - n} more`] : list);
 
-/** The SwiftUI check: compiles, renders in the simulator and compares pixels. */
-async function verifySwiftUI({ id, exported, file, view, fonts, device }) {
-  if (!hasXcode()) throw new Error('Xcode with the iOS simulator SDK is needed to check SwiftUI code, and was not found.');
-  const slug = id.replace(/[^0-9A-Za-z]+/g, '_');
+/** The folder above [file] (or [start]) with a Swift package or an Xcode project, or null. */
+function swiftProjectOf(file) {
+  return projectOf(file, isSwiftRoot);
+}
+
+/**
+ * [file] as an absolute path: as given when it exists, else relative to the
+ * project the server runs in.
+ */
+function resolveFile(file, isRoot) {
+  const absolute = path.resolve(file);
+  if (path.isAbsolute(file) || fs.existsSync(absolute)) return absolute;
+  const project = projectOf(path.join(process.cwd(), 'x'), isRoot);
+  return project ? path.resolve(project, file) : absolute;
+}
+
+/** Writes [exported] for the check script and runs [task] with its path, removing it after. */
+async function withExport(id, exported, task) {
   const dir = path.join(DATA_DIR, 'verify');
   fs.mkdirSync(dir, { recursive: true });
-  const exportFile = path.join(dir, `${slug}_${process.pid}_${Date.now()}.json`);
+  const exportFile = path.join(dir, `${id.replace(/[^0-9A-Za-z]+/g, '_')}_${process.pid}_${Date.now()}.json`);
   fs.writeFileSync(exportFile, JSON.stringify(exported.data));
-  const args = [id, '--export', exportFile, '--fetch-fonts', '--out', path.join(dir, `${slug}_swiftui${file ? '_project' : ''}`)];
-  for (const f of fonts) args.push('--fonts', f);
-  if (device) args.push('--device', device);
-  if (file) {
-    const absolute = path.resolve(file);
-    if (!fs.existsSync(absolute)) throw new Error(`${file} does not exist.`);
-    const project = projectOf(absolute, isSwiftRoot) || path.dirname(absolute);
-    args.push('--project', project, '--file', path.relative(project, absolute));
-    if (view) args.push('--view', view);
-  }
-  let report;
   try {
-    report = await oneAtATime(() => runCheck(args, null, SWIFTUI_CHECK));
+    return await task(exportFile, dir);
   } finally {
     fs.rmSync(exportFile, { force: true });
   }
+}
+
+const FAILED_AT = {
+  compile: 'The code did not compile, so nothing was rendered.',
+  assets: 'The asset catalog did not compile (actool), so nothing was rendered.',
+  sign: 'The check app could not be signed, so nothing was rendered.',
+};
+
+/**
+ * The framework to check: from the file's extension, else the project
+ * (a Swift project checks SwiftUI, a Flutter one Flutter). Other projects
+ * must say which.
+ */
+function frameworkOf(file, flutter) {
+  if (file && /\.swift$/i.test(file)) return 'swiftui';
+  if (file && /\.dart$/i.test(file)) return 'flutter';
+  const detected = detectFramework({});
+  if (detected === 'swiftui' || detected === 'flutter') return detected;
+  if (flutter || (flutterTool() && !hasXcode())) return 'flutter';
+  if (hasXcode() && !flutterTool()) return 'swiftui';
+  throw new Error('verify_code checks Flutter or SwiftUI code, and this project is neither a Flutter project nor a Swift ' +
+    'package or Xcode project: pass framework: "flutter" or "swiftui".');
+}
+
+/** The SwiftUI check: compiles, renders in the simulator and compares pixels. */
+async function verifySwiftUI({ id, exported, file, view, fonts, device }) {
+  if (!hasXcode()) throw new Error('Xcode with the iOS simulator SDK is needed to check SwiftUI code, and was not found.');
+  const args = [];
+  if (file) {
+    const absolute = resolveFile(file, isSwiftRoot);
+    if (!fs.existsSync(absolute)) throw new Error(`${file} does not exist.`);
+    if (!/\.swift$/.test(absolute)) throw new Error(`${file} is not a .swift file.`);
+    const project = swiftProjectOf(absolute) || path.dirname(absolute);
+    args.push('--project', project, '--file', path.relative(project, absolute));
+    if (view) args.push('--view', view);
+  }
+  for (const f of fonts) args.push('--fonts', f);
+  if (device) args.push('--device', device);
+  const slug = id.replace(/[^0-9A-Za-z]+/g, '_');
+  const report = await withExport(id, exported, (exportFile, dir) => oneAtATime(() => runCheck([
+    id, '--export', exportFile, '--fetch-fonts', '--out', path.join(dir, `${slug}_swiftui${file ? '_project' : ''}`), ...args,
+  ], null, SWIFTUI_CHECK)));
   const summary = {
     node: report.node,
     view: report.view,
     ...(exported.source === 'snapshot' ? { source: `snapshot saved ${exported.exportedAt || 'earlier'}` } : {}),
-    compiler: report.compiler,
+    compiler: { errors: brief(report.compiler.errors, 30), warnings: brief(report.compiler.warnings, 15) },
     fontsNotFound: report.fontsNotBundled,
     ...(report.generatorWarnings.length ? { generatorWarnings: brief(report.generatorWarnings) } : {}),
     files: report.files,
   };
-  if (!report.pixels) return [text(summary), text('The code did not compile, so nothing was rendered.')];
-  Object.assign(summary, { renderedSize: report.renderedSize, pixels: report.pixels, systemUiLeftOut: report.systemUiLeftOut });
+  if (report.failedAt === 'render') {
+    return [text({ ...summary, device: report.device }), text(`The code compiled, but rendering failed: ${report.renderError}`)];
+  }
+  if (!report.pixels) return [text(summary), text(FAILED_AT[report.failedAt] || FAILED_AT.compile)];
+  Object.assign(summary, { device: report.device, renderedSize: report.renderedSize, pixels: report.pixels, systemUiLeftOut: report.systemUiLeftOut });
   return [
     text(summary),
     text('Diff (the design in grey, differing pixels in red, system UI left out in blue):'),
-    image(fs.readFileSync(report.files.diff)),
+    image(fitPng(fs.readFileSync(report.files.diff), DIFF_MAX)),
   ];
 }
 
@@ -155,19 +219,22 @@ export function registerVerifyTools(server, bridge, source) {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
       framework: z.enum(['flutter', 'swiftui']).optional().describe(
-        'What to check: flutter or swiftui (default: swiftui for a Swift package or Xcode project, else flutter).'),
+        'What to check: flutter or swiftui (default: from the file\'s extension, else swiftui for a Swift package or ' +
+        'Xcode project and flutter for a Flutter project).'),
       file: z.string().optional().describe(
-        'The .dart file with the widget, under the project\'s lib/, or the .swift file with the view (absolute, or relative to the project).'),
+        'The .dart file with the widget, under the project\'s lib/, or the .swift file with the view (absolute, or relative to the ' +
+        'project root above the server\'s working folder).'),
       widget: z.string().optional().describe('The widget class or SwiftUI view struct in `file` (default: its first one).'),
       viewport: z.string().regex(/^\d+(\.\d+)?x\d+(\.\d+)?$/).optional().describe(
         'Flutter: lay the code out on a screen of this size, e.g. "360x780", and report runtime errors ' +
         '(overflows) and layers pushed off screen instead of comparing.'),
       fonts: z.array(z.string()).optional().describe('Folders with font files (default: the project\'s assets/fonts and the system fonts).'),
       flutter: z.string().optional().describe('Flutter: path of the flutter tool, when it is not on PATH.'),
-      device: z.string().optional().describe('SwiftUI: the simulator to render in, by udid or name (default: the booted iPhone, else an available one).'),
+      device: z.string().optional().describe('SwiftUI: the simulator to render in, by udid or name (default: a booted iPhone 17 Pro, another booted iPhone, ' +
+        'else an iPhone Pro it boots). Renders are 2x and light mode on any device.'),
     },
   }, guard(async ({ nodeId, framework, file, widget, viewport, fonts = [], flutter, device }) => {
-    const chosen = framework || (detectFramework({ clientLanguages: file ? path.extname(file).slice(1) : '' }) === 'swiftui' ? 'swiftui' : 'flutter');
+    const chosen = framework || frameworkOf(file, flutter);
     if (chosen === 'swiftui') {
       const { id } = await source.resolveId(nodeId);
       const exported = await source.exportData(id);
@@ -179,33 +246,27 @@ export function registerVerifyTools(server, bridge, source) {
     if (viewport && viewport.split('x').some((v) => Number(v) < 1 || Number(v) > 10000)) {
       throw new Error('Each side of `viewport` must be between 1 and 10000.');
     }
-    const { id } = await source.resolveId(nodeId);
-    const exported = await source.exportData(id);
-    if (!exported.data.frames[0].previewPng2x) throw new Error(`There is no render of ${id} to compare with.`);
-    const slug = id.replace(/[^0-9A-Za-z]+/g, '_');
-    const dir = path.join(DATA_DIR, 'verify');
-    fs.mkdirSync(dir, { recursive: true });
-    const exportFile = path.join(dir, `${slug}_${process.pid}_${Date.now()}.json`);
-    fs.writeFileSync(exportFile, JSON.stringify(exported.data));
-    const args = [id, '--export', exportFile, '--flutter', tool, '--fetch-fonts',
-      '--out', path.join(dir, `${slug}${file ? '_project' : ''}${viewport ? `_${viewport}` : ''}`)];
-    for (const f of fonts) args.push('--fonts', f);
-    if (viewport) args.push('--viewport', viewport);
+    const args = [];
     if (file) {
-      const absolute = path.resolve(file);
-      const project = fs.existsSync(absolute) ? projectOf(absolute, hasPubspec) : projectOf(path.join(process.cwd(), 'lib', 'x'), hasPubspec);
+      const absolute = resolveFile(file, hasPubspec);
+      const project = projectOf(fs.existsSync(absolute) ? absolute : path.join(process.cwd(), 'lib', 'x'), hasPubspec);
       if (!project) throw new Error(`No pubspec.yaml above ${file}.`);
       const inProject = fs.existsSync(absolute) ? absolute : path.resolve(project, file);
       if (!fs.existsSync(inProject)) throw new Error(`${file} does not exist.`);
       args.push('--project', project, '--file', path.relative(project, inProject));
       if (widget) args.push('--class', widget);
     }
-    let report;
-    try {
-      report = await oneAtATime(() => runCheck(args, args.includes('--project') ? args[args.indexOf('--project') + 1] : null));
-    } finally {
-      fs.rmSync(exportFile, { force: true });
-    }
+    for (const f of fonts) args.push('--fonts', f);
+    if (viewport) args.push('--viewport', viewport);
+    const { id } = await source.resolveId(nodeId);
+    const exported = await source.exportData(id);
+    if (!exported.data.frames[0].previewPng2x) throw new Error(`There is no render of ${id} to compare with.`);
+    const slug = id.replace(/[^0-9A-Za-z]+/g, '_');
+    const project = args.includes('--project') ? args[args.indexOf('--project') + 1] : null;
+    const report = await withExport(id, exported, (exportFile, dir) => oneAtATime(() => runCheck([
+      id, '--export', exportFile, '--flutter', tool, '--fetch-fonts',
+      '--out', path.join(dir, `${slug}${file ? '_project' : ''}${viewport ? `_${viewport}` : ''}`), ...args,
+    ], project)));
     const summary = {
       node: report.node,
       ...(exported.source === 'snapshot' ? { source: `snapshot saved ${exported.exportedAt || 'earlier'}` } : {}),
@@ -218,7 +279,7 @@ export function registerVerifyTools(server, bridge, source) {
       return [
         text(summary),
         text(`Rendered at ${report.viewport.width}x${report.viewport.height}:`),
-        image(fs.readFileSync(report.files.rendered)),
+        image(fitPng(fs.readFileSync(report.files.rendered), DIFF_MAX)),
       ];
     }
     Object.assign(summary, {
@@ -236,7 +297,7 @@ export function registerVerifyTools(server, bridge, source) {
     return [
       text(summary),
       text('Diff (the design in grey, differing pixels in red):'),
-      image(fs.readFileSync(report.files.diff)),
+      image(fitPng(fs.readFileSync(report.files.diff), DIFF_MAX)),
     ];
   }));
 }
