@@ -13,6 +13,18 @@ const DISCLOSURE = /chevron|arrow|disclosure|caret/i;
 // A role tag in a layer name, or [no-role] to keep a layer plain.
 const TAG = /\s*\[([A-Za-z-]+)\]\s*/;
 const FORCED = ['tabBar', 'tabs', 'segmented', 'chips', 'carousel', 'grid', 'listRow', 'field', 'button', 'iconButton', 'card'];
+// Text inputs: by layer name, or a placeholder inviting typing.
+const INPUT_NAMES = /field|input|text ?box|search ?bar|message|composer|email|password|phone/i;
+const PLACEHOLDER = /^(search|type|enter|write|message|email|password|your )/i;
+// What a text input holds: its content type, keyboard and whether it is secure.
+const CONTENT_TYPES = [
+  [/password|passcode|pin\b/i, { textContentType: '.password', secure: true }],
+  [/e-?mail/i, { textContentType: '.emailAddress', keyboardType: '.emailAddress' }],
+  [/phone|mobile/i, { textContentType: '.telephoneNumber', keyboardType: '.phonePad' }],
+  [/\bname\b/i, { textContentType: '.name' }],
+  [/search/i, { submitLabel: '.search' }],
+  [/message|chat|comment/i, { submitLabel: '.send' }],
+];
 const CLOSE = /close|dismiss|cross|^x$/i;
 const SWAP = /swap|exchange|reverse|switch/i;
 
@@ -234,6 +246,13 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
         // The leading icon of a top bar goes back; a trailing cross closes.
         set(n, 'iconButton', { label: CLOSE.test(n.name) ? 'Close' : 'Back' }, 'medium',
           `a ${Math.round(n.width)}pt icon ${pFlow[0] === n ? 'leading' : 'trailing'} a top bar`);
+      } else if (isAutoLayout(n) && ts.length === 1 && n.height >= 32 && n.height <= 64 && (filled(n) || stroked(n)) &&
+          n.primaryAxisAlignItems !== 'CENTER' && (INPUT_NAMES.test(n.name) || PLACEHOLDER.test(ts[0].characters)) &&
+          kids.every((c) => c.type === 'TEXT' || isIcon(c))) {
+        const words = `${n.name} ${ts[0].characters}`;
+        const content = CONTENT_TYPES.find(([re]) => re.test(words));
+        set(n, 'textInput', { placeholder: ts[0].id, label: ts[0].characters, content: content ? content[1] : null }, 'medium',
+          `a ${stroked(n) ? 'outlined' : 'filled'} box holding one placeholder "${ts[0].characters}"${INPUT_NAMES.test(n.name) ? `, named "${n.name}"` : ''}`);
       } else if (isAutoLayout(n) && ts.length === 1 && n.height >= 36 && n.height <= 64 && (filled(n) || stroked(n)) &&
           radius(n) > 0 && kids.every((c) => c.type === 'TEXT' || isIcon(c))) {
         set(n, 'button', { primary: filled(n), label: ts[0].characters }, 'high',
@@ -302,4 +321,5 @@ export const SWIFTUI_PATTERNS = {
   field: 'form field: a Button that opens its picker (destination, date, travellers)',
   button: 'button: Button with a press-scale style',
   iconButton: 'icon button: Button with an accessibility label',
+  textInput: 'text input: TextField bound to state, with its content type and keyboard (SecureField for a password)',
 };

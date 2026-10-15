@@ -226,6 +226,7 @@ class SwiftUIWriter {
     this.viewport = null;
     this.words = new Set();
     this.metrics = new Map();
+    this.inputs = new Map();
     this.scrolls = false;
     // Layers left out (system UI, bars drawn apart), text and image
     // bindings of a repeated item, and what repeated items need.
@@ -508,6 +509,27 @@ class SwiftUIWriter {
     return name;
   }
 
+  /**
+   * A text field in place of [text], the placeholder of [input]: bound to a
+   * state, in the placeholder's font, with the content type and keyboard
+   * the input's name or placeholder imply.
+   */
+  textInput(node, input, text) {
+    const state = this.member(`${input.label} text`, 'text');
+    this.states.push(`  @State private var ${state} = ""`);
+    const content = input.content || {};
+    const font = (text.mods || []).find((m) => m.name === 'font');
+    const color = (text.mods || []).find((m) => m.name === 'foregroundStyle');
+    // The design's text is the placeholder, in its colour; typed text keeps the primary colour.
+    const prompt = color ? mod(view('Text', [[null, str(input.label)]]), 'foregroundStyle', color.args) : null;
+    let v = view(content.secure ? 'SecureField' : 'TextField', [[null, str(input.label)], ['text', raw(`$${state}`)], ['prompt', prompt]]);
+    if (font) v = mod(v, 'font', font.args);
+    if (content.textContentType) v = mod(v, 'textContentType', [[null, raw(content.textContentType)]]);
+    if (content.keyboardType) v = mod(v, 'keyboardType', [[null, raw(content.keyboardType)]]);
+    if (content.submitLabel) v = mod(v, 'submitLabel', [[null, raw(content.submitLabel)]]);
+    return v;
+  }
+
   /** The environment's Dynamic Type size, declared once. */
   dynamicTypeSize() {
     return this.environment('dynamicTypeSize', 'dynamicTypeSize');
@@ -771,6 +793,8 @@ class SwiftUIWriter {
     }
     if (node.leadingTrim === 'CAP_HEIGHT') this.warn(node, 'the cap height trim is drawn as a centred line box');
     let v = textView(node, { ...this.textCtx(node), bind: this.bindings.get(node.id) || null }).view;
+    const input = !this.inComponent && this.inputs.get(node.id);
+    if (input) v = this.textInput(node, input, v);
     // A control's label stays on one line and shrinks a little before it
     // truncates; other text wraps and grows with Dynamic Type.
     const roles = this.ancestors.map((a) => this.roleOf(a));
@@ -1685,6 +1709,7 @@ export function toSwiftUI(root, assets, options = {}) {
   writer.structName = structName;
   writer.typeNames.add(structName);
   writer.roles = detectRoles(rootNode);
+  for (const r of writer.roles.values()) if (r.role === 'textInput') writer.inputs.set(r.placeholder, r);
   writer.parents = new Map();
   writer.byId = new Map();
   const index = (n) => {

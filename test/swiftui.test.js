@@ -396,6 +396,25 @@ test('toSwiftUI follows prototype taps: back dismisses, navigation names the des
   assert.deepEqual([skip.role, skip.prototype.destination.name, skip.evidence], ['button', 'Home', 'a prototype tap']);
 });
 
+test('toSwiftUI draws text inputs as fields bound to state, with their content type', () => {
+  const input = (name, placeholder, y) => frame(name, {
+    x: 16, y, w: 300, h: 48, mode: 'HORIZONTAL', paddingLeft: 12, itemSpacing: 12, cornerRadius: 24, fills: [solid(white)],
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [icon('emoji', 22, 22, { x: 28, y: y + 13 }), { ...text(placeholder, { x: 62, y: y + 15, size: 16 }), layoutSizingHorizontal: 'FILL' }],
+  });
+  const root = frame('Sign in', {
+    w: 390, h: 844, fills: [solid(white)],
+    children: [input('Email', 'Email address', 120), input('Password field', 'Password', 190), input('Message Field', 'Message', 260)],
+  });
+  const { code } = toSwiftUI(root, assets);
+  assert.match(code, /@State private var emailAddressText = ""/);
+  assert.match(code, /TextField\(\n\s+"Email address",\n\s+text: \$emailAddressText,\n\s+prompt: Text\("Email address"\)/);
+  assert.match(code, /\.textContentType\(\.emailAddress\)\n\s+\.keyboardType\(\.emailAddress\)/);
+  assert.match(code, /SecureField\(\n\s+"Password"/);
+  assert.match(code, /\.textContentType\(\.password\)/);
+  assert.match(code, /\.submitLabel\(\.send\)/);
+});
+
 test('toSwiftUI puts what screens share in DesignSystem.swift', () => {
   const { shared } = toSwiftUI(screen(), assets);
   assert.match(shared, /^import SwiftUI\n/);
