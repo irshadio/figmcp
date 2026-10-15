@@ -10,33 +10,81 @@ const DEFAULT_CATALOG = 'Assets.xcassets';
 const SKIPPED_DIRS = new Set(['node_modules', '.build', '.git', 'Pods', 'DerivedData', 'build', 'Carthage']);
 const CATALOG_DEPTH = 3;
 
-/** Whether [cwd] holds a Swift package or an Xcode project or workspace. */
-function isSwiftProject(cwd) {
+const XCODE = /\.(xcodeproj|xcworkspace)$/;
+
+function list(dir) {
   try {
-    return fs.existsSync(path.join(cwd, 'Package.swift')) ||
-      fs.readdirSync(cwd).some((f) => /\.(xcodeproj|xcworkspace)$/.test(f));
+    return fs.readdirSync(dir);
   } catch {
-    return false;
+    return [];
   }
 }
 
 /**
+ * Whether [cwd] holds a Swift app: a Swift package, an Xcode project or
+ * workspace, an XcodeGen project.yml or a Tuist Project.swift, at the top or
+ * one folder down (ios/App.xcodeproj) when no other app's manifest is at the top.
+ */
+function isSwiftProject(cwd) {
+  const top = list(cwd);
+  const swift = (names) => names.some((f) => XCODE.test(f) || f === 'Package.swift' || f === 'Project.swift' || f === 'Tuist') ||
+    (names.includes('project.yml') && /^\s*targets:/m.test(read(path.join(cwd, 'project.yml'))));
+  if (swift(top)) return true;
+  // React Native, Ionic and Flutter apps keep an ios/ folder of their own.
+  if (top.includes('package.json') || top.includes('pubspec.yaml')) return false;
+  return top.filter((f) => !f.startsWith('.') && !SKIPPED_DIRS.has(f)).some((f) => list(path.join(cwd, f)).some((g) => XCODE.test(g)));
+}
+
+function read(file) {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+/** Whether [cwd] is a Swift package without an app project: its resources load from Bundle.module. */
+export function isSwiftPackage(cwd = process.cwd()) {
+  const top = list(cwd);
+  return top.includes('Package.swift') && !top.some((f) => XCODE.test(f));
+}
+
+/** The frameworks [said] names, in the order they are tested. */
+function namedFrameworks(said) {
+  const out = [];
+  if (/flutter|dart/.test(said)) out.push('flutter');
+  if (/react.?native|expo|ionic|capacitor|cordova/.test(said)) out.push('react');
+  if (/swiftui|\bswift\b|\bios\b|xcode|uikit|objective-?c/.test(said)) out.push('swiftui');
+  if (/react|next|vue|svelte|angular|html|tailwind|javascript|typescript/.test(said)) out.push('react');
+  return [...new Set(out)];
+}
+
+/** The framework of the project in [cwd] by its files, or null. */
+function projectFramework(cwd) {
+  if (fs.existsSync(path.join(cwd, 'pubspec.yaml'))) return 'flutter';
+  if (isSwiftProject(cwd)) return 'swiftui';
+  return fs.existsSync(path.join(cwd, 'package.json')) ? 'react' : null;
+}
+
+/**
  * 'flutter', 'swiftui' or 'react': the explicit [framework], then the
- * client's frameworks and languages, then FIGMA_LOCAL_MCP_FRAMEWORK, then
- * a pubspec.yaml, a Swift package or an Xcode project in [cwd]; React
- * otherwise.
+ * client's frameworks and languages (the project decides between several),
+ * then FIGMA_LOCAL_MCP_FRAMEWORK, then the project's files (a pubspec.yaml,
+ * a Swift package or Xcode project); React otherwise.
  */
 export function detectFramework({ framework, clientFrameworks, clientLanguages } = {}, cwd = process.cwd()) {
   if (FRAMEWORKS.includes(framework)) return framework;
   const said = `${clientFrameworks || ''} ${clientLanguages || ''}`.toLowerCase();
+  // Cross-platform frameworks name iOS too: they decide.
   if (/flutter|dart/.test(said)) return 'flutter';
-  if (/react.?native|expo/.test(said)) return 'react';
-  if (/swiftui|swift|\bios\b|xcode|uikit|objective-?c/.test(said)) return 'swiftui';
-  if (/react|next|vue|svelte|angular|html|tailwind|javascript|typescript/.test(said)) return 'react';
+  if (/react.?native|expo|ionic|capacitor|cordova/.test(said)) return 'react';
+  const named = namedFrameworks(said);
+  const own = projectFramework(cwd);
+  if (named.length === 1) return named[0];
+  if (named.length > 1) return named.includes(own) ? own : named[0];
   const env = String(process.env.FIGMA_LOCAL_MCP_FRAMEWORK || '').toLowerCase();
   if (FRAMEWORKS.includes(env)) return env;
-  if (fs.existsSync(path.join(cwd, 'pubspec.yaml'))) return 'flutter';
-  return isSwiftProject(cwd) ? 'swiftui' : 'react';
+  return own || 'react';
 }
 
 /** Whether the project's pubspec.yaml depends on flutter_screenutil. */
@@ -92,6 +140,9 @@ export function assetCatalog(cwd = process.cwd()) {
     }
   };
   walk(cwd, 1);
-  found.sort((a, b) => a.depth - b.depth || (b.rel.endsWith(DEFAULT_CATALOG) ? 1 : 0) - (a.rel.endsWith(DEFAULT_CATALOG) ? 1 : 0));
+  // The app's own catalog: not a preview, widget, extension or test target's.
+  const aside = (f) => /preview|widget|extension|intent|tests?\b|watch|clip/i.test(f.rel);
+  const named = (f) => path.basename(f.rel) === DEFAULT_CATALOG;
+  found.sort((a, b) => aside(a) - aside(b) || a.depth - b.depth || named(b) - named(a) || a.rel.localeCompare(b.rel));
   return found.length ? found[0].rel.split(path.sep).join('/') : DEFAULT_CATALOG;
 }

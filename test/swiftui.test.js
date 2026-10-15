@@ -469,9 +469,48 @@ test('detectFramework picks swiftui from the client and the project', () => {
     assert.equal(assetCatalog(dir), 'App/Resources/Media.xcassets');
     fs.mkdirSync(path.join(dir, 'App', 'Assets.xcassets'));
     assert.equal(assetCatalog(dir), 'App/Assets.xcassets');
+    // Preview and widget catalogs are not the app's.
+    fs.mkdirSync(path.join(dir, 'App', 'Preview Content', 'Preview Assets.xcassets'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'AWidget', 'Assets.xcassets'), { recursive: true });
+    assert.equal(assetCatalog(dir), 'App/Assets.xcassets');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('detectFramework finds nested and generated Xcode projects, and lets the project decide between languages', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'figmcp-detect-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'ios', 'App.xcodeproj'), { recursive: true });
+    assert.equal(detectFramework({}, dir), 'swiftui');
+    assert.equal(detectFramework({ clientLanguages: 'javascript, swift' }, dir), 'swiftui');
+    // A React Native app keeps an ios/ folder of its own.
+    fs.writeFileSync(path.join(dir, 'package.json'), '{}');
+    assert.equal(detectFramework({}, dir), 'react');
+    assert.equal(detectFramework({ clientLanguages: 'javascript, swift' }, dir), 'react');
+    assert.equal(detectFramework({ clientFrameworks: 'ionic', clientLanguages: 'ios' }, dir), 'react');
+    const gen = fs.mkdtempSync(path.join(os.tmpdir(), 'figmcp-xcodegen-'));
+    fs.writeFileSync(path.join(gen, 'project.yml'), 'name: App\ntargets:\n  App:\n    type: application\n');
+    assert.equal(detectFramework({}, gen), 'swiftui');
+    fs.rmSync(gen, { recursive: true, force: true });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a metadata outline too long for one response is cut by depth', async () => {
+  const { boundedMetadataXml, toMetadataXml } = await import('../src/codegen/metadata.js');
+  const leaf = (i) => ({ id: `3:${i}`, name: 'Label', type: 'TEXT', x: 0, y: 0, width: 1, height: 1 });
+  const root = { id: '1:1', name: 'Page', type: 'FRAME', x: 0, y: 0, width: 1, height: 1,
+    children: Array.from({ length: 60 }, (_, i) => ({ id: `2:${i}`, name: 'Row', type: 'FRAME', x: 0, y: 0, width: 1, height: 1,
+      children: Array.from({ length: 30 }, (_, j) => leaf(i * 30 + j)) })) };
+  const whole = toMetadataXml(root);
+  const cut = boundedMetadataXml(root, 10000);
+  assert.ok(whole.length > 10000);
+  assert.ok(cut.xml.length <= 10000);
+  assert.equal(cut.depth, 2);
+  assert.match(cut.xml, /<frame id="2:0" name="Row" x="0" y="0" width="1" height="1" child-count="30" \/>/);
+  assert.equal(boundedMetadataXml(root, Infinity).depth, Infinity);
 });
 
 const xcrun = spawnSync('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-path'], { encoding: 'utf8' });

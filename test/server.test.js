@@ -25,7 +25,7 @@ test('reads imported snapshots without the plugin', async () => {
 
   const ctx = await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', fileKey: 'abc' } });
   assert.match(texts(ctx), /export default function SampleScreen/);
-  assert.match(texts(ctx), /"imgPhoto": \{\s+"url": "http:\/\/localhost:\d+\/assets\/[a-f0-9]{64}\.png"/);
+  assert.match(texts(ctx), /"imgPhoto": "http:\/\/localhost:\d+\/assets\/[a-f0-9]{64}\.png"/);
   assert.ok(ctx.content.some((c) => c.type === 'image'), 'includes a screenshot');
 
   const shot = await client.callTool({ name: 'get_screenshot', arguments: { nodeId: '10:3', enableBase64Response: true } });

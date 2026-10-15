@@ -132,9 +132,22 @@ test('Xcode projects get SwiftUI with image sets, fonts, the shared design syste
   const ctx = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true } }));
   assert.match(ctx, /^import SwiftUI\n\nstruct SampleScreen: View \{/);
   // Image sets go into the project's own catalog; SVGs keep their vector data.
-  assert.match(ctx, /mkdir -p 'App\/Resources\/Media\.xcassets\/arrow\.imageset'/);
+  assert.match(ctx, /\nC='App\/Resources\/Media\.xcassets'\n/);
+  assert.match(ctx, /\nadd 'arrow' '[^']+\.svg' svg 1/);
   assert.match(ctx, /"preserves-vector-representation":true/);
-  // Only the weights in use are listed for Info.plist.
+  // The script builds valid image sets.
+  const lines = ctx.slice(ctx.indexOf('add() {')).split('\n');
+  const script = lines.slice(0, lines.findIndex((l, i) => i > 0 && !/^(add |  |\}|C=)/.test(l))).join('\n');
+  const run = spawnSync('sh', ['-c', script], { cwd: dir, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  const set = path.join(dir, 'App', 'Resources', 'Media.xcassets', 'arrow.imageset');
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(set, 'Contents.json'), 'utf8')), {
+    images: [{ filename: 'arrow.svg', idiom: 'universal' }], info: { author: 'xcode', version: 1 },
+    properties: { 'preserves-vector-representation': true },
+  });
+  assert.ok(fs.existsSync(path.join(set, 'arrow.svg')));
+  // Faces by PostScript name; only the weights in use are listed for Info.plist.
+  assert.match(ctx, /PostScript name/);
   assert.match(ctx, /<key>UIAppFonts<\/key><array><string>Inter-Medium\.ttf<\/string><string>Inter-SemiBold\.ttf<\/string><\/array>/);
   assert.match(ctx, /- Inter: 500, 600/);
   // The shared declarations come once, apart from the screen.
@@ -249,4 +262,19 @@ test('place_image sends a local image to the plugin and refuses other files', as
   assert.match(texts(missing), /does not exist/);
   plugin.stop();
   await transport.close();
+});
+
+test('a node the open file does not have comes from a snapshot, else a clear error', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  const { client } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  await plugin.ready();
+  const missing = await client.callTool({ name: 'get_metadata', arguments: { nodeId: '99:99' } });
+  assert.ok(missing.isError);
+  assert.match(texts(missing), /Figma could not read node 99:99 in the open file, and no saved snapshot contains it/);
+  assert.match(texts(missing), /Node not found in the open file: 99:99/);
+  const status = texts(await client.callTool({ name: 'whoami', arguments: {} }));
+  assert.ok(status.length < 4000);
+  plugin.stop();
 });

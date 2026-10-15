@@ -1,14 +1,15 @@
 // Design read tools: design context, metadata, screenshots, variables and
 // assets.
+import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { listMappings, lookup } from '../connect.js';
 import { toFlutter } from '../codegen/flutter/index.js';
-import { toMetadataXml } from '../codegen/metadata.js';
+import { boundedMetadataXml } from '../codegen/metadata.js';
 import { countNodes, toReactTailwind } from '../codegen/react.js';
 import { toSwiftUI } from '../codegen/swiftui/index.js';
 import { systemUi } from '../codegen/system-ui.js';
-import { assetCatalog, detectFramework, flutterAssetDirs, FRAMEWORKS, usesScreenUtil } from '../project.js';
+import { assetCatalog, detectFramework, flutterAssetDirs, FRAMEWORKS, isSwiftPackage, usesScreenUtil } from '../project.js';
 import { ASSETS, imageExt, saveAsset, snapshotSummary } from '../store.js';
 import {
   assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, resolver, selectionBlock,
@@ -20,6 +21,11 @@ const CODE_NODE_LIMIT = 800;
 const READ_NODE_LIMIT = 2500;
 const FORCED_NODE_LIMIT = 30000;
 const ASSET_CAP = 20;
+// Responses stay within what clients take in one tool result (about 25k
+// tokens); longer code is asked for part by part.
+const CODE_CHARS = 80000;
+const METADATA_CHARS = 60000;
+const SCREENSHOT_MAX = 4096;
 
 const FLUTTER_GUIDANCE =
   'IMPORTANT: the code above is reference Flutter code generated from the ' +
@@ -77,8 +83,7 @@ const SWIFTUI_GUIDANCE =
   'the listed assets to the asset catalog and the fonts to the target. The ' +
   'shared DesignSystem.swift block (Color(hex:), the button style, DesignTokens, ' +
   'AppFonts) goes into the target once: merge later screens\' tokens into it ' +
-  'rather than adding copies. The code needs iOS 17 or later. Keep the ' +
-  '#Preview, and compare the result with the screenshot.';
+  'rather than adding copies. Keep the #Preview, and compare the result with the screenshot.';
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
@@ -131,8 +136,11 @@ function flutterDetails(result, tree) {
     const dirs = [...new Set(entries.map(([asset]) => path.posix.dirname(asset)))];
     const copy = [`mkdir -p ${dirs.map(shellQuote).join(' ')}`,
       ...entries.map(([asset, file]) => `cp ${shellQuote(file)} ${shellQuote(asset)}`)].join('\n');
-    out.push(text('Assets used in the code (asset path -> file on disk). Copy them into the ' +
-      `project root and declare the folders under flutter: assets: in pubspec.yaml:\n${JSON.stringify(result.assets, null, 2)}\n\n${copy}`));
+    const clashes = entries.filter(([asset, file]) => differs(path.resolve(asset), file)).map(([asset]) => asset);
+    out.push(text('Assets used in the code: each line copies a file on disk to the asset path the code uses. Run it in the ' +
+      `project root and declare the folders under flutter: assets: in pubspec.yaml:\n\n${copy}` +
+      (clashes.length ? `\n\nThe project already has other files at ${clashes.join(', ')}: rename these assets in the code ` +
+        'and the commands instead of overwriting them.' : '')));
   }
   const fonts = Object.entries(result.fonts);
   if (fonts.length) {
@@ -142,43 +150,66 @@ function flutterDetails(result, tree) {
   return [...out, ...sharedDetails(result, tree)];
 }
 
-/** Shell commands that add [name] to the asset catalog [catalog] as an image set. */
-function imageSetCommands(catalog, name, info) {
-  const set = `${catalog}/${name}.imageset`;
-  const file = `${name}.${info.ext}`;
-  const contents = {
-    images: [{ filename: file, idiom: 'universal' }],
-    info: { author: 'xcode', version: 1 },
-    ...(info.vector ? { properties: { 'preserves-vector-representation': true } } : {}),
-  };
-  return [
-    `mkdir -p ${shellQuote(set)}`,
-    `cp ${shellQuote(info.source)} ${shellQuote(`${set}/${file}`)}`,
-    `printf '%s' ${shellQuote(JSON.stringify(contents))} > ${shellQuote(`${set}/Contents.json`)}`,
-  ].join('\n');
+/** Whether [file] exists with other bytes than [source]. */
+function differs(file, source) {
+  try {
+    return fs.statSync(file).isFile() && !fs.readFileSync(file).equals(fs.readFileSync(source));
+  } catch {
+    return false;
+  }
+}
+
+/** Whether the image set [name] of [catalog] (under the project) holds another image than [source]. */
+export function catalogTaken(catalog, name, source) {
+  const set = path.resolve(catalog, `${name}.imageset`);
+  let files;
+  try {
+    files = fs.readdirSync(set).filter((f) => f !== 'Contents.json');
+  } catch {
+    return false;
+  }
+  return files.length > 0 && files.every((f) => differs(path.join(set, f), source));
+}
+
+/** A shell script adding the [entries] ([name, { source, ext, vector }]) to [catalog] as image sets, each path once. */
+function imageSetScript(catalog, entries) {
+  const lines = [
+    'add() { # name, file, ext, vector',
+    '  s="$C/$1.imageset"; mkdir -p "$s" && cp "$2" "$s/$1.$3" &&',
+    '  printf \'{"images":[{"filename":"%s","idiom":"universal"}],"info":{"author":"xcode","version":1}%s}\' "$1.$3" \\',
+    '    "$([ "$4" = 1 ] && echo \',"properties":{"preserves-vector-representation":true}\')" > "$s/Contents.json"',
+    '}',
+    `C=${shellQuote(catalog)}`,
+    ...entries.map(([name, info]) => `add ${shellQuote(name)} ${shellQuote(info.source)} ${info.ext} ${info.vector ? 1 : 0}`),
+  ];
+  return lines.join('\n');
 }
 
 /** The SwiftUI response blocks after the code: asset catalog, fonts, structure, then the shared notes. */
-function swiftuiDetails(result, tree, catalog) {
+function swiftuiDetails(result, tree, catalog, pkg = false) {
   const out = [];
   const entries = Object.entries(result.assets);
   if (entries.length) {
-    const map = Object.fromEntries(entries.map(([name, info]) => [name, info.source]));
-    out.push(text(`Assets used in the code, by asset catalog name (Image("name")) -> file on disk. Add each as an image set ` +
-      `of ${catalog} (SVGs keep their vector data; one-colour icons are tinted in code):\n${JSON.stringify(map, null, 2)}\n\n${
-      entries.map(([name, info]) => imageSetCommands(catalog, name, info)).join('\n')}`));
+    out.push(text(`Assets used in the code, by asset catalog name (Image("name")). This script adds each as an image set of ${catalog} ` +
+      '(SVGs keep their vector data; one-colour icons are tinted in code); names the catalog already gives other images were ' +
+      `avoided:\n\n${imageSetScript(catalog, entries)}` +
+      (pkg ? '\n\nIn a Swift package, put the catalog under the target\'s resources and load images with Image("name", bundle: .module).' : '')));
   }
   const fonts = Object.entries(result.fonts);
   if (fonts.length) {
     const files = fonts.flatMap(([family, weights]) => weights.map((w) => `<string>${fontFileName(family, w)}</string>`));
-    out.push(text('Fonts used (add each family\'s files for these weights to the app target and list them under UIAppFonts ' +
-      `in Info.plist, e.g. <key>UIAppFonts</key><array>${files.join('')}</array>):\n${
+    out.push(text('Fonts used. The code names each face by its PostScript name (Family-Style, e.g. Inter-SemiBold): add the ' +
+      'files of these faces to the target' + (pkg
+        ? ' and register them at launch with CTFontManagerRegisterFontsForURL (a package has no Info.plist)'
+        : ` and list them under UIAppFonts in Info.plist, e.g. <key>UIAppFonts</key><array>${files.join('')}</array>`) +
+      `; check each face's PostScript name in Font Book if a face does not load:\n${
       fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
   }
   if (result.shared) {
-    out.push(text('Shared design system (DesignSystem.swift) the screen needs: Color(hex:), the button style, DesignTokens ' +
-      'and AppFonts. Add it to the target once; when the project already has one from an earlier screen, merge the new ' +
-      `tokens and fonts into it instead of adding a second copy:\n\n${result.shared}`));
+    out.push(text('Shared design system (DesignSystem.swift) the screen needs: Color(hex:), the button style, DesignTokens, ' +
+      'AppFonts and the line height modifier. Add it to the target once; when the project already has one from an earlier ' +
+      'screen, merge the new tokens and fonts into it instead of adding a second copy. The next block is the file.'));
+    out.push(text(result.shared));
   }
   out.push(text('The code needs iOS 17 or later (scrollTargetBehavior, contentMargins, containerRelativeFrame, sensoryFeedback, ' +
     'onGeometryChange): set the deployment target to 17.0 or higher.'));
@@ -267,11 +298,13 @@ export function registerDesignTools(server, bridge, source) {
     const count = countNodes(node.tree);
     if (node.truncated || (count > CODE_NODE_LIMIT && !forceCode)) {
       const outline = node.truncated ? (await source.outline(id)).tree : node.tree;
+      const meta = boundedMetadataXml(outline, METADATA_CHARS);
       return [
         text(`The node has ${node.truncated ? 'more than ' : ''}${node.truncated ? countNodes(outline) : count} layers, ` +
           'too many for code in one response. Here is its metadata instead; call ' +
-          'get_design_context on the child node ids you need, or pass forceCode: true.'),
-        text(toMetadataXml(outline)),
+          'get_design_context on the child node ids you need, or pass forceCode: true.' +
+          (meta.depth !== Infinity ? ` The outline goes ${meta.depth} levels deep; call get_metadata on a child for more.` : '')),
+        text(meta.xml),
         sourceNote(node),
       ];
     }
@@ -291,18 +324,15 @@ export function registerDesignTools(server, bridge, source) {
         }
       } else if (framework === 'swiftui') {
         const catalog = assetsDir ? assetsDir.replace(/\/+$/, '') : assetCatalog();
-        const result = toSwiftUI(node.tree, fileResolver(node.images), { connect, screen });
-        out = [text(result.code), ...swiftuiDetails(result, node.tree, catalog)];
+        const files = { ...fileResolver(node.images), taken: (name, file) => catalogTaken(catalog, name, file) };
+        const result = toSwiftUI(node.tree, files, { connect, screen });
+        out = [text(result.code), ...swiftuiDetails(result, node.tree, catalog, isSwiftPackage())];
       } else {
         const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });
         out = [text(result.code)];
         if (Object.keys(result.assets).length) {
-          const map = {};
-          for (const [name, url] of Object.entries(result.assets)) {
-            map[name] = { url, path: path.join(ASSETS, url.split('/').pop()) };
-          }
-          out.push(text('Assets used in the code (served by the local MCP server; ' +
-            `the same files are on disk at each path):\n${JSON.stringify(map, null, 2)}`));
+          out.push(text('Assets used in the code, served by the local MCP server; each file is also on disk in ' +
+            `${ASSETS} under the last part of its URL:\n${JSON.stringify(result.assets, null, 2)}`));
         }
         if (result.connected.length) {
           out.push(text('Mapped components used (Code Connect). Their exact look is in ' +
@@ -318,7 +348,17 @@ export function registerDesignTools(server, bridge, source) {
       // still gives the structure.
       out = [
         text(`Code generation failed (${e.message}). Here is the node's metadata instead.`),
-        text(toMetadataXml(node.tree)),
+        text(boundedMetadataXml(node.tree, METADATA_CHARS).xml),
+      ];
+    }
+    if (out[0].text.length > CODE_CHARS && !forceCode) {
+      // Code this long would be cut off by the client: the parts are asked for one by one.
+      const meta = boundedMetadataXml(node.tree, METADATA_CHARS);
+      return [
+        text(`The code for this node is ${out[0].text.length} characters, more than one response holds. Call ` +
+          'get_design_context on the sections you need (their ids are below), or pass forceCode: true for all of it.'),
+        text(meta.xml),
+        sourceNote(node),
       ];
     }
     if (node.failures && node.failures.length) {
@@ -361,7 +401,12 @@ export function registerDesignTools(server, bridge, source) {
     }
     const { id } = await source.resolveId(nodeId);
     const outline = await source.outline(id);
-    return [selectionBlock(info), text(toMetadataXml(outline.tree)), sourceNote(outline)];
+    const meta = boundedMetadataXml(outline.tree, METADATA_CHARS);
+    return [
+      selectionBlock(info), text(meta.xml),
+      meta.depth !== Infinity && text(`The outline is cut ${meta.depth} levels deep to fit one response: call get_metadata on a child for its layers.`),
+      sourceNote(outline),
+    ];
   }));
 
   server.registerTool('get_screenshot', {
@@ -376,8 +421,8 @@ export function registerDesignTools(server, bridge, source) {
     inputSchema: {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
-      maxDimension: z.number().int().positive().max(65536).optional()
-        .describe('Longest edge of the PNG in pixels (default 1024).'),
+      maxDimension: z.number().int().positive().max(SCREENSHOT_MAX).optional()
+        .describe(`Longest edge of the PNG in pixels (default 1024, at most ${SCREENSHOT_MAX}).`),
       contentsOnly: z.boolean().optional()
         .describe('Render the node in isolation, without overlapping content.'),
       enableBase64Response: z.boolean().optional()

@@ -408,7 +408,9 @@ class SwiftUIWriter {
     if (this.files.has(source)) return this.files.get(source);
     const base = sIdent(name, kind === 'svg' ? 'icon' : 'image');
     let asset = base;
-    for (let i = 2; this.names.has(asset); i++) asset = `${base}${i}`;
+    // A name the project's catalog already gives another image is not reused.
+    const taken = (n) => this.names.has(n) || Boolean(this.assets.taken && this.assets.taken(n, source));
+    for (let i = 2; taken(asset); i++) asset = `${base}${i}`;
     this.files.set(source, asset);
     this.names.set(asset, { source, ext, vector: kind === 'svg' });
     return asset;
