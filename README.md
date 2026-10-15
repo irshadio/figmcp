@@ -20,6 +20,10 @@ No Figma API calls. No rate limits.</p>
 </p>
 
 <p>
+<a href="https://glama.ai/mcp/servers/irshadio/figmcp"><img src="https://glama.ai/mcp/servers/irshadio/figmcp/badges/score.svg" alt="figmcp MCP server – quality and maintenance score on Glama"></a>
+</p>
+
+<p>
 <a href="https://figmcp.web.app">Website</a> ·
 <a href="https://figmcp.web.app/docs">Docs</a> ·
 <a href="https://figmcp.web.app/docs/installation">Installation</a> ·
