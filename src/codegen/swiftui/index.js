@@ -296,6 +296,10 @@ class SwiftUIWriter {
   constructor(assets, { connect = null, actions = null, probe = false } = {}) {
     this.assets = assets;
     this.probe = Boolean(probe);
+    // In check mode: an item layer's id -> the first item's id, and
+    // "index#first id" -> the layer, for the check to read item boxes back.
+    this.probeAlias = new Map();
+    this.probeIds = {};
     this.connect = connect;
     this.actions = actions || {};
     this.tapped = false;
@@ -581,7 +585,13 @@ class SwiftUIWriter {
     core = this.limits(node, size, core);
     core = this.interactive(node, core);
     // For the render check: each layer reports where it was laid out.
-    if (this.probe && !this.inComponent) core = mod(core, 'checkProbe', [[null, str(node.id)]]);
+    if (this.probe) {
+      // An item's layers are probed by the first item's ids and the item's
+      // place, so every item draws the same code.
+      const alias = this.probeAlias.get(node.id);
+      if (!this.inComponent) core = mod(core, 'checkProbe', [[null, str(node.id)]]);
+      else if (alias) core = mod(core, 'checkProbe', [[null, raw(`probe + ${sString(alias)}`)]]);
+    }
     if (ctx.kind !== 'root' && !this.inComponent && EXTRACT_TYPES.has(node.type) && countVisible(node) >= EXTRACT_SIZE) core = this.extract(node, core);
     return this.wrapPlace(node, ctx, core);
   }
@@ -1681,6 +1691,19 @@ class SwiftUIWriter {
         for (const f of fields) this.bindings.delete(f.nodes[index].id);
       }
     };
+    if (this.probe && !this.inComponent) {
+      items.forEach((item, i) => {
+        const pair = (a, b) => {
+          if (!a || !b || a.visible === false) return;
+          this.probeAlias.set(a.id, b.id);
+          this.probeIds[`${i}#${b.id}`] = a.id;
+          const ka = visibleChildren(a);
+          const kb = visibleChildren(b);
+          ka.forEach((c, j) => pair(c, kb[j]));
+        };
+        pair(item, items[0]);
+      });
+    }
     const screenMetrics = this.metrics;
     this.metrics = new Map();
     const trees = items.map(render);
@@ -1753,6 +1776,7 @@ class SwiftUIWriter {
       model ? `  let item: ${model}` : null,
       selected >= 0 ? '  var isSelected = false' : null,
       indicator ? '  var namespace: Namespace.ID' : null,
+      this.probe ? '  var probe = ""' : null,
     ].filter(Boolean);
     this.components.push([`struct ${viewName}: View {`, ...props, '', '  var body: some View {', `    ${body}`, '  }', '}'].join('\n'));
     let data = null;
@@ -1780,6 +1804,7 @@ class SwiftUIWriter {
       model ? ['item', raw('item')] : null,
       state ? ['isSelected', raw(`index == ${state}`)] : null,
       namespace ? ['namespace', raw(namespace)] : null,
+      this.probe ? ['probe', raw('"\\(index)#"')] : null,
     ].filter(Boolean));
     if (statements.length) {
       item = this.button(item, statements, { style: SELECTABLE.has(kind) ? 'plain' : 'pressable' });
@@ -1789,7 +1814,7 @@ class SwiftUIWriter {
     }
     // Equal rows would share an identity: they are told apart by their place.
     const unique = !model || new Set(items.map((n, i) => fields.map((f) => f.values[i]).join('\u0000'))).size === items.length;
-    const indexed = state || spread || (fires && !model) || !unique;
+    const indexed = state || spread || (fires && !model) || !unique || this.probe;
     const body_ = [...(spread ? [raw('if index > 0 { Spacer(minLength: 0) }')] : []), item];
     if (!model) return view('ForEach', [[null, raw(`0..<${items.length}`)], ['id', raw('\\.self')]], body_, indexed ? 'index' : '_');
     if (indexed) return view('ForEach', [[null, raw(`Array(${data}.enumerated())`)], ['id', raw('\\.offset')]], body_, 'index, item');
@@ -2093,6 +2118,7 @@ export function toSwiftUI(root, assets, options = {}) {
     rasterized: writer.rasterized,
     warnings: writer.warnings,
     structure: structureOf(writer.roles, rootNode),
+    ...(options.probe ? { probeIds: writer.probeIds } : {}),
   };
 }
 

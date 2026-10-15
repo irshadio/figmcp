@@ -630,8 +630,12 @@ async function check(opts, design, out, sdk) {
     report.files.diff = path.join(out, 'diff.png');
     const layout = `${rendered}.layout.json`;
     if (generated && fs.existsSync(layout)) {
-      // Layers the screen draws itself (items drawn from data are not probed), outside the phone's own UI.
+      // Layers drawn, outside the phone's own UI.
       const rects = JSON.parse(fs.readFileSync(layout, 'utf8'));
+      // Items drawn from data report "index#first item's id": read back as their own layers.
+      for (const [key, rect] of Object.entries(rects)) {
+        if (key.includes('#') && generated.probeIds[key]) rects[generated.probeIds[key]] = rect;
+      }
       const chromeIds = new Set(chrome.map((c) => c.id));
       const boxes = expectedBoxes(tree, { skip: (n) => chromeIds.has(n.id) }).filter((b) => rects[b.id]);
       const cmp = compareBoxes(boxes, rects, new Set(fontFamilies.filter((f) => !fontsNotBundled.includes(f))), tree);
