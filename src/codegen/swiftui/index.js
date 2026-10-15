@@ -41,6 +41,8 @@ const SWIFTUI_TYPES = new Set([
 const NAMED_COLORS = { white: 'FFFFFF', black: '000000' };
 // Roles whose layer is a Button calling the screen's action, and roles whose
 // items select on tap.
+// Item runs, by the word their name ends in.
+const CONTAINER_ROLES = { carousel: 'carousel', grid: 'grid', chips: 'chips', tabs: 'picker', segmented: 'picker', tabBar: 'tab bar' };
 // Roles whose text is a label.
 const CONTROLS = new Set(['tabBar', 'tabs', 'segmented', 'chips', 'button', 'iconButton']);
 const TAPPABLE = new Set(['button', 'iconButton', 'field', 'link', 'listRow']);
@@ -572,6 +574,13 @@ class SwiftUIWriter {
     if (role && role.label) return role.label;
     const short = (t) => String(t || '').trim().split(/\s+/).slice(0, 3).join(' ');
     if (isText(node)) return short(node.characters);
+    // A run of items is named after its section, not after the text of one item.
+    if (role && CONTAINER_ROLES[role.role]) {
+      for (let p = this.parents.get(node.id); p; p = this.parents.get(p.id)) {
+        if (!isGenericName(p.name)) return `${p.name} ${CONTAINER_ROLES[role.role]}`;
+      }
+      return CONTAINER_ROLES[role.role];
+    }
     if (role && role.title) {
       const title = this.byId.get(role.title);
       if (title) return short(title.characters);
