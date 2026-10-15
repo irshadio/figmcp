@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -117,6 +118,57 @@ test('Flutter projects get Flutter code with their asset folders', async () => {
   assert.match(scaled, /Lengths use flutter_screenutil/);
   const plain = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true, screenUtil: false } }));
   assert.doesNotMatch(plain, /flutter_screenutil/);
+  plugin.stop();
+});
+
+test('Xcode projects get SwiftUI with image sets, fonts, the shared design system and the structure', async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  fs.mkdirSync(path.join(dir, 'App.xcodeproj'));
+  fs.mkdirSync(path.join(dir, 'App', 'Resources', 'Media.xcassets'), { recursive: true });
+  const { client } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  await plugin.ready();
+  const ctx = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true } }));
+  assert.match(ctx, /^import SwiftUI\n\nstruct SampleScreen: View \{/);
+  // Image sets go into the project's own catalog; SVGs keep their vector data.
+  assert.match(ctx, /mkdir -p 'App\/Resources\/Media\.xcassets\/arrow\.imageset'/);
+  assert.match(ctx, /"preserves-vector-representation":true/);
+  // Only the weights in use are listed for Info.plist.
+  assert.match(ctx, /<key>UIAppFonts<\/key><array><string>Inter-Medium\.ttf<\/string><string>Inter-SemiBold\.ttf<\/string><\/array>/);
+  assert.match(ctx, /- Inter: 500, 600/);
+  // The shared declarations come once, apart from the screen.
+  const screen = ctx.slice(0, ctx.indexOf('Assets used'));
+  assert.doesNotMatch(screen, /extension Color|enum AppFonts|enum DesignTokens/);
+  assert.match(ctx, /Shared design system \(DesignSystem\.swift\)[\s\S]*import SwiftUI/);
+  assert.match(ctx, /iOS 17 or later/);
+  assert.match(ctx, /DesignSystem\.swift block[\s\S]*merge/);
+  assert.doesNotMatch(ctx, /undefined/);
+  // A React Native client still gets React.
+  const rn = texts(await client.callTool({ name: 'get_design_context', arguments: {
+    nodeId: '10:1', excludeScreenshot: true, clientFrameworks: 'react-native', clientLanguages: 'typescript, ios',
+  } }));
+  assert.match(rn, /export default function SampleScreen\(\)/);
+  plugin.stop();
+});
+
+const simctl = spawnSync('xcrun', ['simctl', 'list', 'devices', 'booted', '-j'], { encoding: 'utf8' });
+const bootedIphone = simctl.status === 0 && Object.values(JSON.parse(simctl.stdout).devices).flat().some((d) => d.state === 'Booted' && /iPhone/.test(d.name));
+
+test('verify_code renders SwiftUI in the simulator for an Xcode project', { skip: bootedIphone ? false : 'no booted iPhone simulator' }, async () => {
+  const port = nextPort();
+  const dir = tmpDir();
+  fs.mkdirSync(path.join(dir, 'App.xcodeproj'));
+  const { client } = await startClient(dir, port);
+  const plugin = fakePlugin(port, { code: pairing(dir) });
+  await plugin.ready();
+  const res = await client.callTool({ name: 'verify_code', arguments: { nodeId: '10:1', framework: 'swiftui' } }, undefined, { timeout: 300000 });
+  const report = JSON.parse(res.content[0].text);
+  assert.equal(res.isError, undefined, res.content[0].text);
+  assert.equal(report.view, 'SampleScreen');
+  assert.deepEqual(report.compiler.errors, []);
+  assert.equal(typeof report.pixels.differingPercent, 'number');
+  assert.equal(res.content[2].type, 'image');
   plugin.stop();
 });
 
