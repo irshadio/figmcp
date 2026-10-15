@@ -15,8 +15,8 @@
 // { "name": "/path/on/disk" } (asset catalog names as the code uses them)
 // and the shared DesignSystem.swift the response gave (--shared).
 // With --project it checks a view of a Swift project: that file is compiled
-// on its own with the project's asset catalogs, so it must build without
-// the rest of the project. The view needs an init without arguments.
+// with the project's DesignSystem.swift and asset catalogs, so it must build
+// without the rest of the project. The view needs an init without arguments.
 // The design's status bar and home indicator are drawn by the phone: the
 // render keeps their room and the comparison leaves them out.
 // Fonts are found in the --fonts folders, the system font folders and the
@@ -94,9 +94,10 @@ function viewName(code) {
   return m ? m[1] : null;
 }
 
-/** Every *.xcassets under [dir], a few levels deep. */
-function assetCatalogs(dir) {
-  const out = [];
+/** Every *.xcassets under [dir], and its DesignSystem.swift files, a few levels deep. */
+function projectFiles(dir) {
+  const catalogs = [];
+  const systems = [];
   const walk = (d, depth) => {
     let entries;
     try {
@@ -105,14 +106,15 @@ function assetCatalogs(dir) {
       return;
     }
     for (const e of entries) {
-      if (!e.isDirectory() || SKIPPED_DIRS.has(e.name)) continue;
       const full = path.join(d, e.name);
-      if (e.name.endsWith('.xcassets')) out.push(full);
-      else if (depth < 3) walk(full, depth + 1);
+      if (e.isFile() && e.name === 'DesignSystem.swift') systems.push(full);
+      if (!e.isDirectory() || SKIPPED_DIRS.has(e.name)) continue;
+      if (e.name.endsWith('.xcassets')) catalogs.push(full);
+      else if (depth < 4) walk(full, depth + 1);
     }
   };
   walk(dir, 1);
-  return out;
+  return { catalogs, systems };
 }
 
 /** Writes an asset catalog with an image set per asset: { name: { source, ext, vector } }. */
@@ -301,7 +303,11 @@ async function main() {
     const file = path.resolve(project, opts.file);
     code = fs.readFileSync(file, 'utf8');
     view = opts.view || viewName(code);
-    catalogs = assetCatalogs(project);
+    // The shared design system the generated screens use is compiled with the view.
+    const found = projectFiles(project);
+    catalogs = found.catalogs;
+    const system = found.systems.find((f) => f !== file);
+    shared = system ? fs.readFileSync(system, 'utf8') : null;
     fontFamilies = [...families(tree)];
   } else if (opts.code) {
     code = fs.readFileSync(opts.code, 'utf8');

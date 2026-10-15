@@ -503,3 +503,22 @@ test('swiftui-check renders the generated code in the simulator', { skip: iphone
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('swiftui-check compiles a project view with its DesignSystem.swift', { skip: iphone ? false : 'no booted iPhone simulator' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'figmcp-swiftui-project-'));
+  try {
+    const { code, shared } = toSwiftUI(screen(), assets);
+    fs.mkdirSync(path.join(dir, 'App.xcodeproj'));
+    fs.mkdirSync(path.join(dir, 'App', 'Screens'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'App', 'Screens', 'Home.swift'), code);
+    fs.writeFileSync(path.join(dir, 'App', 'DesignSystem.swift'), shared);
+    const r = spawnSync(process.execPath, [CHECK.pathname, '1:1', '--export', EXPORT.pathname, '--out', path.join(dir, 'out'),
+      '--device', iphone.udid, '--project', dir, '--file', 'App/Screens/Home.swift'], { encoding: 'utf8', timeout: 300000 });
+    assert.equal(r.status, 0, r.stderr);
+    const report = JSON.parse(r.stdout);
+    assert.deepEqual(report.compiler.errors, []);
+    assert.equal(report.view, 'Home');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

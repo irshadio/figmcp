@@ -140,8 +140,9 @@ export function registerVerifyTools(server, bridge, source) {
       'With `file`, it checks that widget or view inside its own project: a ' +
       'Flutter widget with the project\'s packages and assets, inside a ' +
       'MaterialApp, scaled by flutter_screenutil to the frame size when the ' +
-      'project uses it; a SwiftUI view compiled on its own with the project\'s ' +
-      'asset catalogs, so it must build without the rest of the project. The ' +
+      'project uses it; a SwiftUI view compiled with the project\'s ' +
+      'DesignSystem.swift and asset catalogs, so it must build without the ' +
+      'rest of the project. The ' +
       'widget or view needs an init without arguments. Without `file`, it ' +
       'checks the reference code get_design_context generates (and, for ' +
       'Flutter, compares every layer\'s box). Use it after implementing a ' +
