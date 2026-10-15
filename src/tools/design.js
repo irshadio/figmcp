@@ -188,7 +188,14 @@ function swiftuiDetails(result, tree, catalog) {
         r.label ? `"${r.label}"` : null, r.link ? `link "${r.link}"` : null].filter(Boolean).join(', ');
       const sure = r.confidence ? ` [${r.confidence}: ${r.evidence}]` : '';
       const native = r.native ? `; ${r.native.use ? 'uses' : 'not'} ${r.native.control}: ${r.native.reason}` : '';
-      return `- ${r.id} "${r.name}": ${facts}${sure} -> ${r.pattern}${native}`;
+      const tap = r.prototype ? `; prototype: ${{
+        navigate: () => `navigates to "${r.prototype.destination.name}" (push it in a NavigationStack)`,
+        overlay: () => `opens "${r.prototype.destination.name}" over the screen (a .sheet)`,
+        back: () => 'goes back (dismiss)',
+        close: () => 'closes the overlay (dismiss)',
+        url: () => `opens ${r.prototype.url} (openURL)`,
+      }[r.prototype.kind]()}` : '';
+      return `- ${r.id} "${r.name}": ${facts}${sure} -> ${r.pattern}${native}${tap}`;
     }).join('\n')}`));
   }
   return [...out, ...sharedDetails(result, tree)];

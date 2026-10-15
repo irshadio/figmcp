@@ -296,6 +296,20 @@ class SwiftUIWriter {
     const given = this.actions[node.id];
     if (!given && !TAPPABLE.has(kind)) return core;
     const accessibilityLabel = kind === 'iconButton' ? role.label : null;
+    const tap = role && role.prototype;
+    if (tap && !given) {
+      // The prototype says what the tap does.
+      if (tap.kind === 'back' || tap.kind === 'close') {
+        this.environment('dismiss', 'dismiss');
+        return this.button(core, ['dismiss()'], { accessibilityLabel });
+      }
+      if (tap.kind === 'url') {
+        this.environment('openURL', 'openURL');
+        return this.button(core, [`if let url = URL(string: ${sString(tap.url)}) { openURL(url) }`], { accessibilityLabel });
+      }
+      const name = this.actionCase(`${tap.kind === 'overlay' ? 'show' : 'open'} ${tap.destination.name}`);
+      return this.button(core, [`action(.${name})`], { accessibilityLabel });
+    }
     const pair = this.swaps.get(node.id);
     if (pair && !given) return this.button(core, [`withAnimation(.snappy) { (${pair[0]}, ${pair[1]}) = (${pair[1]}, ${pair[0]}) }`], { accessibilityLabel });
     const name = this.actionCase(given || this.actionName(node, role));
@@ -496,11 +510,14 @@ class SwiftUIWriter {
 
   /** The environment's Dynamic Type size, declared once. */
   dynamicTypeSize() {
-    if (!this.dynamicType) {
-      this.dynamicType = true;
-      this.states.push('  @Environment(\\.dynamicTypeSize) private var dynamicTypeSize');
-    }
-    return 'dynamicTypeSize';
+    return this.environment('dynamicTypeSize', 'dynamicTypeSize');
+  }
+
+  /** An environment value of the screen, declared once; its name. */
+  environment(key, name) {
+    const line = `  @Environment(\\.${key}) private var ${name}`;
+    if (!this.states.includes(line)) this.states.push(line);
+    return name;
   }
 
   /**
@@ -1781,6 +1798,7 @@ function structureOf(roles, root) {
     const entry = { id: r.id, name: r.name, role: r.role, pattern: native ? `system control: ${r.native.control}` : pattern };
     if (r.confidence) Object.assign(entry, { confidence: r.confidence, evidence: r.evidence });
     if (r.native) entry.native = r.native;
+    if (r.prototype) entry.prototype = r.prototype;
     if (r.items) entry.items = r.items.length;
     if (typeof r.selected === 'number' && r.selected >= 0) entry.selected = nameOf(r.items[r.selected]);
     if (r.label) entry.label = r.label;

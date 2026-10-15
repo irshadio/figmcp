@@ -380,6 +380,22 @@ test('toSwiftUI uses the system segmented control when the design draws one', ()
   assert.equal(entry.pattern, 'system control: Picker with .pickerStyle(.segmented)');
 });
 
+test('toSwiftUI follows prototype taps: back dismisses, navigation names the destination', () => {
+  const root = onboarding();
+  const row = root.children[1].children[1];
+  row.children[0].reactions = [{ trigger: 'ON_CLICK', action: 'BACK' }];
+  row.children[1].reactions = [{ trigger: 'ON_HOVER', action: 'NODE', navigation: 'CHANGE_TO', destination: null },
+    { trigger: 'ON_CLICK', action: 'NODE', navigation: 'NAVIGATE', destination: { id: '9:9', name: 'Home' } }];
+  const { code, structure } = toSwiftUI(root, assets);
+  assert.match(code, /@Environment\(\\\.dismiss\) private var dismiss/);
+  assert.match(code, /Button \{\n\s+dismiss\(\)\n\s+\} label:/);
+  // The Skip text becomes a Button whose case names where it goes.
+  assert.match(code, /Button \{\n\s+action\(\.openHome\)\n\s+\} label: \{\n\s+Text\("Skip"\)/);
+  assert.match(code, /case openHome/);
+  const skip = structure.find((r) => r.prototype && r.prototype.kind === 'navigate');
+  assert.deepEqual([skip.role, skip.prototype.destination.name, skip.evidence], ['button', 'Home', 'a prototype tap']);
+});
+
 test('toSwiftUI puts what screens share in DesignSystem.swift', () => {
   const { shared } = toSwiftUI(screen(), assets);
   assert.match(shared, /^import SwiftUI\n/);

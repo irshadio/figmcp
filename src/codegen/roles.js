@@ -69,6 +69,22 @@ function oddFilled(items) {
   return on === 1 ? has.indexOf(true) : -1;
 }
 
+/**
+ * What the prototype does when [n] is tapped: { kind: 'navigate' | 'overlay'
+ * | 'back' | 'close' | 'url', destination?, url? }, or null.
+ */
+export function tapOf(n) {
+  for (const r of n.reactions || []) {
+    if (!/^ON_(CLICK|PRESS)$/.test(r.trigger || '')) continue;
+    if (r.action === 'BACK') return { kind: 'back' };
+    if (r.action === 'CLOSE') return { kind: 'close' };
+    if (r.action === 'URL' && r.url) return { kind: 'url', url: r.url };
+    if (r.action === 'NODE' && r.destination && ['NAVIGATE', 'SWAP'].includes(r.navigation)) return { kind: 'navigate', destination: r.destination };
+    if (r.action === 'NODE' && r.destination && r.navigation === 'OVERLAY') return { kind: 'overlay', destination: r.destination };
+  }
+  return null;
+}
+
 /** How many boxes with a fill [n] holds (frames and shapes, not glyphs or text). */
 function boxes(n) {
   if (!n || n.visible === false) return 0;
@@ -246,6 +262,24 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
         `two fields of one shape and a "${button.name}" button between them`);
     }
   }
+  // Prototype taps: what a layer does when tapped, and a Button for a layer no rule found.
+  const taps = (n, parent) => {
+    if (!n || n.visible === false) return;
+    const tap = tapOf(n);
+    if (tap && parent && !suppressed.has(n.id)) {
+      if (!roles.has(n.id)) {
+        const ts = texts(n);
+        const small = n.width <= 52 && n.height <= 52;
+        if (small && isIcon(n)) {
+          set(n, 'iconButton', { label: tap.kind === 'back' ? 'Back' : tap.kind === 'close' ? 'Close' : n.name.replace(TAG, '').trim() },
+            'high', 'a prototype tap');
+        } else set(n, 'button', { primary: filled(n), label: ts.length ? ts[0].characters : n.name }, 'high', 'a prototype tap');
+      }
+      roles.get(n.id).prototype = tap;
+    }
+    visibleChildren(n).forEach((c) => taps(c, n));
+  };
+  taps(root, null);
   for (const id of suppressed) {
     const r = roles.get(id);
     if (r && r.items) r.items.forEach((i) => roles.delete(i));
