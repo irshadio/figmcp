@@ -46,7 +46,7 @@ test('code connect maps a component set and names it in the design context', asy
 
   const ctx = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true } }));
   assert.match(ctx, /^\/\/ AppPrimaryButton: lib\/widgets\/app_primary_button.dart \(Flutter\)/);
-  assert.match(ctx, /<AppPrimaryButton className="relative shrink-0 w-full h-\[40px\]"/);
+  assert.match(ctx, /<div className="relative shrink-0 w-full h-10"[^>]*data-node-id="10:3"[^>]*>\n\s+\{\/\* AppPrimaryButton texts in the design: "Continue" \*\/\}\n\s+<AppPrimaryButton \/>/);
   const raw = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true, disableCodeConnect: true } }));
   assert.doesNotMatch(raw, /<AppPrimaryButton/);
 

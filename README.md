@@ -89,7 +89,7 @@ build this frame as a React component with Tailwind, using our existing Button
 compare your screen with the Figma screenshot and fix the differences
 ```
 
-Projects with a `pubspec.yaml` get **Flutter** widgets, and SVGs and images are saved into the asset folders the pubspec declares. Everything else gets **React + Tailwind**. The code is a reference that your agent adapts to your project. [More →](https://figmcp.web.app/docs/design-to-code)
+Projects with a `pubspec.yaml` get **Flutter** widgets, and SVGs and images are saved into the asset folders the pubspec declares. Everything else gets **React + Tailwind**. React output uses the real font families, declares the design's variables as CSS (with a Tailwind 4 `@theme`), names assets after their layers with copy commands for `public/figma`, turns prototype taps and layer names into buttons, links and landmarks, and draws phone frames as screens that fill the viewport. Its classes work in Tailwind 3.4 and 4. The code is a reference that your agent adapts to your project. [More →](https://figmcp.web.app/docs/design-to-code)
 
 ### Design in Figma
 
@@ -145,7 +145,7 @@ Step-by-step for each client, on macOS and Windows: [figmcp.web.app/docs/configu
 | `get_screenshot` | PNG of a node or the selection. |
 | `get_variable_defs` | Variables and styles used by a node, resolved for its mode. |
 | `download_assets` | Exported renders, original image fills and vector SVGs. |
-| `verify_code` | Render Flutter code with `flutter test` and compare it with Figma's render: analyzer and runtime errors, differing pixels and a diff image. |
+| `verify_code` | Render Flutter code with `flutter test`, or React + Tailwind in headless Chrome, and compare it with Figma's render: errors, layout mismatches, differing pixels and a diff image. |
 | `use_figma` | Run Figma plugin API scripts to create and edit designs. |
 | `search_design_system` | Components (with properties and variants), styles and variables of the open file, to reuse while designing. |
 | `place_image` | Put a local PNG, JPG, GIF or SVG into the open file, as a new layer or a layer's fill. |

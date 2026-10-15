@@ -7,10 +7,12 @@ import { toFlutter } from '../codegen/flutter/index.js';
 import { toMetadataXml } from '../codegen/metadata.js';
 import { countNodes, toReactTailwind } from '../codegen/react.js';
 import { systemUi } from '../codegen/system-ui.js';
-import { detectFramework, flutterAssetDirs, FRAMEWORKS, usesScreenUtil } from '../project.js';
+import {
+  detectFramework, flutterAssetDirs, FRAMEWORKS, isReactNative, reactAssetDir, tailwindVersion, usesScreenUtil,
+} from '../project.js';
 import { ASSETS, imageExt, saveAsset, snapshotSummary } from '../store.js';
 import {
-  assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, resolver, selectionBlock,
+  assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, selectionBlock,
   sourceNote, text,
 } from './common.js';
 
@@ -65,11 +67,7 @@ function flutterDetails(result, tree) {
     out.push(text(`${result.className} is drawn as a phone screen: it fills the screen` +
       `${result.scrolls ? ' and scrolls (the design is taller than a phone)' : ', and scrolls on a phone too short for its layers'}.`));
   }
-  const chrome = systemUi(tree);
-  if (chrome.length) {
-    out.push(text(`System UI in the design (drawn by the phone, not the app):\n${
-      chrome.map((c) => `- ${c.id} "${c.name}": ${c.kind}, ${c.box[2]}x${c.box[3]} at (${c.box[0]}, ${c.box[1]})`).join('\n')}`));
-  }
+  out.push(systemUiBlock(tree));
   if (result.connected.length) {
     out.push(text('Mapped components used (Code Connect). Their exact look is in the design: call ' +
       'get_design_context with disableCodeConnect: true on the instance id when the ' +
@@ -85,17 +83,93 @@ function flutterDetails(result, tree) {
   return out;
 }
 
-const GUIDANCE =
-  'IMPORTANT: the code above is reference React + Tailwind generated from the ' +
-  'design. Convert it to the target project\'s framework, components, tokens ' +
-  'and conventions instead of copying it. Every value is exact: sizes, ' +
-  'spacing, radii, colours and fonts. var(--name,value) marks a design ' +
-  'variable: use the project token of that name, with that value. Each ' +
-  'element carries data-node-id; call get_design_context on a child id for ' +
-  'detail. data-component / data-variant name the component and its variant; ' +
-  'data-interactions list prototype actions; data-rasterized marks a layer ' +
-  'shipped as an image (a mask or a rotated group). Compare the result with ' +
-  'the screenshot.';
+/** The phone's own layers (status bar, home indicator) in the design, or null. */
+function systemUiBlock(tree) {
+  const chrome = systemUi(tree);
+  if (!chrome.length) return null;
+  return text(`System UI in the design (drawn by the phone, not the app):\n${
+    chrome.map((c) => `- ${c.id} "${c.name}": ${c.kind}, ${c.box[2]}x${c.box[3]} at (${c.box[0]}, ${c.box[1]})`).join('\n')}`);
+}
+
+/** The React response blocks after the code: tokens, assets, fonts, notes. */
+function reactDetails(result, tree) {
+  const out = [];
+  if (result.css) {
+    out.push(text('Design variables used, as CSS: add them to the global stylesheet (or map each to the ' +
+      `project's token of the same name) so the var() fallbacks are not needed:\n${result.css}`));
+  }
+  const files = Object.entries(result.files);
+  if (files.length) {
+    const dirs = [...new Set(files.map(([file]) => path.posix.dirname(file)))];
+    const copy = [`mkdir -p ${dirs.map(shellQuote).join(' ')}`,
+      ...files.map(([file, { source }]) => `cp ${shellQuote(source)} ${shellQuote(file)}`)].join('\n');
+    out.push(text('Assets used in the code (project path -> file on disk). Copy them into the project root; ' +
+      `the code loads each from its URL:\n${JSON.stringify(Object.fromEntries(files.map(([file, { url, source }]) => [file, { url, source }])), null, 2)}\n\n${copy}`));
+  } else if (Object.keys(result.assets).length) {
+    const map = {};
+    for (const [name, url] of Object.entries(result.assets)) {
+      map[name] = { url, path: path.join(ASSETS, url.split('/').pop()) };
+    }
+    out.push(text('Assets used in the code (served by the local MCP server; ' +
+      `the same files are on disk at each path):\n${JSON.stringify(map, null, 2)}`));
+  }
+  const fonts = Object.entries(result.fonts);
+  if (fonts.length) {
+    out.push(text('Fonts used (load each family with these weights, e.g. with next/font, a Google Fonts ' +
+      `<link> or @font-face; the classes name the family itself):\n${
+        fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
+  }
+  if (result.textStyles.length) {
+    out.push(text(`Figma text styles used (elements carry data-text-style; map each to the project's type scale):\n${
+      result.textStyles.map((s) => `- ${s.name}: ${s.classes}`).join('\n')}`));
+  }
+  if (result.screen) {
+    out.push(text(`${result.componentName} is drawn as a phone screen: it fills the viewport width up to the ` +
+      `design's ${tree.width}px, is at least as tall as the screen` +
+      `${result.scrolls ? ' and scrolls (the design is taller than a phone)' : ', and scrolls on a phone too short for its layers'}.`));
+  }
+  out.push(systemUiBlock(tree));
+  if (result.connected.length) {
+    out.push(text('Mapped components used (Code Connect). Each sits in a wrapper with its position; set its ' +
+      'props from the hint comment and the variant. Their exact look is in the design: call ' +
+      'get_design_context with disableCodeConnect: true on the instance id when the ' +
+      `component's defaults may differ:\n${JSON.stringify(result.connected, null, 2)}`));
+  }
+  if (result.rasterized.length) {
+    out.push(text(`Layers shipped as 2x images (masks, rotated groups):\n${JSON.stringify(result.rasterized, null, 2)}`));
+  }
+  if (result.warnings.length) {
+    out.push(text(`Approximations (the design has more than this code draws):\n${
+      result.warnings.map((w) => `- ${w.id} "${w.name}": ${w.message}`).join('\n')}`));
+  }
+  if (result.placeholders.length) {
+    out.push(text(`Layers drawn as placeholders:\n${result.placeholders.map((w) => `- ${w.id} "${w.name}": ${w.error}`).join('\n')}`));
+  }
+  return out.filter(Boolean);
+}
+
+function guidance({ tailwind, native }) {
+  return [
+    'IMPORTANT: the code above is reference React + Tailwind generated from the ' +
+    'design. Adapt it to the target project\'s framework, components, tokens ' +
+    'and conventions instead of copying it. Values are exact, in CSS pixels at ' +
+    'the design size: sizes, spacing, radii, colours, font families, weights ' +
+    'and line heights. Theme classes (px-4, rounded-full, font-bold) are used ' +
+    'only where they equal the design value; the classes work in Tailwind 3.4 and 4' +
+    `${tailwind ? ` (the project uses Tailwind ${tailwind})` : ''}. var(--name,value) marks a design ` +
+    'variable: use the project token of that name. Elements carry data-node-id ' +
+    '(call get_design_context on a child id for detail), data-component / ' +
+    'data-variant, data-interactions (prototype actions) and data-rasterized ' +
+    '(a layer shipped as an image). Buttons, links and landmarks come from ' +
+    'prototype taps and layer names: add the handlers, routes and form fields ' +
+    'the design implies, and give content images real alt text. Layers listed as ' +
+    'system UI belong to the phone: leave them out. Frames without auto layout ' +
+    'are absolutely positioned: rebuild such sections with flex or grid when ' +
+    'they must reflow. Compare the result with the screenshot.',
+    native ? 'The client builds React Native: map div, p and img to View, Text and Image ' +
+      '(or use NativeWind for the classes), and drop web-only classes.' : null,
+  ].filter(Boolean).join('\n\n');
+}
 
 export function registerDesignTools(server, bridge, source) {
   server.registerTool('get_design_context', {
@@ -119,9 +193,11 @@ export function registerDesignTools(server, bridge, source) {
       clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" (picks the framework).'),
       clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" (picks the framework).'),
       screen: z.boolean().optional().describe(
-        'Flutter: draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
+        'Draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
       assetsDir: z.string().optional().describe(
-        'Flutter: folder of the asset paths in the code (default: the svg/png/images folders of the project\'s pubspec.yaml, else assets/figma).'),
+        'Folder of the asset files in the code. Flutter default: the svg/png/images folders of the project\'s ' +
+        'pubspec.yaml, else assets/figma. React default: public/figma (static/figma for SvelteKit), loaded by URL ' +
+        '(/figma/name.svg).'),
       screenUtil: z.boolean().optional().describe(
         'Flutter: write lengths with flutter_screenutil (.w, .h, .r, .sp) so the layout scales from the design size ' +
         '(default: when the project\'s pubspec.yaml depends on flutter_screenutil).'),
@@ -168,24 +244,9 @@ export function registerDesignTools(server, bridge, source) {
             'when it differs from this frame, the frame\'s numbers still scale against it.'));
         }
       } else {
-        const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });
-        out = [text(result.code)];
-        if (Object.keys(result.assets).length) {
-          const map = {};
-          for (const [name, url] of Object.entries(result.assets)) {
-            map[name] = { url, path: path.join(ASSETS, url.split('/').pop()) };
-          }
-          out.push(text('Assets used in the code (served by the local MCP server; ' +
-            `the same files are on disk at each path):\n${JSON.stringify(map, null, 2)}`));
-        }
-        if (result.connected.length) {
-          out.push(text('Mapped components used (Code Connect). Their exact look is in ' +
-            'the design: call get_design_context with disableCodeConnect: true on the ' +
-            `instance id when the component's defaults may differ:\n${JSON.stringify(result.connected, null, 2)}`));
-        }
-        if (result.warnings.length) {
-          out.push(text(`Layers drawn as placeholders:\n${result.warnings.map((w) => `- ${w.id} "${w.name}": ${w.error}`).join('\n')}`));
-        }
+        const dir = (assetsDir || reactAssetDir()).replace(/^\.?\/+|\/+$/g, '');
+        const result = toReactTailwind(node.tree, fileResolver(node.images), { connect, screen, assetDir: dir });
+        out = [text(result.code), ...reactDetails(result, node.tree)];
       }
     } catch (e) {
       // The generators isolate each layer; this is a last resort so a read
@@ -203,7 +264,8 @@ export function registerDesignTools(server, bridge, source) {
     if (vars && vars.source === 'live' && Object.keys(vars.defs).length) {
       out.push(text(`These variables and styles are used in the design:\n${JSON.stringify(vars.defs, null, 2)}`));
     }
-    out.push(text(framework === 'flutter' ? FLUTTER_GUIDANCE : GUIDANCE));
+    out.push(text(framework === 'flutter' ? FLUTTER_GUIDANCE
+      : guidance({ tailwind: tailwindVersion(), native: isReactNative(args) })));
     // A node too large to render still gets its code.
     const shot = shotRead && await shotRead;
     if (shot) out.push(image(shot.png));
