@@ -2,6 +2,12 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.5.2",
+    notes: [
+      { type: "improved", text: "Clearer descriptions for remove_code_connect_map, get_variable_defs and import_design_export: what each one changes, when to use it, and what happens without the plugin." },
+    ],
+  },
+  {
     version: "1.5.1",
     notes: [
       { type: "improved", text: "New figmcp logo: the plugin panel opens with the wordmark, in light and dark themes." },
