@@ -1201,11 +1201,12 @@ class SwiftUIWriter {
       const placed = isAutoLayout(node) ? visibleChildren(node).filter((c) => !inFlow(c, node)) : visibleChildren(node);
       const grows = typeof size.h === 'number' && hasText(node) && placed.every((c) => this.stackPlacement(c, node).v.mode === 'min') &&
         this.fitsHeight(node);
-      if (!isAutoLayout(node) && !grows && (size.w === 'inf' || size.h === 'inf')) {
-        // Children never size a frame without auto layout: its layers lie
-        // over a box of its size, so a large one cannot stretch what fills.
+      if (!isAutoLayout(node) && !grows && !content.padding && v.name === 'ZStack' && Array.isArray(v.body)) {
+        // Children never size a frame without auto layout: each layer lies
+        // over a box of its size, so a large or far one cannot stretch the
+        // layers that fill (a ZStack would offer them the union of all).
         const box = this.frame(clear(), { w: size.w ?? node.width, h: size.h ?? node.height });
-        v = mod(box, 'overlay', [['alignment', raw(content.align || '.topLeading')]], [v]);
+        v = v.body.reduce((out, item) => mod(out, 'overlay', [['alignment', raw('.topLeading')]], [item]), box);
       } else v = this.frame(v, grows ? { ...size, h: { min: size.h } } : size, content.align);
       if (node.clipsContent) {
         // Figma clips the children, not the frame's own fills and shadows.
@@ -1453,12 +1454,12 @@ class SwiftUIWriter {
     };
     const under = decor.filter((c) => !behind(c) || order(c) < order(behind(c))).map(drawDecor).filter(Boolean);
     const above = decor.filter((c) => behind(c) && order(c) > order(behind(c))).map(drawDecor).filter(Boolean);
-    if (under.length) page = mod(page, 'background', [['alignment', raw('.topLeading')]], [view('ZStack', [['alignment', raw('.topLeading')]], under)]);
-    if (above.length) {
-      page = mod(page, 'overlay', [['alignment', raw('.topLeading')]], [
-        mod(view('ZStack', [['alignment', raw('.topLeading')]], above), 'allowsHitTesting', [[null, false]]),
-      ]);
-    }
+    // Decor lies over a clear box of the page's size, so a layer reaching
+    // past the page's edge does not widen what fills it.
+    // Each its own overlay: a ZStack would stretch layers that fill to the union of all.
+    const layer = (items) => items.reduce((v, item) => mod(v, 'overlay', [['alignment', raw('.topLeading')]], [item]), clear());
+    if (under.length) page = mod(page, 'background', [['alignment', raw('.topLeading')]], [layer(under)]);
+    if (above.length) page = mod(page, 'overlay', [['alignment', raw('.topLeading')]], [mod(layer(above), 'allowsHitTesting', [[null, false]])]);
     return page;
   }
 
