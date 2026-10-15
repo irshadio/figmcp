@@ -7,9 +7,12 @@ import { listMappings, lookup } from '../connect.js';
 import { toFlutter } from '../codegen/flutter/index.js';
 import { boundedMetadataXml } from '../codegen/metadata.js';
 import { countNodes, toReactTailwind } from '../codegen/react.js';
+import { mergeDesignSystem } from '../codegen/swiftui/design-system.js';
 import { toSwiftUI } from '../codegen/swiftui/index.js';
 import { systemUi } from '../codegen/system-ui.js';
-import { assetCatalog, detectFramework, flutterAssetDirs, FRAMEWORKS, isSwiftPackage, usesScreenUtil } from '../project.js';
+import {
+  assetCatalog, designSystemFile, detectFramework, flutterAssetDirs, FRAMEWORKS, isSwiftPackage, usesScreenUtil,
+} from '../project.js';
 import { ASSETS, imageExt, saveAsset, snapshotSummary } from '../store.js';
 import {
   assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, resolver, selectionBlock,
@@ -62,7 +65,7 @@ const SWIFTUI_GUIDANCE =
   'phone-sized frame fills the screen and scrolls, with pinned bars in safeAreaInset and system UI left to the ' +
   'phone; sections follow each other in a VStack, so growing text pushes the rest down, and rows and grids ' +
   'stack at accessibility sizes. Fixed sizes stay as designed: check narrow phones. Merge DesignSystem.swift into ' +
-  'the target once. Keep the #Preview, check the result with verify_code or against the screenshot.';
+  'the target once (later screens return the project\'s file with what it lacks added). Keep the #Preview, check the result with verify_code or against the screenshot.';
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
@@ -185,10 +188,21 @@ function swiftuiDetails(result, tree, catalog, pkg = false) {
       fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
   }
   if (result.shared) {
-    out.push(text('Shared design system (DesignSystem.swift) the screen needs: Color(hex:), the button style, DesignTokens, ' +
-      'AppFonts and the line height modifier. Add it to the target once; when the project already has one from an earlier ' +
-      'screen, merge the new tokens and fonts into it instead of adding a second copy. The next block is the file.'));
-    out.push(text(result.shared));
+    const file = designSystemFile();
+    const merged = file ? mergeDesignSystem(fs.readFileSync(file, 'utf8'), result.shared) : null;
+    if (!merged) {
+      out.push(text('Shared design system (DesignSystem.swift) the screen needs: Color(hex:), the button style, DesignTokens, ' +
+        'AppFonts and the line height modifier. Add it to the target once. The next block is the file.'));
+      out.push(text(result.shared));
+    } else if (!merged.added.length) {
+      out.push(text(`The project's ${file} already declares everything this screen uses from the design system.` +
+        (merged.conflicts.length ? ` It differs from the design in: ${merged.conflicts.join('; ')}.` : '')));
+    } else {
+      out.push(text(`The project's ${file} lacks ${merged.added.join(', ')}. The next block is that file with them added; ` +
+        'the rest of it is unchanged, so write it over the file.' +
+        (merged.conflicts.length ? ` Kept as the project has them (they differ from the design): ${merged.conflicts.join('; ')}.` : '')));
+      out.push(text(merged.text));
+    }
   }
   out.push(text('The code needs iOS 17 or later (scrollTargetBehavior, contentMargins, containerRelativeFrame, sensoryFeedback, ' +
     'onGeometryChange): set the deployment target to 17.0 or higher.'));

@@ -269,3 +269,18 @@ test('a floating button on an auto-layout screen stays pinned', { skip }, () => 
   assert.ok(scroll >= 0 && pinned > end, 'drawn over the scroll view, not in it');
   assert.equal(typecheck([r]), '');
 });
+
+test('a later screen\'s design system merges into the project\'s file', { skip }, async () => {
+  const { mergeDesignSystem } = await import('../src/codegen/swiftui/design-system.js');
+  const token = (name, value) => frame(name, { w: 100, h: 40, fills: [solid(value)], vars: { 'fill.0': name }, children: [text('Hi')] });
+  const a = generate(column('Home', [token('brand/primary', brand), button('Go')], { h: 200 }));
+  const b = generate(column('Search', [token('brand/primary', ink), token('ink/strong', ink), chips('Fares', ['A', 'B', 'C'], 0)], { h: 200 }));
+  const project = `${a.shared}\n// The team's own additions.\nlet spacingUnit: CGFloat = 4\n`;
+  const merged = mergeDesignSystem(project, b.shared);
+  assert.ok(merged.text.startsWith(project.trimEnd().split('\n')[0]));
+  assert.match(merged.text, /The team's own additions/);
+  assert.ok(merged.added.includes('DesignTokens.inkStrong'), merged.added.join());
+  assert.match(merged.conflicts.join(), /DesignTokens\.brandPrimary is Color\(hex: 0x3D3BD9\) in the project/);
+  assert.equal(mergeDesignSystem(merged.text, b.shared).added.length, 0);
+  assert.equal(typecheck([a, b].map((r) => ({ ...r, shared: null })).concat([{ structName: 'DesignSystem', code: merged.text, shared: null }])), '');
+});

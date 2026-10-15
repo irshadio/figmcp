@@ -146,3 +146,22 @@ export function assetCatalog(cwd = process.cwd()) {
   found.sort((a, b) => aside(a) - aside(b) || a.depth - b.depth || named(b) - named(a) || a.rel.localeCompare(b.rel));
   return found.length ? found[0].rel.split(path.sep).join('/') : DEFAULT_CATALOG;
 }
+
+/**
+ * The project's DesignSystem.swift, relative to [cwd], or null: the
+ * shallowest one outside preview, widget and test targets.
+ */
+export function designSystemFile(cwd = process.cwd()) {
+  const found = [];
+  const walk = (dir, depth) => {
+    for (const e of (() => { try { return fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; } })()) {
+      const full = path.join(dir, e.name);
+      if (e.isFile() && e.name === 'DesignSystem.swift') found.push({ rel: path.relative(cwd, full), depth });
+      else if (e.isDirectory() && !SKIPPED_DIRS.has(e.name) && !e.name.startsWith('.') && !e.name.endsWith('.xcassets') && depth < 5) walk(full, depth + 1);
+    }
+  };
+  walk(cwd, 1);
+  const aside = (f) => /preview|widget|extension|tests?\b/i.test(f.rel);
+  found.sort((a, b) => aside(a) - aside(b) || a.depth - b.depth || a.rel.localeCompare(b.rel));
+  return found.length ? found[0].rel : null;
+}
