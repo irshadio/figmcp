@@ -1831,7 +1831,10 @@ function structureOf(roles, root) {
       else (n.children || []).forEach(walk);
     };
     walk(root);
-    return found ? found.name : id;
+    if (!found) return id;
+    // An item reads as its label ("Regular"), not its layer name ("Chip").
+    const label = findText(found);
+    return label ? String(label.characters).trim() : found.name;
   };
   const out = [];
   for (const r of roles.values()) {
