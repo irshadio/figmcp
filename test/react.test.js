@@ -212,11 +212,14 @@ test('phone frames are screens: they fill the viewport, stretch their sections a
     children: [
       { ...box('11:10', { name: 'Cards', width: 470, height: 80, layoutMode: 'HORIZONTAL', itemSpacing: 10, layoutSizingHorizontal: 'HUG' }), children: [card('11:11'), card('11:12'), card('11:13')] },
       { ...box('11:14', { name: 'Chips', width: 300, height: 40, layoutMode: 'HORIZONTAL', itemSpacing: 10, layoutSizingHorizontal: 'FILL' }), children: [card('11:15'), card('11:16')] },
+      { ...box('11:17', { name: 'Wide chips', x: 40, width: 300, height: 40, layoutMode: 'HORIZONTAL', itemSpacing: 10, layoutSizingHorizontal: 'FILL' }), children: [card('11:18'), card('11:19'), card('11:20')] },
     ],
   }] });
   assert.match(rows.code, /max-w-full overflow-x-auto overflow-y-hidden \[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden" data-name="Cards"/);
-  assert.match(rows.code, /[^-]overflow-x-auto overflow-y-hidden \[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden" data-name="Chips"/);
-  assert.equal(rows.warnings.length, 2);
+  // Content that overflows its row but ends inside the screen shows as designed, and scrolls only where it would be cut.
+  assert.match(rows.code, / max-\[310px\]:overflow-x-auto max-\[310px\]:overflow-y-hidden \[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden" data-name="Chips"/);
+  assert.match(rows.code, /[^:]overflow-x-auto overflow-y-hidden \[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden" data-name="Wide chips"/);
+  assert.equal(rows.warnings.length, 3);
   assert.doesNotMatch(code({ ...phone, width: 1440, height: 1024, children: phone.children.slice(2, 3) }), /overflow-x-auto/, 'only phones scroll rows');
   // Desktop frames keep their size; screen: false turns the mode off.
   assert.match(code({ ...phone, width: 1440, height: 1024 }), /className="relative w-\[1440px\] h-\[1024px\]"/);
@@ -275,4 +278,35 @@ test('the render check runs module code and finds font weights in file names', (
   assert.deepEqual(faceOf('Inter', '/f/Inter-Regular.ttf'), { weight: '400', italic: false });
   assert.deepEqual(faceOf('Onest', '/f/Onest-VariableFont_wght.ttf'), { weight: '100 900', italic: false });
   assert.deepEqual(faceOf('Inter', '/f/Inter-ExtraLight.ttf'), { weight: '200', italic: false });
+});
+
+test('text fields become inputs; button labels and headings do not', () => {
+  const row = (name, characters, extra = {}) => ({
+    ...box('13:1', { name, width: 300, height: 44, layoutMode: 'HORIZONTAL', ...extra }),
+    children: [box('13:2', { name: 'Icon', width: 20, height: 20 }), { ...text(characters, { id: '13:3', width: 120 }), layoutSizingHorizontal: 'HUG' }],
+  });
+  const named = code(frame([row('Message Field', 'Message')]));
+  assert.match(named, /<input className="relative flex-1 min-w-0 font-\['Inter',sans-serif\] font-normal text-\[16px\] leading-\[20px\] placeholder:text-black bg-transparent border-0 p-0 outline-none" data-name="T" data-node-id="13:3" type="text" placeholder="Message" \/>/);
+  assert.match(code(frame([row('Frame 12', 'What are you looking for?')])), /<input [^>]*type="text" placeholder="What are you looking for\?"/);
+  assert.match(code(frame([row('Frame 12', 'Search hotels')])), /\[appearance:none\][^>]*type="search" placeholder="Search hotels"/);
+  for (const [name, characters] of [['Frame 12', 'Add to Cart'], ['Card', 'Need help?'], ['Primary button', 'Search flights']]) {
+    assert.doesNotMatch(code(frame([row(name, characters)])), /<input/, characters);
+  }
+  // A trailing sibling keeps its place: the field keeps the text's width.
+  const mid = row('Search bar', 'Search');
+  mid.children.push(box('13:4', { name: 'Mic', width: 20, height: 20 }));
+  assert.match(code(frame([mid])), /<input className="relative shrink-0 w-\[120px\]/);
+  // Two texts are a form row, not a field.
+  const two = row('Input', 'Email');
+  two.children.push(text('Required', { id: '13:5' }));
+  assert.doesNotMatch(code(frame([two])), /<input/);
+});
+
+test('names read by people lose Figma\'s paste and duplicate suffixes, and generated names are dropped', async () => {
+  const { readableName } = await import('../src/codegen/semantics.js');
+  const cases = {
+    'Phone 1': 'Phone', 'Gimbel copy 1': 'Gimbel', 'Card copy': 'Card', 'iPhone 15': 'iPhone 15', 'Galaxy S23 1': 'Galaxy S23',
+    'Screen (Replace Here)': 'Screen', 'MQE23ref_VW_34FR+watch-49-titanium-ultra_VW_34FR-removebg (1) 1': '', 'Image 2': '',
+  };
+  for (const [name, want] of Object.entries(cases)) assert.equal(readableName({ name }), want, name);
 });

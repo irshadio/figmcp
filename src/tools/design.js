@@ -160,9 +160,9 @@ function guidance({ tailwind, native }) {
     'variable: use the project token of that name. Elements carry data-node-id ' +
     '(call get_design_context on a child id for detail), data-component / ' +
     'data-variant, data-interactions (prototype actions) and data-rasterized ' +
-    '(a layer shipped as an image). Buttons, links and landmarks come from ' +
-    'prototype taps and layer names: add the handlers, routes and form fields ' +
-    'the design implies, and give content images real alt text. Layers listed as ' +
+    '(a layer shipped as an image). Buttons, links, landmarks and text inputs come ' +
+    'from prototype taps, layer names and placeholders: add the handlers, state and ' +
+    'routes the design implies, and give content images real alt text. Layers listed as ' +
     'system UI belong to the phone: leave them out. Frames without auto layout ' +
     'are absolutely positioned: rebuild such sections with flex or grid when ' +
     'they must reflow. Compare the result with the screenshot.',

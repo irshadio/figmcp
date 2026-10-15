@@ -13,7 +13,9 @@ import {
   backgroundClasses, blendClass, effectClasses, fillLayers, imagePlacement,
   needsFillLayers, paintValue, strokeLayers,
 } from './paint.js';
-import { altText, containerElement, headingTag, isGenericName, readableName } from './semantics.js';
+import {
+  altText, containerElement, fieldPlaceholder, headingTag, isGenericName, readableName,
+} from './semantics.js';
 import { mergeEdges, snapClass, tokensCss } from './tailwind.js';
 import {
   autoLineRatios, cssWeight, fontClasses, jsxText, paragraphs, scriptOf, segmentsOf, textBlockClasses,
@@ -171,6 +173,7 @@ class Writer {
     this.placeholders = [];
     this.fonts = new Map();
     this.textStyles = new Map();
+    this.inputs = new Map();
     this.stack = [];
   }
 
@@ -396,6 +399,37 @@ class Writer {
   }
 
   /**
+   * The placeholder of a text field as an <input>: the text's font and
+   * box, its colour as the placeholder's. In a row it takes the free room
+   * when that moves nothing else (last in the row, or a space-between row).
+   * False when the text cannot be one (several styles, gradient text).
+   */
+  input(node, parent, pos, depth) {
+    const field = this.inputs.get(node.id);
+    const segs = segmentsOf(node);
+    if (segs.length !== 1 || !parent) return false;
+    const font = fontClasses(segs[0], node, this.ratios);
+    if (font.includes('bg-clip-text')) return false;
+    this.font(segs[0]);
+    const colour = (c) => /^text-\[(#|rgba?\(|var\()/.test(c);
+    const flow = visibleChildren(parent).filter((c) => inFlow(c, parent));
+    const row = inFlow(node, parent) && parent.layoutMode === 'HORIZONTAL';
+    const grow = row && (flow[flow.length - 1] === node || parent.primaryAxisAlignItems === 'SPACE_BETWEEN' ||
+      sizingOf(node, parent, 'x') === 'FILL');
+    let box = pos;
+    if (grow) box = [...pos.filter((c) => !/^(w-|min-w-|flex-\[|shrink-0$|max-w-)/.test(c)), 'flex-1', 'min-w-0'];
+    else box = pos.map((c) => (/^min-w-\[/.test(c) && node.textAutoResize === 'WIDTH_AND_HEIGHT' ? c.slice(4) : c));
+    const classes = [...box, ...font.map((c) => (colour(c) ? `placeholder:${c}` : c)),
+      ...textBlockClasses(node).filter((c) => !/^(truncate|line-clamp|overflow-hidden|text-ellipsis)/.test(c)),
+      'bg-transparent', 'border-0', 'p-0', 'outline-none', field.type === 'search' ? '[appearance:none]' : null];
+    const characters = String(node.characters || '').trim();
+    const attrs = { type: field.type, placeholder: characters };
+    if (field.label !== characters) attrs['aria-label'] = field.label;
+    this.open(depth, 'input', classes, node, null, true, attrs);
+    return true;
+  }
+
+  /**
    * A mapped component: its layout stays on a wrapper, so the component
    * gets only the variant props it has in Figma; its texts are a hint.
    */
@@ -544,7 +578,7 @@ class Writer {
       return;
     }
     if (node.type === 'TEXT') {
-      this.text(node, pos, depth);
+      if (!this.inputs.has(node.id) || !this.input(node, parent, pos, depth)) this.text(node, pos, depth);
       return;
     }
     if (line) {
@@ -567,13 +601,16 @@ class Writer {
     const box = this.boxClasses(node, style, true);
     const strokes = strokeLayers(node, { clip: Boolean(node.clipsContent), radius: (grow) => radiusClasses(node, grow) });
     let classes = [...pos, ...containerClasses(node), ...box.classes, ...strokes.classes];
-    const scroll = this.screen && parent ? scrollsSideways(node, parent) : null;
+    const scroll = this.screen && parent ? scrollsSideways(node, parent, this.screen) : null;
     if (scroll) {
       // On a phone a row wider than its room scrolls sideways instead of
       // being cut off; its scroll starts where the design shows it.
-      classes = classes.filter((c) => c !== 'overflow-clip');
-      classes.push(...(scroll === 'beyond' ? ['max-w-full'] : []), 'overflow-x-auto', 'overflow-y-hidden', ...NO_SCROLLBAR);
-      this.warn(node, 'the row scrolls sideways on a phone: its content is wider than its room');
+      const when = scroll.below ? `max-[${px(scroll.below)}]:` : '';
+      if (!when) classes = classes.filter((c) => c !== 'overflow-clip');
+      classes.push(...(scroll.beyond ? ['max-w-full'] : []), `${when}overflow-x-auto`, `${when}overflow-y-hidden`, ...NO_SCROLLBAR);
+      this.warn(node, scroll.below
+        ? `the row scrolls sideways on screens narrower than ${num(scroll.below)}px, where its content would be cut off`
+        : 'the row scrolls sideways on a phone: its content is wider than its room');
     }
     const children = visibleChildren(node);
     const element = parent ? containerElement(node, this.inside()) : null;
@@ -584,6 +621,8 @@ class Writer {
       classes.push('text-start', 'cursor-pointer');
     }
     const extra = element ? element.attrs : {};
+    const field = tag === 'div' ? fieldPlaceholder(node, this.inside()) : null;
+    if (field) this.inputs.set(field.id, field);
     if (!children.length && !box.layers.length && !box.inner && !strokes.overlays.length) {
       this.open(depth, tag, classes, node, style, tag === 'div', extra);
       if (tag !== 'div') this.close(depth, tag);
@@ -641,20 +680,26 @@ function dashedLine(node) {
 }
 
 /**
- * Whether a row of a phone screen should scroll sideways: 'own' when its
- * content is wider than its box, 'beyond' when the row itself runs past its
- * column; else null.
+ * Whether a row of a phone screen scrolls sideways: { beyond, below }.
+ * [beyond] when the row runs past its column (it is then held to the
+ * column's width). A row whose content overflows its own box but ends
+ * inside the screen shows as in the design and scrolls only on screens
+ * narrower than where its content ends ([below], in px); otherwise
+ * [below] is null and it always scrolls. Null when the row fits.
  */
-function scrollsSideways(node, parent) {
+function scrollsSideways(node, parent, screen) {
   if (node.layoutMode !== 'HORIZONTAL' || node.layoutWrap === 'WRAP') return null;
   const flow = visibleChildren(node).filter((c) => inFlow(c, node));
   if (flow.length < 2) return null;
   const between = node.primaryAxisAlignItems === 'SPACE_BETWEEN';
-  const content = flow.reduce((t, c) => t + c.width, 0) + (between ? 0 : (node.itemSpacing || 0) * (flow.length - 1)) +
-    (node.paddingLeft || 0) + (node.paddingRight || 0);
-  if (content > node.width + 1) return 'own';
+  const items = flow.reduce((t, c) => t + c.width, 0) + (between ? 0 : (node.itemSpacing || 0) * (flow.length - 1));
+  const content = items + (node.paddingLeft || 0) + (node.paddingRight || 0);
+  if (content > node.width + 1) {
+    const end = node.x - screen.x + (node.paddingLeft || 0) + items;
+    return { beyond: false, below: end <= screen.width ? Math.ceil(end) : null };
+  }
   const right = parent.x + parent.width - (isAutoLayout(parent) ? parent.paddingRight || 0 : 0);
-  if (inFlow(node, parent) && parent.layoutMode === 'VERTICAL' && node.x + node.width > right + 1) return 'beyond';
+  if (inFlow(node, parent) && parent.layoutMode === 'VERTICAL' && node.x + node.width > right + 1) return { beyond: true, below: null };
   return null;
 }
 

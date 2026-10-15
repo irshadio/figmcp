@@ -15,6 +15,9 @@ const GENERATED_NAMES = [
   // A capture or export time in the name.
   /\b\d{1,2}[_.:]\d{2}[_.:]\d{2}( ?[AP]M)?\b/i,
   /\.(png|jpe?g|webp|gif|svg|avif|heic)( \d+)?$/i,
+  // A run of 20 characters without a space, or a background-removal export.
+  /[^\s]{20,}/,
+  /removebg|remove-bg|-nobg\b/i,
 ];
 const BUTTON_NAMES = /(^|[\s/_-])(button|btn|cta)([\s/_-]|$)/i;
 const NAV_NAMES = /(^|[\s/_-])(nav|navbar|navigation|tab ?bar|bottom ?nav|menu ?bar|breadcrumbs?)([\s/_-]|$)/i;
@@ -22,6 +25,10 @@ const HEADER_NAMES = /(^|[\s/_-])(header|top ?bar|app ?bar|masthead)([\s/_-]|$)/
 const FOOTER_NAMES = /(^|[\s/_-])footer([\s/_-]|$)/i;
 const HEADING_LEVEL = /(^|[\s/_-])h([1-6])([\s/_-]|$)/i;
 const HEADING_STYLES = /(^|[\s/_-])(heading|headline|title|display)([\s/_-]|$)/i;
+const FIELD_NAMES = /(^|[\s/_-])(input|text ?field|textfield|text ?box|text ?area|textarea|search ?(bar|field|box|input)|message ?(field|input|box|bar)|composer)([\s/_-]|$)/i;
+// What a placeholder says: an invitation to type, or a question to answer.
+const PLACEHOLDER_START = /^(search|type|enter|write|find|ask)\b/i;
+const PLACEHOLDER_QUESTION = /^(what|where|who|how|which|when)\b.*\?\s*$/i;
 const CONTAINERS = new Set(['FRAME', 'INSTANCE', 'COMPONENT', 'GROUP']);
 const CLICKS = new Set(['ON_CLICK', 'ON_PRESS', 'ON_MOUSE_DOWN', 'ON_MOUSE_UP']);
 
@@ -37,10 +44,16 @@ export function isGenericName(name, strict = false) {
   return KIND_NAMES.test(n) && (strict || NUMBERED.test(n));
 }
 
-/** A name for people: the layer's name when it says what the layer is, else ''. */
+/**
+ * A name for people: the layer's name without the suffixes Figma adds to
+ * pasted and duplicated layers ("Phone 1", "Card copy 2") and notes in
+ * brackets, when it says what the layer is; else ''.
+ */
 export function readableName(node) {
   if (!node || isGenericName(node.name, true)) return '';
-  return String(node.name).trim().replace(/\s+/g, ' ');
+  const name = String(node.name).replace(/\s*\([^)]*\)/g, ' ').replace(/(\s+copy(\s+\d+)?|\s+1)+\s*$/i, '')
+    .trim().replace(/\s+/g, ' ');
+  return name && !isGenericName(name, true) ? name : '';
 }
 
 /** The URL a click on [node] opens, if any. */
@@ -94,6 +107,35 @@ export function containerElement(node, inside) {
   if (NAV_NAMES.test(name) && !inside.has('nav')) return { tag: 'nav', attrs: {} };
   if (HEADER_NAMES.test(name) && !inside.has('header') && !inside.has('footer')) return { tag: 'header', attrs: {} };
   return null;
+}
+
+/**
+ * The placeholder text of a text field, when [node] is one: a box named
+ * like an input with one line of text, or a row much wider than its one
+ * left-aligned line that reads like a placeholder. Returns
+ * { id, type, label } for the text, or null.
+ */
+export function fieldPlaceholder(node, inside) {
+  if (!CONTAINERS.has(node.type) || ['a', 'button', 'label'].some((t) => inside.has(t))) return null;
+  const all = [];
+  const walk = (n) => {
+    if (!n || n.visible === false) return;
+    if (n.type === 'TEXT') all.push(n);
+    else if (n !== node && FIELD_NAMES.test(`${n.name || ''} ${componentName(n)}`)) all.push(null, null);
+    (n.children || []).forEach(walk);
+  };
+  (node.children || []).forEach(walk);
+  if (all.length !== 1 || !all[0]) return null;
+  const text = all[0];
+  const characters = String(text.characters || '').trim();
+  if (!characters || /[\n\u2028]/.test(characters) || characters.length > 80) return null;
+  const named = FIELD_NAMES.test(`${node.name || ''} ${componentName(node)}`);
+  const looks = (PLACEHOLDER_START.test(characters) || PLACEHOLDER_QUESTION.test(characters)) &&
+    (!text.textAlignHorizontal || text.textAlignHorizontal === 'LEFT') &&
+    node.height >= 24 && node.height <= 72 && node.width >= text.width * 1.5;
+  if (!named && !looks) return null;
+  const label = readableName(node) && !FIELD_NAMES.test(readableName(node)) ? readableName(node) : characters;
+  return { id: text.id, type: /search/i.test(`${node.name} ${characters}`) ? 'search' : 'text', label };
 }
 
 /** h1-h6 for a text whose Figma text style names a heading, else null. */

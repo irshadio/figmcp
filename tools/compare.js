@@ -124,6 +124,7 @@ export function compareBoxes(boxes, rects, bundled, tree = null) {
     const width = typeof got.scrollWidth === 'number' && Math.abs(got.scrollWidth - box.width) < Math.abs(got.width - box.width)
       ? got.scrollWidth : got.width;
     const d = ['x', 'y', 'width', 'height'].map((k) => Math.round(((k === 'width' ? width : got[k]) - box[k]) * 100) / 100);
+    if (got.grows && d[2] > 0) d[2] = 0;
     if (d.some((v) => Math.abs(v) > tol)) {
       const rounding = sensitive.get(box.id) && Math.abs(d[0]) <= ROUNDING && Math.abs(d[2]) <= ROUNDING &&
         Math.abs(d[1]) <= tol && Math.abs(d[3]) <= tol;

@@ -263,6 +263,8 @@ export async function reactCheck({
         boxes[node.getAttribute('data-node-id')] = {
           x: r.left - root.left, y: r.top - root.top, width: r.width, height: r.height,
           ...(scroller ? { scrollWidth: node.scrollWidth } : {}),
+          // A text field drawn from a placeholder may take its row's free room.
+          ...(node.tagName === 'INPUT' && parseFloat(getComputedStyle(node).flexGrow) > 0 ? { grows: true } : {}),
         };
       }
       // What of each layer shows: its box cut by the ancestors that clip or scroll.

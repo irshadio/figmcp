@@ -34,6 +34,17 @@ const RADII = { 6: 'md', 8: 'lg', 12: 'xl', 16: '2xl', 24: '3xl' };
  * valid in Tailwind 3.4 and 4 are used.
  */
 export function snapClass(cls) {
+  // Variants (placeholder:, max-[310px]:) stay; the utility after them snaps.
+  let depth = 0;
+  for (let i = cls.length - 1; i >= 0; i--) {
+    if (cls[i] === ']') depth++;
+    else if (cls[i] === '[') depth--;
+    else if (cls[i] === ':' && depth === 0) return cls.slice(0, i + 1) + snapUtility(cls.slice(i + 1));
+  }
+  return snapUtility(cls);
+}
+
+function snapUtility(cls) {
   const m = /^(-?)([a-z]+(?:-[a-z]+)*)-\[([^\]]+)\]$/.exec(cls);
   if (!m) return cls;
   const [, neg, prefix, value] = m;
