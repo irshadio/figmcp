@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { detectRoles } from '../src/codegen/roles.js';
 import { toSwiftUI } from '../src/codegen/swiftui/index.js';
+import { isGenericName } from '../src/codegen/swiftui/repeat.js';
 import { assetCatalog, detectFramework } from '../src/project.js';
 
 const CHECK = new URL('../tools/swiftui-check.js', import.meta.url);
@@ -316,6 +317,30 @@ test('toSwiftUI lays a freely placed screen out as a column that reflows', () =>
   // Tab bar items show the large content viewer; control labels keep one line.
   assert.match(home, /\.accessibilityShowsLargeContentViewer\(\)/);
   assert.match(home, /Text\(item\.title\)[\s\S]*?\.lineLimit\(1\)/);
+});
+
+test('toSwiftUI names layers Figma left unnamed from their role, text or section', () => {
+  assert.ok(isGenericName('Frame 2147232163') && isGenericName('Component 6') && isGenericName('image 2') && isGenericName('d'));
+  assert.ok(isGenericName('ChatGPT Image Sep 22, 2026, 02_07_02 PM 1'));
+  assert.ok(!isGenericName('Coins banner') && !isGenericName('Icon/plane') && !isGenericName('Tab bar'));
+  const { code, assets: named } = toSwiftUI(onboarding(), assets);
+  // The back button's glyph and the hero picture.
+  assert.ok('back' in named, Object.keys(named).join());
+  assert.ok('hero' in named, Object.keys(named).join());
+  assert.doesNotMatch(code, /component6|frame\d{5,}|ItemItem/);
+});
+
+test('toSwiftUI draws a pattern of many small vectors as one image', () => {
+  const doodles = Array.from({ length: 14 }, (_, i) => ({ ...icon('d', 20, 20, { x: (i % 7) * 50, y: 300 + Math.floor(i / 7) * 50 }), svgBounds: { x: (i % 7) * 50, y: 300 + Math.floor(i / 7) * 50, width: 20, height: 20 } }));
+  const root = onboarding();
+  root.children.push({ ...frame('Wallpaper', { x: 0, y: 300, w: 393, h: 100, children: doodles }), layoutPositioning: 'ABSOLUTE' });
+  const saved = [];
+  const { assets: named } = toSwiftUI(root, { ...assets, svg: (t) => { saved.push(t); return `/tmp/s${saved.length}.svg`; } });
+  assert.ok('wallpaper' in named, Object.keys(named).join());
+  assert.equal(Object.keys(named).filter((n) => /^d\d*$/.test(n)).length, 0);
+  const pattern = saved.find((t) => (t.match(/<svg/g) || []).length === 15);
+  assert.match(pattern, /^<svg width="393" height="100" viewBox="0 0 393 100"/);
+  assert.match(pattern, /<svg x="50" y="0" width="20" height="20"/);
 });
 
 test('toSwiftUI puts what screens share in DesignSystem.swift', () => {

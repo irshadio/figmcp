@@ -15,7 +15,7 @@ import {
   blendMode, blurs, composite, effectsOf, gradient, HELPERS, isRectangle, sColor, shadowArgs, shapeOf, swiftBlur,
 } from './paint.js';
 import { indicatorOf, PRESSABLE_STYLE, withIndicator } from './patterns.js';
-import { baseName, fieldsOf, mergeVariants, plural, runsOf } from './repeat.js';
+import { baseName, fieldsOf, isGenericName, mergeVariants, plural, runsOf } from './repeat.js';
 import { array, call, mod, print, raw, sIdent, sNum, sString, str, sType, trailing, view } from './swift.js';
 import { fontOf, isSystemFamily, textView } from './text.js';
 
@@ -119,6 +119,45 @@ function padded(v, [top, right, bottom, left]) {
   const sides = [['top', top], ['leading', left], ['bottom', bottom], ['trailing', right]].filter(([, x]) => x);
   if (sides.length === 1) return mod(v, 'padding', [[null, raw(`.${sides[0][0]}`)], [null, sides[0][1]]]);
   return mod(v, 'padding', [[null, call('EdgeInsets', [['top', top], ['leading', left], ['bottom', bottom], ['trailing', right]])]]);
+}
+
+// A frame of this many small vector layers and nothing else is a pattern.
+const PATTERN_SIZE = 12;
+
+/**
+ * [node] with each decorative pattern in it (a frame of many small vector
+ * layers, no text: a doodle wallpaper) drawn as one SVG, so it is one
+ * image set instead of one per layer.
+ */
+function withPatterns(node) {
+  if (!node || !node.children) return node;
+  const kids = node.children.filter((c) => c.visible !== false);
+  const pattern = ['FRAME', 'GROUP'].includes(node.type) && kids.length >= PATTERN_SIZE && !visiblePaints(node.fills).length &&
+    kids.every((c) => c.svg && !hasText(c) && c.width * c.height < node.width * node.height * 0.05);
+  if (!pattern) {
+    const children = node.children.map(withPatterns);
+    return children.some((c, i) => c !== node.children[i]) ? { ...node, children } : node;
+  }
+  const r = (v) => Math.round(v * 100) / 100;
+  const parts = kids.map((c) => {
+    const b = c.svgBounds || { x: c.x, y: c.y, width: c.width, height: c.height };
+    const open = /^<svg\b[^>]*>/.exec(c.svg)[0];
+    const attrs = open.replace(/\s(width|height|x|y)="[^"]*"/g, '').replace(/^<svg/, `<svg x="${r(b.x - node.x)}" y="${r(b.y - node.y)}" width="${r(b.width)}" height="${r(b.height)}"`);
+    return attrs + c.svg.slice(open.length);
+  });
+  const svg = `<svg width="${r(node.width)}" height="${r(node.height)}" viewBox="0 0 ${r(node.width)} ${r(node.height)}" fill="none" ` +
+    `xmlns="http://www.w3.org/2000/svg">\n${parts.join('\n')}\n</svg>`;
+  return { ...node, children: [], svg, svgBounds: { x: node.x, y: node.y, width: node.width, height: node.height } };
+}
+
+function findText(node, accept = () => true) {
+  if (!node || node.visible === false) return null;
+  if (node.type === 'TEXT') return accept(node) ? node : null;
+  for (const c of node.children || []) {
+    const t = findText(c, accept);
+    if (t) return t;
+  }
+  return null;
 }
 
 function hasText(node) {
@@ -243,7 +282,7 @@ class SwiftUIWriter {
     switch (role.role) {
       case 'button': case 'iconButton': return role.label;
       case 'link': return `${node.characters} ${role.section || ''}`;
-      default: return node.name;
+      default: return this.label(node);
     }
   }
 
@@ -470,9 +509,36 @@ class SwiftUIWriter {
     return name;
   }
 
+  /**
+   * A name saying what [node] is: its own unless Figma's default, else its
+   * role's label, its short text, or the nearest named ancestor's name
+   * with [kind] ("icon", "image", "section").
+   */
+  label(node, kind = null, { text = true } = {}) {
+    if (!isGenericName(node.name)) return node.name;
+    const role = this.roles.get(node.id);
+    if (role && role.label) return role.label;
+    const short = (t) => String(t || '').trim().split(/\s+/).slice(0, 3).join(' ');
+    if (isText(node)) return short(node.characters);
+    if (role && role.title) {
+      const title = this.byId.get(role.title);
+      if (title) return short(title.characters);
+    }
+    // A short text without digits names what holds it ("Service details"); one with digits is a value.
+    const first = text && kind !== 'icon' && kind !== 'image' ? findText(node, (t) => /^[^\d]{2,24}$/.test(String(t.characters).trim())) : null;
+    if (first) return short(first.characters);
+    for (let p = this.parents.get(node.id); p; p = this.parents.get(p.id)) {
+      if (!isGenericName(p.name)) return kind ? `${p.name} ${kind}` : p.name;
+    }
+    return kind || node.name;
+  }
+
   /** A view property holding [v], referenced by name. */
   extract(node, v) {
-    const name = this.member(node.name, 'section');
+    const label = this.label(node, 'section');
+    // A section shares its name with its items' data: it is that section.
+    const taken = this.propNames.has(sIdent(label, 'section')) && !/section$/i.test(label);
+    const name = this.member(taken ? `${label} section` : label, 'section');
     this.props.push({ name, view: v, node });
     return view('', [[null, raw(name)]]);
   }
@@ -741,7 +807,7 @@ class SwiftUIWriter {
 
   /** The asset name of a layer's SVG. */
   svgAsset(node) {
-    return this.asset(this.assets.svg(this.svgSource(node).text), 'svg', node.name, 'svg');
+    return this.asset(this.assets.svg(this.svgSource(node).text), 'svg', this.label(node, 'icon'), 'svg');
   }
 
   /** The one solid colour vector layers are painted with (fills and strokes), or null. */
@@ -784,7 +850,7 @@ class SwiftUIWriter {
 
   render(node, size) {
     this.rasterized.push({ id: node.id, name: node.name, reason: node.rasterized });
-    const name = this.asset(this.assets.render(node.render), 'image', node.name, 'png');
+    const name = this.asset(this.assets.render(node.render), 'image', this.label(node, 'image'), 'png');
     const image = mod(mod(view('Image', [[null, str(name)]]), 'resizable'), 'accessibilityHidden', [[null, true]]);
     return this.picture(node, size, node.renderBounds, image);
   }
@@ -835,7 +901,7 @@ class SwiftUIWriter {
     }
     const bound = this.bindings.get(node.id);
     const name = bound ? raw(bound)
-      : str(this.asset(source, 'image', node.name, this.assets.imageExt ? this.assets.imageExt(paint.imageHash) : 'png'));
+      : str(this.asset(source, 'image', this.label(node, 'image'), this.assets.imageExt ? this.assets.imageExt(paint.imageHash) : 'png'));
     const image = view('Image', [[null, name]]);
     const clip = (v) => (isRectangle(shape) ? mod(v, 'clipped') : mod(v, 'clipShape', [[null, shape]]));
     if (paint.rotation) this.warn(node, 'a rotated image fill is drawn unrotated');
@@ -1296,11 +1362,11 @@ class SwiftUIWriter {
         f.values = f.nodes.map((n) => {
           const p = n.fills.find((x) => x && x.visible !== false && x.type === 'IMAGE');
           const source = this.assets.image(p.imageHash);
-          return source ? this.asset(source, 'image', n.name, this.assets.imageExt ? this.assets.imageExt(p.imageHash) : 'png') : '';
+          return source ? this.asset(source, 'image', this.label(n, 'image'), this.assets.imageExt ? this.assets.imageExt(p.imageHash) : 'png') : '';
         });
       }
     }
-    const label = baseName(items, this.ancestors);
+    const label = baseName(items, this.ancestors, this.label(parent, 'item', { text: false }));
     const model = fields.length ? this.typeName(label) : null;
     const viewName = model ? `${model}View` : `${this.typeName(label)}View`;
     this.typeNames.add(viewName);
@@ -1549,12 +1615,22 @@ function printProperty(p) {
 export function toSwiftUI(root, assets, options = {}) {
   const writer = new SwiftUIWriter(assets, options);
   writer.ratios = autoLineRatios(root);
-  const rootNode = { ...root, x: root.x ?? 0, y: root.y ?? 0 };
+  const rootNode = withPatterns({ ...root, x: root.x ?? 0, y: root.y ?? 0 });
   const screen = options.screen ?? isPhoneScreen(rootNode);
   const structName = options.structName || sType(root.name, 'Design');
   writer.structName = structName;
   writer.typeNames.add(structName);
   writer.roles = detectRoles(rootNode);
+  writer.parents = new Map();
+  writer.byId = new Map();
+  const index = (n) => {
+    writer.byId.set(n.id, n);
+    for (const c of n.children || []) {
+      writer.parents.set(c.id, n);
+      index(c);
+    }
+  };
+  index(rootNode);
   let tree = null;
   if (screen) {
     writer.screen = rootNode;

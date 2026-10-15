@@ -4,6 +4,16 @@ import { drawnAsSvg, hasImageFill, visibleChildren } from '../nodes.js';
 import { casedRuns, segmentsOf } from '../text.js';
 
 const GENERIC = /^(row|rows|grid|list|items?|content|container|frame|group|stack|wrapper|body|section|text|auto layout.*|frame \d+)$/i;
+// Figma's default layer names and pasted file names, which say nothing of what a layer is.
+const DEFAULT_NAME = new RegExp('^((frame|group|component|instance|rectangle|rect|vector|ellipse|polygon|star|line|union|subtract|' +
+  'intersect|exclude|image|img|icon|ic|item|layer|shape|row|rows|column|grid|list|items|content|container|stack|wrapper|body|' +
+  'section|text|auto layout|property|variant)([\\s_/-]*\\d+)*|[a-z]|\\d+|.*\\bimage\\b.*\\d{3,}.*)$', 'i');
+
+/** Whether [name] says nothing of what its layer is ("Frame 2147232163", "Group 12", "image 2"). */
+export function isGenericName(name) {
+  const s = String(name || '').trim();
+  return !s || DEFAULT_NAME.test(s) || GENERIC.test(s);
+}
 
 /** A key that equal layers share whatever their texts, images and colours. */
 export function shapeKey(n) {
@@ -87,11 +97,11 @@ export function fieldsOf(items) {
 }
 
 /** A type name for the items: their shared layer name, else the nearest named ancestor, singular. */
-export function baseName(items, ancestors) {
+export function baseName(items, ancestors, label = null) {
   const first = items[0].name;
-  if (items.every((n) => n.name === first) && !GENERIC.test(first)) return first;
-  const named = [...ancestors].reverse().find((a) => a && !GENERIC.test(a.name || '') && /[A-Za-z]/.test(a.name || ''));
-  let word = named ? named.name : 'Item';
+  if (items.every((n) => n.name === first) && !isGenericName(first)) return first;
+  const named = [...ancestors].reverse().find((a) => a && !isGenericName(a.name) && /[A-Za-z]/.test(a.name || ''));
+  let word = named ? named.name : label || 'Item';
   // Items of a bar or a menu are its items, not bars.
   if (/(bar|menu|nav|navigation|toolbar)$/i.test(word)) word = `${word} item`;
   return word.replace(/(ch|sh|ss|x)es$/i, '$1').replace(/ies$/i, 'y').replace(/([^s])s$/i, '$1');
