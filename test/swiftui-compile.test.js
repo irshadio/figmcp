@@ -143,9 +143,9 @@ test('runs named like SwiftUI or generated types compile', { skip }, () => {
     frame('Scroll view', { w: 300, h: 40, mode: 'HORIZONTAL', layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG',
       children: [frame('Flow layout', { w: 100, h: 40, mode: 'HORIZONTAL', children: [text('A')] }), frame('Flow layout', { w: 100, h: 40, mode: 'HORIZONTAL', children: [text('B')] })] }),
   ], { h: 600 }));
-  // The screen and its own Action enum aside, no declared type takes a name the code uses.
+  // The screen and its own Action and Field enums aside, no declared type takes a name the code uses.
   for (const m of r.code.matchAll(/^\s*(struct|enum) (\w+)/gm)) {
-    if (m[2] !== r.structName && `${m[1]} ${m[2]}` !== 'enum Action') assert.ok(!SWIFT_TYPE_NAMES.has(m[2]), `declares ${m[2]}`);
+    if (m[2] !== r.structName && !['enum Action', 'enum Field'].includes(`${m[1]} ${m[2]}`)) assert.ok(!SWIFT_TYPE_NAMES.has(m[2]), `declares ${m[2]}`);
   }
   assert.equal(typecheck([r]), '');
 });

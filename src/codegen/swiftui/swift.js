@@ -42,7 +42,7 @@ export const SWIFT_TYPE_NAMES = new Set([
   'ContentUnavailableView', 'ShareLink', 'PhotosPicker', 'Canvas', 'TimelineView', 'Item', 'Action', 'Model', 'ID',
   'Preview', 'PreviewProvider', 'SubmitLabel', 'UIKeyboardType', 'UITextContentType', 'SensoryFeedback',
   // The generator's own helpers.
-  'FlowLayout', 'PressableButtonStyle', 'DesignTokens', 'AppFonts', 'DesignLineHeight', 'UIFont',
+  'FlowLayout', 'PressableButtonStyle', 'DesignTokens', 'AppFonts', 'DesignLineHeight', 'UIFont', 'Field', 'FocusState',
 ]);
 
 /** A Swift number literal, rounded to 4 decimals (ratios need them; points come rounded). */
@@ -170,8 +170,8 @@ function printCall(e, indent) {
     : `${e.name}${e.args.length || !e.body ? `(${printArgs(e.args, indent)})` : ''}`;
   if (e.body) out += `${e.args.length || e.name ? ' ' : ''}${printBody(e.body, indent, e.params)}`;
   for (const t of e.trailing || []) out += ` ${t.label}: ${printBody(t.body, indent)}`;
-  // Modifiers line up with a closing brace, else indent one level.
-  const at = e.view && out.endsWith('}') ? indent : indent + 1;
+  // Modifiers line up with a closing brace or parenthesis on its own line, else indent one level.
+  const at = e.view && (out.endsWith('}') || (out.endsWith(')') && out.includes('\n'))) ? indent : indent + 1;
   for (const m of e.mods) {
     const level = e.view ? at : indent;
     const args = m.args.length || !m.body ? `(${printArgs(m.args, level)})` : '';

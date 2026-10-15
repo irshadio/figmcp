@@ -12,11 +12,14 @@ const TEXT_STYLES = [
   [17, 'body'], [20, 'title3'], [22, 'title2'], [28, 'title'], [34, 'largeTitle'],
 ];
 
-export const PRESSABLE_STYLE = `/// Scales the label down a little while it is pressed.
+export const PRESSABLE_STYLE = `/// Scales the label down a little while it is pressed (only dims it when
+/// the person has asked for reduced motion).
 struct PressableButtonStyle: ButtonStyle {
+  @Environment(\\.accessibilityReduceMotion) private var reduceMotion
+
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .scaleEffect(configuration.isPressed ? 0.97 : 1)
+      .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
       .opacity(configuration.isPressed ? 0.9 : 1)
       .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
   }

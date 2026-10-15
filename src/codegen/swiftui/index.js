@@ -36,7 +36,8 @@ const EXTRACT_TYPES = new Set(['FRAME', 'GROUP', 'INSTANCE', 'COMPONENT', 'COMPO
 const NAMED_COLORS = { white: 'FFFFFF', black: '000000' };
 // Members the screen struct may declare apart from member(): its body, the
 // action closure, environment values, and names closures use.
-const RESERVED_MEMBERS = ['body', 'action', 'dismiss', 'openURL', 'dynamicTypeSize', 'index', 'item', 'isSelected', 'namespace'];
+const RESERVED_MEMBERS = ['body', 'action', 'dismiss', 'openURL', 'dynamicTypeSize', 'reduceMotion', 'focusedField', 'index', 'item',
+  'isSelected', 'namespace'];
 // Names of the Dynamic Type metrics scaledMetric declares.
 const METRIC_NAME = /^iconSize[\d_]+$/;
 // Roles whose layer is a Button calling the screen's action, and roles whose
@@ -304,6 +305,11 @@ class SwiftUIWriter {
     const role = this.roles.get(node.id);
     const kind = role ? role.role : null;
     if (kind === 'heading') return mod(core, 'accessibilityAddTraits', [[null, raw('.isHeader')]]);
+    const field = kind === 'textInput' && this.focus && this.focus.find((f) => f.id === node.id);
+    if (field) {
+      // A tap anywhere on the box starts editing its field.
+      return mod(mod(core, 'contentShape', [[null, call('Rectangle')]]), 'onTapGesture', [], [raw(`focusedField = .${field.name}`)]);
+    }
     if (this.inComponent) return core;
     const given = this.actions[node.id];
     if (!given && !TAPPABLE.has(kind)) return core;
@@ -323,7 +329,7 @@ class SwiftUIWriter {
       return this.button(core, [`action(.${name})`], { accessibilityLabel });
     }
     const pair = this.swaps.get(node.id);
-    if (pair && !given) return this.button(core, [`withAnimation(.snappy) { (${pair[0]}, ${pair[1]}) = (${pair[1]}, ${pair[0]}) }`], { accessibilityLabel });
+    if (pair && !given) return this.button(core, [`withAnimation(${this.motion('.snappy')}) { (${pair[0]}, ${pair[1]}) = (${pair[1]}, ${pair[0]}) }`], { accessibilityLabel });
     const name = this.actionCase(given || this.actionName(node, role));
     return this.button(core, [`action(.${name})`], { accessibilityLabel });
   }
@@ -566,8 +572,14 @@ class SwiftUIWriter {
    * the input's name or placeholder imply.
    */
   textInput(node, input, text) {
-    const state = this.member(`${input.label} text`, 'text');
+    // Named after the field ("Email"), else its placeholder.
+    // "Password field" is the password.
+    const own = String(input.name || '').replace(/[\s_-]*(text[\s_-]*)?(field|input|box)$/i, '').trim();
+    const named = own && !isGenericName(own) && !/^(text|search ?bar)$/i.test(own);
+    const base = named ? own : input.label;
+    const state = this.member(base, 'text');
     this.states.push(`  @State private var ${state} = ""`);
+    const focus = this.focusCase(input, base);
     const content = input.content || {};
     const font = (text.mods || []).find((m) => m.name === 'font');
     const color = (text.mods || []).find((m) => m.name === 'foregroundStyle');
@@ -577,8 +589,47 @@ class SwiftUIWriter {
     if (font) v = mod(v, 'font', font.args);
     if (content.textContentType) v = mod(v, 'textContentType', [[null, raw(content.textContentType)]]);
     if (content.keyboardType) v = mod(v, 'keyboardType', [[null, raw(content.keyboardType)]]);
-    if (content.submitLabel) v = mod(v, 'submitLabel', [[null, raw(content.submitLabel)]]);
-    return v;
+    v = mod(v, 'focused', [[null, raw('$focusedField')], ['equals', raw(`.${focus.name}`)]]);
+    v = mod(v, 'submitLabel', [[null, content.submitLabel ? raw(content.submitLabel) : focus.submitLabel]]);
+    return mod(v, 'onSubmit', [], [focus.submit]);
+  }
+
+  /**
+   * The focus case of a text input, in reading order: Return moves to the
+   * next field and the last one ends editing. Its submit statement and
+   * submit label are filled in once every field is known.
+   */
+  focusCase(input, label) {
+    if (!this.focus) {
+      this.focus = [];
+      this.states.push('  @FocusState private var focusedField: Field?');
+    }
+    let name = sIdent(label, 'field');
+    for (let i = 2; this.focus.some((f) => f.name === name); i++) name = `${sIdent(label, 'field')}${i}`;
+    const entry = { id: input.id, name, submit: raw(''), submitLabel: raw('') };
+    this.focus.push(entry);
+    return { name, submit: entry.submit, submitLabel: entry.submitLabel };
+  }
+
+  /** The Field enum and each field's submit, once every text input is drawn. */
+  finishFocus() {
+    if (!this.focus) return null;
+    // Declared after the fields' states.
+    const line = '  @FocusState private var focusedField: Field?';
+    this.states = [...this.states.filter((l) => l !== line), line];
+    this.focus.forEach((f, i) => {
+      const next = this.focus[i + 1];
+      f.submit.code = next ? `focusedField = .${next.name}` : 'focusedField = nil';
+      f.submitLabel.code = next ? '.next' : '.done';
+    });
+    return ['/// The screen\'s text fields, in the order Return moves through them.', 'enum Field: Hashable {',
+      ...this.focus.map((f) => `  case ${f.name}`), '}'].join('\n');
+  }
+
+  /** [animation], or none when the person has asked for reduced motion. */
+  motion(animation) {
+    if (this.inComponent) return animation;
+    return `${this.environment('accessibilityReduceMotion', 'reduceMotion')} ? nil : ${animation}`;
   }
 
   /** The environment's Dynamic Type size, declared once. */
@@ -1580,7 +1631,7 @@ class SwiftUIWriter {
     const tappable = SELECTABLE.has(kind) || TAPPABLE_ITEMS.has(this.roleOf(items[0])) || items.some((n) => this.actions[n.id]);
     const fires = tappable && kind !== 'segmented' && kind !== 'chips';
     const statements = [];
-    if (state) statements.push(`withAnimation(.snappy) { ${state} = index }`);
+    if (state) statements.push(`withAnimation(${this.motion('.snappy')}) { ${state} = index }`);
     if (fires) statements.push(`action(.${this.actionCase(label, model || 'Int')}(${model ? 'item' : 'index'}))`);
     if (state && SELECTABLE.has(kind)) {
       this.containerMods.set(parent.id, [['sensoryFeedback', [[null, raw('.selection')], ['trigger', raw(state)]]]]);
@@ -1837,8 +1888,10 @@ export function toSwiftUI(root, assets, options = {}) {
   }
   tree = tree || writer.node(rootNode, { kind: 'root' }) || view('EmptyView');
   // What only this screen uses lives in its namespace, so screens of one module do not clash.
+  const fields = writer.finishFocus();
   const nested = [
     ...(writer.tapped ? [actionEnum(writer.cases)] : []),
+    ...(fields ? [fields] : []),
     ...writer.components,
     ...writer.models,
   ];

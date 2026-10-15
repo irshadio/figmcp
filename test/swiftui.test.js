@@ -206,7 +206,8 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.match(code, /@Namespace private var tabBarItemIndicator/);
   assert.match(code, /@Namespace private var tripTypeIndicator/);
   assert.equal((code.match(/\.matchedGeometryEffect\(id: "selection", in: namespace\)/g) || []).length, 2);
-  assert.match(code, /withAnimation\(\.snappy\) \{ selectedTabBarItem = index \}/);
+  assert.match(code, /withAnimation\(reduceMotion \? nil : \.snappy\) \{ selectedTabBarItem = index \}/);
+  assert.match(code, /@Environment\(\\\.accessibilityReduceMotion\) private var reduceMotion/);
   assert.match(code, /\.sensoryFeedback\(\.selection, trigger: selectedTabBarItem\)/);
   assert.match(code, /\.accessibilityAddTraits\(index == selectedTripType \? \.isSelected : \[\]\)/);
   assert.doesNotMatch(code, /onTapGesture/);
@@ -228,7 +229,7 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.match(code, /@State private var from = RouteEnd\(title: "Kochi"\)/);
   assert.match(code, /@State private var to = RouteEnd\(title: "Dubai"\)/);
   assert.match(code, /Text\(from\.title\)/);
-  assert.match(code, /withAnimation\(\.snappy\) \{ \(from, to\) = \(to, from\) \}/);
+  assert.match(code, /withAnimation\(reduceMotion \? nil : \.snappy\) \{ \(from, to\) = \(to, from\) \}/);
   assert.doesNotMatch(code, /case swap\n/);
   assert.doesNotMatch(code, /struct PressableButtonStyle|enum DesignTokens|enum AppFonts|extension Color/);
   // Carousel, grid, header, fonts and decorative images.
@@ -412,8 +413,13 @@ test('toSwiftUI draws text inputs as fields bound to state, with their content t
     children: [input('Email', 'Email address', 120), input('Password field', 'Password', 190), input('Message Field', 'Message', 260)],
   });
   const { code } = toSwiftUI(root, assets);
-  assert.match(code, /@State private var emailAddressText = ""/);
-  assert.match(code, /TextField\(\n\s+"Email address",\n\s+text: \$emailAddressText,\n\s+prompt: Text\("Email address"\)/);
+  // State named after the field; Return moves through the fields; a tap on the box focuses its field.
+  assert.match(code, /@State private var email = ""\n  @State private var password = ""\n  @State private var message = ""\n  @FocusState private var focusedField: Field\?/);
+  assert.match(code, /TextField\(\n\s+"Email address",\n\s+text: \$email,\n\s+prompt: Text\("Email address"\)/);
+  assert.match(code, /\.focused\(\$focusedField, equals: \.email\)\n\s+\.submitLabel\(\.next\)\n\s+\.onSubmit \{\n\s+focusedField = \.password\n/);
+  assert.match(code, /\.onSubmit \{\n\s+focusedField = nil\n/);
+  assert.match(code, /enum Field: Hashable \{\n    case email\n    case password\n    case message\n  \}/);
+  assert.match(code, /\.onTapGesture \{\n\s+focusedField = \.email\n/);
   assert.match(code, /\.textContentType\(\.emailAddress\)\n\s+\.keyboardType\(\.emailAddress\)/);
   assert.match(code, /SecureField\(\n\s+"Password"/);
   assert.match(code, /\.textContentType\(\.password\)/);
