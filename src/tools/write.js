@@ -5,6 +5,8 @@ import path from 'node:path';
 import { z } from 'zod';
 import { fileKeySchema, guard, nodeIdSchema, text } from './common.js';
 
+// A result longer than this is cut, so one response stays readable.
+const RESULT_CHARS = 40000;
 const DEFAULT_TIMEOUT = 60000;
 const MAX_IMAGE = 20 * 1024 * 1024;
 
@@ -110,10 +112,24 @@ export function registerWriteTools(server, bridge) {
         .describe(`How long to wait for the script, in ms (default ${DEFAULT_TIMEOUT}).`),
     },
   }, guard(async ({ code, timeoutMs = DEFAULT_TIMEOUT }) => {
-    const { result, logs } = await bridge.call('run', { code }, timeoutMs);
+    let reply;
+    try {
+      reply = await bridge.call('run', { code }, timeoutMs);
+    } catch (e) {
+      if (!/did not answer "run" in time/.test(e.message)) throw e;
+      throw new Error(`The script did not finish within ${timeoutMs} ms. It may still be running in Figma and make its ` +
+        'changes later: check the file (get_metadata or get_screenshot) before running it again, and pass a larger ' +
+        'timeoutMs or split the work into smaller scripts.');
+    }
+    const { result, logs } = reply;
+    const json = JSON.stringify({ result }, null, 2);
+    const log = logs.length ? `Logs:\n${logs.join('\n')}` : '';
     return [
-      text({ result }),
-      logs.length && text(`Logs:\n${logs.join('\n')}`),
+      text(json.length > RESULT_CHARS
+        ? `${json.slice(0, RESULT_CHARS)}\n… cut: the result is ${json.length} characters. The script ran; return less ` +
+          '(ids and the fields you need) to see all of it.'
+        : json),
+      log && text(log.length > RESULT_CHARS ? `${log.slice(0, RESULT_CHARS)}\n… cut: ${logs.length} log lines.` : log),
     ];
   }));
 
