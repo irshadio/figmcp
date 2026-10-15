@@ -171,10 +171,20 @@ export function pixelDiff(a, b, masks = []) {
       }
     }
   }
+  // Beyond a pixel of rounding, area one image has and the other lacks differs.
+  const sizeMismatch = Math.abs(pa.width - pb.width) > 2 || Math.abs(pa.height - pb.height) > 2
+    ? `the design is ${pa.width}x${pa.height} px and the render ${pb.width}x${pb.height} px; the area outside their overlap counts as differing`
+    : null;
+  if (sizeMismatch) {
+    const extra = Math.max(pa.width, pb.width) * Math.max(pa.height, pb.height) - w * h;
+    bad += extra;
+    counted += extra;
+  }
   return {
     sizes: { design: [pa.width, pa.height], rendered: [pb.width, pb.height] },
     differingPixels: bad,
     differingPercent: counted ? Math.round((bad / counted) * 10000) / 100 : 0,
+    ...(sizeMismatch ? { sizeMismatch } : {}),
     image: PNG.sync.write(diff),
   };
 }
