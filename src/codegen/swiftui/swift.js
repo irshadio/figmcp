@@ -33,7 +33,8 @@ export function sString(value) {
 }
 
 function words(name) {
-  return String(name).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[^A-Za-z0-9]+/g, ' ').trim()
+  // A role tag in a layer name ("Pay [button]") is not part of the name.
+  return String(name).replace(/\[[A-Za-z-]+\]/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[^A-Za-z0-9]+/g, ' ').trim()
     .split(' ').filter(Boolean);
 }
 

@@ -33,7 +33,8 @@ import { families, loadDesign, pixelDiff } from './compare.js';
 import { familyFiles, fetchGoogleFont, FONT_CACHE, fontFiles, SYSTEM_FONTS } from './flutter-check.js';
 
 const CHECK_DIR = path.join(DATA_DIR, 'swiftui-check');
-const BUNDLE_ID = 'dev.figmcp.swiftui-check';
+// One app per run, so runs side by side do not stop each other's.
+const BUNDLE_ID = `dev.figmcp.swiftui-check.p${process.pid}`;
 const EXECUTABLE = 'SwiftUICheck';
 const TARGET = `${process.arch === 'arm64' ? 'arm64' : 'x86_64'}-apple-ios17.0-simulator`;
 const RENDER_TIMEOUT = 90000;
@@ -257,6 +258,7 @@ function render(device, app, out, { w, h, top, bottom }) {
   const until = Date.now() + RENDER_TIMEOUT;
   while (!fs.existsSync(out) && Date.now() < until) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
   run('xcrun', ['simctl', 'terminate', device, BUNDLE_ID]);
+  run('xcrun', ['simctl', 'uninstall', device, BUNDLE_ID]);
   if (!fs.existsSync(out)) throw new Error('The simulator did not render the view in time.');
 }
 

@@ -365,6 +365,8 @@ test('detectRoles gives each role its confidence and evidence, and layer name ta
   assert.deepEqual([byName(tagged, 'Header [button]').role, byName(tagged, 'Header [button]').confidence], ['button', 'set by name']);
   assert.equal(byName(tagged, 'Fares [no-role]'), undefined);
   assert.equal([...tagged.values()].filter((r) => r.role === 'chip').length, 0);
+  // Tags stay out of the code's names.
+  assert.doesNotMatch(toSwiftUI(root, assets).code, /noRole|Button\]|headerButton\b/i);
 });
 
 test('toSwiftUI uses the system segmented control when the design draws one', () => {
