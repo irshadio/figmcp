@@ -110,8 +110,9 @@ function literal(text) {
 }
 
 /**
- * The text of [node] as a view, without its frame: a Text, Text runs joined
- * with +, or a VStack of them when paragraphs are spaced or listed. Returns
+ * The text of [node] as a view, without its frame: a Text, styled runs
+ * interpolated into one Text, or a VStack of them when paragraphs are
+ * spaced or listed. Returns
  * { view, lineHeight, natural } with the line height the text keeps.
  */
 export function textView(node, ctx) {
@@ -148,8 +149,10 @@ export function textView(node, ctx) {
     if (!runs.length) runs.push({ index: 0, text: '' });
     if (ctx.bind) return applied(view('', [[null, applied(call('Text', [[null, raw(ctx.bind)]]), own[0])]]), shared);
     if (runs.length === 1) return applied(view('', [[null, applied(literal(runs[0].text), own[runs[0].index])]]), shared);
-    const joined = runs.map((r) => print(applied(literal(r.text), own[r.index]))).join(' + ');
-    return applied(view('', [[null, raw(`(${joined})`)]]), shared);
+    // Runs are interpolated into one Text: a chain of Text + Text slows the
+    // type checker down with each run, and iOS 26 deprecates it.
+    const joined = runs.map((r) => `\\(${print(applied(literal(r.text), own[r.index]))})`).join('');
+    return applied(view('', [[null, raw(`Text("${joined}")`)]]), shared);
   };
 
   const seg = segs[0];

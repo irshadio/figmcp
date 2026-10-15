@@ -1,7 +1,7 @@
 // SwiftUI patterns the layer roles become: the press-scale button style,
 // the sliding selection indicator of a tab bar or segmented control, and the
 // text style a font size scales with.
-import { mergeVariants } from './repeat.js';
+import { mergeTrees } from './repeat.js';
 import { mod, print, raw } from './swift.js';
 
 const SHAPES = new Set(['Rectangle', 'RoundedRectangle', 'Capsule', 'Circle', 'Ellipse', 'UnevenRoundedRectangle']);
@@ -45,8 +45,8 @@ function isShapeFill(e) {
   return Boolean(c) && c.kind === 'call' && SHAPES.has(c.name) && !c.body && c.mods.some((m) => m.name === 'fill');
 }
 
-function mergeable(a, b) {
-  return mergeVariants(print(a, 2), print(b, 2)) !== null;
+function mergeable(a, b, options) {
+  return mergeTrees(a, b, options) !== null;
 }
 
 /** [e] with the indicator's place marked as a background at mod index [at]. */
@@ -61,7 +61,7 @@ function marked(e, at = e.mods.length) {
  * and otherwise differing in values only. Null when the items differ in
  * more than that.
  */
-export function indicatorOf(on, off) {
+export function indicatorOf(on, off, options = {}) {
   if (!on || !off || on.kind !== 'call' || off.kind !== 'call') return null;
   const a = unwrap(on);
   const b = unwrap(off);
@@ -70,25 +70,25 @@ export function indicatorOf(on, off) {
     const m = a.mods[i];
     if (m.name !== 'background' || !m.body || m.body.length !== 1 || !isShapeFill(m.body[0])) continue;
     const stripped = { ...a, mods: a.mods.filter((_, j) => j !== i) };
-    if (mergeable(stripped, b)) return { indicator: unwrap(m.body[0]), on: marked(stripped, i), off: marked(b, i) };
+    if (mergeable(stripped, b, options)) return { indicator: unwrap(m.body[0]), on: marked(stripped, i), off: marked(b, i) };
   }
   // A shape under the content of a ZStack the unselected item draws bare.
   if (a.name === 'ZStack' && Array.isArray(a.body) && a.body.length === 2 && isShapeFill(a.body[0])) {
     const inner = unwrap(a.body[1]);
     if (inner && inner.kind === 'call') {
       const flat = { ...inner, mods: [...inner.mods, ...a.mods] };
-      if (mergeable(flat, b)) return { indicator: unwrap(a.body[0]), on: marked(flat), off: marked(b) };
+      if (mergeable(flat, b, options)) return { indicator: unwrap(a.body[0]), on: marked(flat), off: marked(b) };
     }
   }
   // The same place deeper in both trees.
   if (Array.isArray(a.body) && Array.isArray(b.body) && a.body.length === b.body.length) {
     for (let i = 0; i < a.body.length; i++) {
-      const r = indicatorOf(a.body[i], b.body[i]);
+      const r = indicatorOf(a.body[i], b.body[i], options);
       if (!r) continue;
       const withAt = (e, item) => ({ ...e, body: e.body.map((x, j) => (j === i ? item : x)) });
       const onTree = withAt(a, r.on);
       const offTree = withAt(b, r.off);
-      if (mergeable(onTree, offTree)) return { indicator: r.indicator, on: onTree, off: offTree };
+      if (mergeable(onTree, offTree, options)) return { indicator: r.indicator, on: onTree, off: offTree };
     }
   }
   return null;

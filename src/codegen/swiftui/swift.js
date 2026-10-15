@@ -11,6 +11,40 @@ const RESERVED = new Set([
 ]);
 const WIDTH = 100;
 
+/**
+ * Type names a generated type must not take: Swift, Foundation and SwiftUI
+ * types the code uses or a project commonly does, and the generator's own
+ * helpers. A nested type of that name would shadow them in the screen.
+ */
+export const SWIFT_TYPE_NAMES = new Set([
+  // Swift and Foundation.
+  'Any', 'AnyObject', 'Self', 'Type', 'Protocol', 'Never', 'Void', 'Optional', 'Array', 'Dictionary', 'Set', 'String',
+  'Substring', 'Character', 'Int', 'UInt', 'UInt32', 'Int32', 'Double', 'Float', 'Bool', 'Error', 'Result', 'Range',
+  'ClosedRange', 'Sequence', 'Collection', 'Hashable', 'Equatable', 'Identifiable', 'Codable', 'Decodable', 'Encodable',
+  'Comparable', 'Sendable', 'Data', 'Date', 'URL', 'UUID', 'Locale', 'Measurement', 'Decimal', 'Task', 'MainActor',
+  'CGFloat', 'CGPoint', 'CGSize', 'CGRect', 'CGAffineTransform', 'AttributedString', 'LocalizedStringKey', 'Bundle',
+  'Notification', 'Timer', 'Calendar', 'TimeZone', 'Formatter', 'NumberFormatter', 'DateFormatter', 'Mirror',
+  // SwiftUI views and values.
+  'App', 'Scene', 'View', 'ViewModifier', 'ViewBuilder', 'Body', 'Content', 'EmptyView', 'AnyView', 'TupleView', 'Group',
+  'Text', 'Image', 'Label', 'Button', 'ButtonStyle', 'PrimitiveButtonStyle', 'Link', 'Toggle', 'Picker', 'Slider',
+  'Stepper', 'DatePicker', 'ColorPicker', 'Menu', 'TextField', 'SecureField', 'TextEditor', 'Form', 'Section', 'List',
+  'ForEach', 'ScrollView', 'ScrollViewReader', 'ScrollViewProxy', 'GeometryReader', 'GeometryProxy', 'NavigationStack',
+  'NavigationLink', 'NavigationView', 'NavigationSplitView', 'NavigationPath', 'TabView', 'Tab', 'HStack', 'VStack',
+  'ZStack', 'LazyHStack', 'LazyVStack', 'LazyHGrid', 'LazyVGrid', 'Grid', 'GridRow', 'GridItem', 'Spacer', 'Divider',
+  'Layout', 'AnyLayout', 'HStackLayout', 'VStackLayout', 'ZStackLayout', 'Color', 'Font', 'Gradient', 'LinearGradient',
+  'RadialGradient', 'AngularGradient', 'EllipticalGradient', 'Shape', 'ShapeStyle', 'AnyShape', 'Path', 'Rectangle',
+  'RoundedRectangle', 'UnevenRoundedRectangle', 'Capsule', 'Circle', 'Ellipse', 'Material', 'Angle', 'Animation',
+  'Transaction', 'Transition', 'AnyTransition', 'Edge', 'EdgeInsets', 'Alignment', 'HorizontalAlignment',
+  'VerticalAlignment', 'Axis', 'UnitPoint', 'StrokeStyle', 'BlendMode', 'ContentMode', 'ColorScheme',
+  'DynamicTypeSize', 'State', 'Binding', 'Bindable', 'Environment', 'EnvironmentValues', 'EnvironmentObject',
+  'ObservedObject', 'StateObject', 'Observable', 'ObservableObject', 'Published', 'Namespace', 'ScaledMetric',
+  'FocusState', 'AppStorage', 'SceneStorage', 'Gauge', 'ProgressView', 'Map', 'Chart', 'Table', 'Badge',
+  'ContentUnavailableView', 'ShareLink', 'PhotosPicker', 'Canvas', 'TimelineView', 'Item', 'Action', 'Model', 'ID',
+  'Preview', 'PreviewProvider', 'SubmitLabel', 'UIKeyboardType', 'UITextContentType', 'SensoryFeedback',
+  // The generator's own helpers.
+  'FlowLayout', 'PressableButtonStyle', 'DesignTokens', 'AppFonts',
+]);
+
 /** A Swift number literal, rounded to 4 decimals (ratios need them; points come rounded). */
 export function sNum(v) {
   const n = Math.round(v * 10000) / 10000;

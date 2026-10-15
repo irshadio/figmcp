@@ -2,6 +2,7 @@
 // by data, and a run where one item is drawn differently is a selection.
 import { drawnAsSvg, hasImageFill, visibleChildren } from '../nodes.js';
 import { casedRuns, segmentsOf } from '../text.js';
+import { print, raw } from './swift.js';
 
 const GENERIC = /^(row|rows|grid|list|items?|content|container|frame|group|stack|wrapper|body|section|text|auto layout.*|frame \d+)$/i;
 // Figma's default layer names and pasted file names, which say nothing of what a layer is.
@@ -114,35 +115,99 @@ export function plural(ident) {
   return `${ident}s`;
 }
 
+// More ternaries than this in one item body slow the type checker down;
+// the item is then drawn with if isSelected { ... } else { ... }.
+const MAX_TERNARIES = 6;
+const GRADIENTS = new Set(['LinearGradient', 'RadialGradient', 'AngularGradient', 'EllipticalGradient']);
+// Calls whose string arguments are what the user reads: a differing label is data, not selection.
+const LABELS = new Set(['Text', 'Label', 'TextField', 'SecureField', 'Link', 'Toggle', 'Picker']);
+
 /**
- * Merges the code of a selected and an unselected item: a single body with
- * `isSelected ? a : b` where only values differ, else null.
+ * The Swift type a value has, as far as a ternary needs: values of one
+ * class can be the two sides of `isSelected ? a : b`. Null when unknown.
+ * [tokenType] gives the type of a design token by its identifier.
  */
-export function mergeVariants(on, off) {
-  const a = on.split('\n');
-  const b = off.split('\n');
-  if (a.length !== b.length) return null;
-  const out = [];
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] === b[i]) {
-      out.push(a[i]);
-      continue;
-    }
-    let p = 0;
-    while (p < a[i].length && a[i][p] === b[i][p]) p++;
-    let s = 0;
-    while (s < a[i].length - p && s < b[i].length - p && a[i][a[i].length - 1 - s] === b[i][b[i].length - 1 - s]) s++;
-    // Widen to whole arguments: from after '(', ' ' or ',' to before ')' or ','.
-    while (p > 0 && !/[( ,]/.test(a[i][p - 1])) p--;
-    const balanced = (t) => [...t].reduce((d, c) => d + (c === '(' ? 1 : c === ')' ? -1 : 0), 0) === 0;
-    const mid = (line) => line.slice(p, line.length - s);
-    while (s > 0 && (!balanced(mid(a[i])) || !balanced(mid(b[i])) || !/[),]/.test(a[i][a[i].length - s]))) s--;
-    const x = mid(a[i]);
-    const y = mid(b[i]);
-    if (!balanced(x) || !balanced(y) || !x.trim() || !y.trim()) return null;
-    // A colour and a gradient are different types.
-    if (/Gradient\(/.test(x) !== /Gradient\(/.test(y)) return null;
-    out.push(`${a[i].slice(0, p)}isSelected ? ${x} : ${y}${a[i].slice(a[i].length - s)}`);
+function classOf(v, tokenType) {
+  if (typeof v === 'number') return 'number';
+  if (typeof v === 'boolean') return 'bool';
+  if (!v || typeof v !== 'object') return null;
+  if (v.kind === 'str') return 'string';
+  if (v.kind === 'raw') {
+    const code = v.code.trim();
+    if (/^-?\d+(\.\d+)?$/.test(code) || /^iconSize[\d_]+$/.test(code)) return 'number';
+    if (/^Color\(hex: 0x[0-9A-F]{6}(, opacity: [\d.]+)?\)$/.test(code)) return 'Color';
+    const token = /^DesignTokens\.(\w+)(\.opacity\([\d.]+\))?$/.exec(code);
+    if (token) return tokenType(token[1]) === 'Color' ? 'Color' : token[2] ? null : 'number';
+    if (/^AppFonts\.\w+$/.test(code)) return 'Font';
+    if (/^\.[a-zA-Z]\w*$/.test(code)) return 'member';
+    return null;
   }
-  return out.join('\n');
+  if (v.kind === 'call') {
+    if (GRADIENTS.has(v.name) && !v.view) return v.name;
+    if ((v.name === '.custom' || v.name === '.system') && !v.view) return 'Font';
+  }
+  return null;
+}
+
+/**
+ * The code of a selected item [on] and an unselected one [off] (expression
+ * trees) as one tree: where only values of one type differ, the value
+ * becomes `isSelected ? a : b`. Null when the items differ in structure
+ * (another modifier, another view), in a label's text, or in more values
+ * than one expression should hold.
+ */
+export function mergeTrees(on, off, { tokenType = () => null } = {}) {
+  let left = MAX_TERNARIES;
+  const ternary = (a, b) => {
+    const x = print(a, 0);
+    const y = print(b, 0);
+    if (x.includes('\n') || y.includes('\n') || --left < 0) return null;
+    return raw(`isSelected ? ${x} : ${y}`);
+  };
+  const same = (a, b) => a === b || (typeof a === 'object' && typeof b === 'object' && a && b && print(a, 0) === print(b, 0));
+  const value = (a, b, owner) => {
+    if (same(a, b)) return a;
+    if (a && b && typeof a === 'object' && typeof b === 'object' && a.kind === 'call' && b.kind === 'call') {
+      const merged = node(a, b);
+      if (merged) return merged;
+    }
+    if (a && b && typeof a === 'object' && typeof b === 'object' && a.kind === 'array' && b.kind === 'array') {
+      if (a.items.length !== b.items.length) return null;
+      const items = a.items.map((x, i) => value(x, b.items[i], owner));
+      return items.every((x) => x !== null) ? { ...a, items } : null;
+    }
+    const type = classOf(a, tokenType);
+    if (!type || type !== classOf(b, tokenType)) return null;
+    if (type === 'string' && LABELS.has(owner)) return null;
+    return ternary(a, b);
+  };
+  const args = (x, y, owner) => {
+    if (x.length !== y.length || x.some(([label], i) => label !== y[i][0])) return null;
+    const out = x.map(([label, v], i) => [label, value(v, y[i][1], owner)]);
+    return out.every(([, v]) => v !== null) ? out : null;
+  };
+  const body = (x, y) => {
+    if (!Array.isArray(x) || !Array.isArray(y)) return x === y || same(x, y) ? x : null;
+    if (x.length !== y.length) return null;
+    const out = x.map((item, i) => (same(item, y[i]) ? item : item && y[i] && item.kind === 'call' && y[i].kind === 'call' ? node(item, y[i]) : null));
+    return out.every((item) => item !== null) ? out : null;
+  };
+  const node = (a, b) => {
+    if (same(a, b)) return a;
+    if (a.kind !== 'call' || b.kind !== 'call' || a.name !== b.name || a.params !== b.params || a.view !== b.view) return null;
+    if (a.mods.length !== b.mods.length || (a.trailing || []).length !== (b.trailing || []).length) return null;
+    const merged = { ...a, args: args(a.args, b.args, a.name), body: body(a.body, b.body) };
+    if (!merged.args || (a.body && !merged.body)) return null;
+    merged.trailing = (a.trailing || []).map((t, i) => (t.label === b.trailing[i].label ? { ...t, body: body(t.body, b.trailing[i].body) } : null));
+    if (merged.trailing.some((t) => !t || !t.body)) return null;
+    merged.mods = a.mods.map((m, i) => {
+      const n = b.mods[i];
+      if (m.name !== n.name || Boolean(m.body) !== Boolean(n.body)) return null;
+      const margs = args(m.args, n.args, m.name);
+      const mbody = m.body || n.body ? body(m.body, n.body) : null;
+      return margs && (!m.body || mbody) ? { ...m, args: margs, body: mbody } : null;
+    });
+    return merged.mods.every(Boolean) ? merged : null;
+  };
+  return node(on, off);
 }

@@ -59,7 +59,8 @@ const SWIFTUI_GUIDANCE =
   'snapping carousels, pinned bars, the header trait on titles, accessibility ' +
   'labels on icon buttons, decorative images hidden from VoiceOver). ' +
   'Selection is @State initialised to the design; the screen tells its ' +
-  'owner what to do through its action enum: own that state in a view model ' +
+  'owner what to do through its nested Action enum (the screen\'s `action` closure; types only the ' +
+  'screen uses, like its item models, are nested in it too): own that state in a view model ' +
   'or the owning view, wire each case to real navigation (NavigationStack, ' +
   'sheets, tab switching) and replace the literal data with the model\'s. ' +
   'A phone-sized frame is drawn as a screen: it fills the screen and scrolls, ' +

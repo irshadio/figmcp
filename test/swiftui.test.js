@@ -195,7 +195,9 @@ test('toSwiftUI builds the roles as production patterns', () => {
   const { code, structure, screen: isScreen } = toSwiftUI(screen(), assets);
   assert.ok(isScreen);
   // Data, models and selection state.
-  assert.match(code, /struct TabBarItem: Hashable \{\n  let icon: String\n  let title: String\n\}/);
+  // Types only this screen uses are nested in it.
+  assert.match(code, /\nextension Home \{\n/);
+  assert.match(code, /\n  struct TabBarItem: Hashable \{\n    let icon: String\n    let title: String\n  \}/);
   assert.match(code, /private let tabBarItems: \[TabBarItem\] = \[/);
   assert.match(code, /@State private var selectedTabBarItem = 0/);
   assert.match(code, /@State private var selectedTripType = 0/);
@@ -209,8 +211,8 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.match(code, /\.accessibilityAddTraits\(index == selectedTripType \? \.isSelected : \[\]\)/);
   assert.doesNotMatch(code, /onTapGesture/);
   // Buttons with a typed action.
-  assert.match(code, /var action: \(HomeAction\) -> Void = \{ _ in \}/);
-  assert.match(code, /enum HomeAction: Hashable \{/);
+  assert.match(code, /var action: \(Action\) -> Void = \{ _ in \}/);
+  assert.match(code, /\n  enum Action: Hashable \{/);
   assert.match(code, /case tabBarItem\(TabBarItem\)/);
   assert.match(code, /case searchFlights\n/);
   assert.match(code, /case bell\n/);
@@ -222,7 +224,7 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.match(code, /\.buttonStyle\(\.pressable\)/);
   assert.match(code, /\.accessibilityLabel\("Bell"\)/);
   // The route's ends swap as state.
-  assert.match(code, /struct RouteEnd: Hashable \{\n  let title: String\n\}/);
+  assert.match(code, /struct RouteEnd: Hashable \{\n    let title: String\n  \}/);
   assert.match(code, /@State private var from = RouteEnd\(title: "Kochi"\)/);
   assert.match(code, /@State private var to = RouteEnd\(title: "Dubai"\)/);
   assert.match(code, /Text\(from\.title\)/);

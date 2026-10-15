@@ -15,8 +15,10 @@ import {
   blendMode, blurs, composite, effectsOf, gradient, HELPERS, isRectangle, sColor, shadowArgs, shapeOf, swiftBlur,
 } from './paint.js';
 import { indicatorOf, PRESSABLE_STYLE, withIndicator } from './patterns.js';
-import { baseName, fieldsOf, isGenericName, mergeVariants, plural, runsOf } from './repeat.js';
-import { array, call, mod, print, raw, sIdent, sNum, sString, str, sType, trailing, view } from './swift.js';
+import { baseName, fieldsOf, isGenericName, mergeTrees, plural, runsOf } from './repeat.js';
+import {
+  array, call, mod, print, raw, sIdent, sNum, sString, str, sType, SWIFT_TYPE_NAMES, trailing, view,
+} from './swift.js';
 import { fontOf, isSystemFamily, textView } from './text.js';
 
 const H_ALIGN = { MIN: 'leading', CENTER: '', MAX: 'trailing', SPACE_BETWEEN: 'leading' };
@@ -30,15 +32,13 @@ const INFINITY = raw('.infinity');
 // which keeps each expression small for the Swift type checker.
 const EXTRACT_SIZE = 10;
 const EXTRACT_TYPES = new Set(['FRAME', 'GROUP', 'INSTANCE', 'COMPONENT', 'COMPONENT_SET', 'SECTION']);
-const SWIFTUI_TYPES = new Set([
-  'Button', 'Text', 'Image', 'Label', 'Toggle', 'Map', 'Section', 'List', 'Group', 'Tab', 'Color', 'Font', 'Shape',
-  'Path', 'Grid', 'Menu', 'Link', 'Picker', 'Form', 'Divider', 'Spacer', 'Circle', 'Capsule', 'Rectangle', 'Ellipse',
-  'Gradient', 'Angle', 'Animation', 'Edge', 'Alignment', 'Axis', 'Content', 'View', 'Item', 'Date', 'Data', 'Set',
-  'Array', 'String', 'Int', 'Double', 'Error', 'Result', 'State', 'Binding', 'Environment', 'Stepper', 'Slider',
-  'Gauge', 'Table', 'Layout', 'Material', 'Badge', 'Chart',
-]);
 
 const NAMED_COLORS = { white: 'FFFFFF', black: '000000' };
+// Members the screen struct may declare apart from member(): its body, the
+// action closure, environment values, and names closures use.
+const RESERVED_MEMBERS = ['body', 'action', 'dismiss', 'openURL', 'dynamicTypeSize', 'index', 'item', 'isSelected', 'namespace'];
+// Names of the Dynamic Type metrics scaledMetric declares.
+const METRIC_NAME = /^iconSize[\d_]+$/;
 // Roles whose layer is a Button calling the screen's action, and roles whose
 // items select on tap.
 // Item runs, by the word their name ends in.
@@ -125,6 +125,12 @@ function padded(v, [top, right, bottom, left]) {
 
 // A frame of this many small vector layers and nothing else is a pattern.
 const PATTERN_SIZE = 12;
+const SVG_OPEN = /^<svg\b[^>]*>/;
+
+/** [svg] from its <svg> element on, without an XML declaration, doctype or comments before it. */
+function svgBody(svg) {
+  return String(svg).replace(/^\s*(<\?xml[^>]*\?>|<!DOCTYPE[^>]*>|<!--[\s\S]*?-->|\s)*/i, '');
+}
 
 /**
  * [node] with each decorative pattern in it (a frame of many small vector
@@ -135,7 +141,7 @@ function withPatterns(node) {
   if (!node || !node.children) return node;
   const kids = node.children.filter((c) => c.visible !== false);
   const pattern = ['FRAME', 'GROUP'].includes(node.type) && kids.length >= PATTERN_SIZE && !visiblePaints(node.fills).length &&
-    kids.every((c) => c.svg && !hasText(c) && c.width * c.height < node.width * node.height * 0.05);
+    kids.every((c) => c.svg && !hasText(c) && c.width * c.height < node.width * node.height * 0.05 && SVG_OPEN.test(svgBody(c.svg)));
   if (!pattern) {
     const children = node.children.map(withPatterns);
     return children.some((c, i) => c !== node.children[i]) ? { ...node, children } : node;
@@ -143,9 +149,10 @@ function withPatterns(node) {
   const r = (v) => Math.round(v * 100) / 100;
   const parts = kids.map((c) => {
     const b = c.svgBounds || { x: c.x, y: c.y, width: c.width, height: c.height };
-    const open = /^<svg\b[^>]*>/.exec(c.svg)[0];
+    const svg = svgBody(c.svg);
+    const open = SVG_OPEN.exec(svg)[0];
     const attrs = open.replace(/\s(width|height|x|y)="[^"]*"/g, '').replace(/^<svg/, `<svg x="${r(b.x - node.x)}" y="${r(b.y - node.y)}" width="${r(b.width)}" height="${r(b.height)}"`);
-    return attrs + c.svg.slice(open.length);
+    return attrs + svg.slice(open.length);
   });
   const svg = `<svg width="${r(node.width)}" height="${r(node.height)}" viewBox="0 0 ${r(node.width)} ${r(node.height)}" fill="none" ` +
     `xmlns="http://www.w3.org/2000/svg">\n${parts.join('\n')}\n</svg>`;
@@ -218,7 +225,7 @@ class SwiftUIWriter {
     this.textStyles = new Map();
     this.textStyleIdents = new Set();
     this.props = [];
-    this.propNames = new Set(['body']);
+    this.propNames = new Set(RESERVED_MEMBERS);
     this.warnings = [];
     this.rasterized = [];
     this.connected = new Map();
@@ -371,6 +378,12 @@ class SwiftUIWriter {
     return raw(`DesignTokens.${ident}`);
   }
 
+  /** 'Color' or 'CGFloat': the type of the design token [ident]. */
+  tokenType(ident) {
+    for (const t of this.tokens.values()) if (t.ident === ident) return t.type;
+    return null;
+  }
+
   /** A number, or its design token when a variable is bound. */
   value(v, varName) {
     const n = round(v);
@@ -484,8 +497,10 @@ class SwiftUIWriter {
 
   /** A member name of the screen struct, unique. */
   member(label, fallback) {
-    let name = sIdent(label, fallback);
-    for (let i = 2; this.propNames.has(name); i++) name = `${sIdent(label, fallback)}${i}`;
+    let base = sIdent(label, fallback);
+    if (METRIC_NAME.test(base)) base = `${base}${fallback[0].toUpperCase()}${fallback.slice(1)}`;
+    let name = base;
+    for (let i = 2; this.propNames.has(name); i++) name = `${base}${i}`;
     this.propNames.add(name);
     return name;
   }
@@ -493,11 +508,25 @@ class SwiftUIWriter {
   /** A type name, unique in the file and clear of SwiftUI's own types. */
   typeName(label) {
     let base = sType(label, 'Item');
-    if (SWIFTUI_TYPES.has(base) || base === this.structName) base = `${base}Item`;
+    if (this.takenType(base) || this.takenType(`${base}View`)) base = `${base}Item`;
     let name = base;
-    for (let i = 2; this.typeNames.has(name) || this.typeNames.has(`${name}View`); i++) name = `${base}${i}`;
+    for (let i = 2; this.typeNames.has(name) || this.typeNames.has(`${name}View`) || this.takenType(`${name}View`); i++) name = `${base}${i}`;
     this.typeNames.add(name);
     return name;
+  }
+
+  /**
+   * Runs of layers drawn as one view over data. Items holding a text input
+   * are left out: each field needs a state of its own.
+   */
+  runsOf(flow) {
+    const input = (n) => this.inputs.has(n.id) || (n.children || []).some(input);
+    return runsOf(flow).filter((r) => !r.items.some(input));
+  }
+
+  /** Whether a nested type named [name] would shadow a type the code uses. */
+  takenType(name) {
+    return SWIFT_TYPE_NAMES.has(name) || name === this.structName;
   }
 
   /** A length that scales with Dynamic Type, declared once per view struct; its name. */
@@ -1088,11 +1117,19 @@ class SwiftUIWriter {
       // A box of text grows with it.
       const grows = typeof size.h === 'number' && hasText(node);
       v = this.frame(v, grows ? { ...size, h: { min: size.h } } : size, content.align);
-      if (content.underlay) layers.push(content.underlay);
-      if (layers.length) v = mod(v, 'background', layers.length > 1 || content.underlay ? [['alignment', raw('.topLeading')]] : [], layers);
-      if (content.overlay) v = mod(v, 'overlay', [['alignment', raw('.topLeading')]], [content.overlay]);
+      if (node.clipsContent) {
+        // Figma clips the children, not the frame's own fills and shadows.
+        const topLeading = [['alignment', raw('.topLeading')]];
+        if (content.underlay) v = mod(v, 'background', topLeading, [content.underlay]);
+        if (content.overlay) v = mod(v, 'overlay', topLeading, [content.overlay]);
+        v = isRectangle(shape) ? mod(v, 'clipped') : mod(v, 'clipShape', [[null, shape]]);
+        if (layers.length) v = mod(v, 'background', layers.length > 1 ? topLeading : [], layers);
+      } else {
+        if (content.underlay) layers.push(content.underlay);
+        if (layers.length) v = mod(v, 'background', layers.length > 1 || content.underlay ? [['alignment', raw('.topLeading')]] : [], layers);
+        if (content.overlay) v = mod(v, 'overlay', [['alignment', raw('.topLeading')]], [content.overlay]);
+      }
     }
-    if (node.clipsContent && !leaf) v = isRectangle(shape) ? mod(v, 'clipped') : mod(v, 'clipShape', [[null, shape]]);
     if (stroke) v = mod(v, 'overlay', [], [stroke]);
     if (drops.length && !shadowed) {
       // Without a fill, the content casts the shadow.
@@ -1399,6 +1436,7 @@ class SwiftUIWriter {
       idents.add(id);
       f.ident = id;
     }
+    const role = this.roles.get(parent.id);
     const cell = kind === 'grid';
     const render = (n) => {
       const index = items.indexOf(n);
@@ -1429,17 +1467,21 @@ class SwiftUIWriter {
     let indicator = null;
     if (kinds.length === 1) body = codes[0];
     else if (kinds.length === 2) {
+      // Only a control's items select; other items drawn two ways are drawn one by one.
+      if (!SELECTABLE.has(kind)) return null;
       const counts = kinds.map((k) => codes.filter((c) => c === k).length);
-      const odd = counts[0] === 1 ? 0 : counts[1] === 1 ? 1 : -1;
-      if (odd < 0) return null;
+      const given = role && typeof role.selected === 'number' && role.selected >= 0 && role.selected < items.length ? role.selected : -1;
+      const odd = given >= 0 ? kinds.indexOf(codes[given]) : counts[0] === 1 ? 0 : counts[1] === 1 ? 1 : -1;
+      if (odd < 0 || counts[odd] !== 1) return null;
       selected = codes.indexOf(kinds[odd]);
-      const split = kind === 'tabBar' || kind === 'segmented'
-        ? indicatorOf(trees[selected], trees[codes.indexOf(kinds[1 - odd])]) : null;
-      if (split) {
-        indicator = split.indicator;
-        body = mergeVariants(print(split.on, 2), print(split.off, 2));
-      } else body = mergeVariants(kinds[odd], kinds[1 - odd]);
-      if (!body) {
+      const on = trees[selected];
+      const off = trees[codes.indexOf(kinds[1 - odd])];
+      const options = { tokenType: (ident) => this.tokenType(ident) };
+      const split = kind === 'tabBar' || kind === 'segmented' ? indicatorOf(on, off, options) : null;
+      const merged = split ? mergeTrees(split.on, split.off, options) : mergeTrees(on, off, options);
+      if (split && merged) indicator = split.indicator;
+      if (merged) body = print(merged, 2);
+      else {
         const indent = (code) => code.split('\n').map((l, i) => (i ? `  ${l}` : l)).join('\n');
         body = `if isSelected {\n      ${indent(kinds[odd])}\n    } else {\n      ${indent(kinds[1 - odd])}\n    }`;
       }
@@ -1457,7 +1499,6 @@ class SwiftUIWriter {
     }
     const label = baseName(items, this.ancestors, this.label(parent, 'item', { text: false }));
     const model = fields.length ? this.typeName(label) : null;
-    const role = this.roles.get(parent.id);
     const title = fields.find((f) => f.kind === 'text');
     if (kind === 'segmented' && role.native && role.native.use && model && title && selected >= 0) {
       // Drawn like the system control: the system control.
@@ -1520,7 +1561,9 @@ class SwiftUIWriter {
       // At accessibility text sizes a long press shows the item enlarged, as in the system tab bar.
       if (kind === 'tabBar') item = mod(item, 'accessibilityShowsLargeContentViewer');
     }
-    const indexed = state || spread || (fires && !model);
+    // Equal rows would share an identity: they are told apart by their place.
+    const unique = !model || new Set(items.map((n, i) => fields.map((f) => f.values[i]).join('\u0000'))).size === items.length;
+    const indexed = state || spread || (fires && !model) || !unique;
     const body_ = [...(spread ? [raw('if index > 0 { Spacer(minLength: 0) }')] : []), item];
     if (!model) return view('ForEach', [[null, raw(`0..<${items.length}`)], ['id', raw('\\.self')]], body_, indexed ? 'index' : '_');
     if (indexed) return view('ForEach', [[null, raw(`Array(${data}.enumerated())`)], ['id', raw('\\.offset')]], body_, 'index, item');
@@ -1567,7 +1610,7 @@ class SwiftUIWriter {
     let padding = this.paddingValues(node);
     if (node.layoutWrap === 'WRAP') {
       const wctx = { kind: 'wrap', parent: node };
-      const runs = this.inComponent ? [] : runsOf(flow);
+      const runs = this.inComponent ? [] : this.runsOf(flow);
       const items = [];
       for (let i = 0; i < flow.length; i++) {
         const run = runs.find((r) => r.start === i);
@@ -1632,7 +1675,7 @@ class SwiftUIWriter {
         return mod(box, 'overlay', crossAt ? [['alignment', raw(`.${crossAt}`)]] : [], [item]);
       };
       let items = [];
-      const runs = this.inComponent ? [] : runsOf(flow);
+      const runs = this.inComponent ? [] : this.runsOf(flow);
       for (let i = 0; i < flow.length; i++) {
         const run = runs.find((r) => r.start === i);
         const group = run && this.repeated(run.items, ctx, spread);
@@ -1719,47 +1762,57 @@ function printProperty(p) {
  * pattern the code uses for it.
  */
 export function toSwiftUI(root, assets, options = {}) {
-  const writer = new SwiftUIWriter(assets, options);
-  writer.ratios = autoLineRatios(root);
   const rootNode = withPatterns({ ...root, x: root.x ?? 0, y: root.y ?? 0 });
   const screen = options.screen ?? isPhoneScreen(rootNode);
-  const structName = options.structName || sType(root.name, 'Design');
-  writer.structName = structName;
-  writer.typeNames.add(structName);
-  writer.roles = detectRoles(rootNode);
-  for (const r of writer.roles.values()) if (r.role === 'textInput') writer.inputs.set(r.placeholder, r);
-  writer.parents = new Map();
-  writer.byId = new Map();
-  const index = (n) => {
-    writer.byId.set(n.id, n);
-    for (const c of n.children || []) {
-      writer.parents.set(c.id, n);
-      index(c);
-    }
+  let structName = options.structName || sType(root.name, 'Design');
+  if (SWIFT_TYPE_NAMES.has(structName)) structName = `${structName}Screen`;
+  const ratios = autoLineRatios(root);
+  const roles = detectRoles(rootNode);
+  const start = () => {
+    const w = new SwiftUIWriter(assets, options);
+    w.ratios = ratios;
+    w.structName = structName;
+    w.typeNames.add(structName);
+    w.roles = roles;
+    for (const r of roles.values()) if (r.role === 'textInput') w.inputs.set(r.placeholder, r);
+    w.parents = new Map();
+    w.byId = new Map();
+    const index = (n) => {
+      w.byId.set(n.id, n);
+      for (const c of n.children || []) {
+        w.parents.set(c.id, n);
+        index(c);
+      }
+    };
+    index(rootNode);
+    return w;
   };
-  index(rootNode);
+  let writer = start();
   let tree = null;
   if (screen) {
     writer.screen = rootNode;
     try {
       tree = writer.screenRoot(rootNode);
     } catch (e) {
+      // Drawn again from scratch at its design size, so nothing of the failed screen layout is left.
+      writer = start();
       writer.warnings.push({ id: root.id, name: root.name, message: `drawn at its design size: ${e.message}` });
-      writer.screen = null;
-      Object.assign(writer, {
-        props: [], skip: new Set(), components: [], models: [], states: [], lets: [], propNames: new Set(['body']),
-        cases: new Map(), containerMods: new Map(), margins: new Map(), tapped: false,
-      });
     }
   }
   tree = tree || writer.node(rootNode, { kind: 'root' }) || view('EmptyView');
+  // What only this screen uses lives in its namespace, so screens of one module do not clash.
+  const nested = [
+    ...(writer.tapped ? [actionEnum(writer.cases)] : []),
+    ...writer.components,
+    ...writer.models,
+  ];
   const lines = [
     'import SwiftUI',
     '',
     ...[...writer.connected.values()].map((m) => `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`),
     ...(writer.connected.size ? [''] : []),
     `struct ${structName}: View {`,
-    ...(writer.tapped ? [`  var action: (${structName}Action) -> Void = { _ in }`] : []),
+    ...(writer.tapped ? ['  var action: (Action) -> Void = { _ in }'] : []),
     ...writer.states,
     ...(writer.tapped || writer.states.length ? [''] : []),
     '  var body: some View {',
@@ -1768,10 +1821,11 @@ export function toSwiftUI(root, assets, options = {}) {
     ...writer.props.flatMap((p) => ['', printProperty(p)]),
     ...writer.lets.flatMap((l) => ['', l]),
     '}',
-    ...(writer.tapped ? ['', ...actionEnum(structName, writer.cases)] : []),
-    ...writer.components.flatMap((c) => ['', c]),
-    ...writer.models.flatMap((m) => ['', m]),
   ];
+  if (nested.length) {
+    const indent = (block) => block.split('\n').map((l) => (l ? `  ${l}` : l)).join('\n');
+    lines.push('', `extension ${structName} {`, nested.map(indent).join('\n\n'), '}');
+  }
   if (options.preview !== false) lines.push('', '#Preview {', `  ${structName}()`, '}');
   const shared = ['import SwiftUI'];
   if (writer.textStyles.size) {
@@ -1814,11 +1868,11 @@ export function toSwiftUI(root, assets, options = {}) {
 }
 
 /** The screen's action enum: what tapping its controls asks the owner to do. */
-function actionEnum(structName, cases) {
-  const lines = ['/// What the screen asks its owner to do.', `enum ${structName}Action: Hashable {`];
+function actionEnum(cases) {
+  const lines = ['/// What the screen asks its owner to do.', 'enum Action: Hashable {'];
   for (const [name, payload] of cases) lines.push(`  case ${name}${payload ? `(${payload})` : ''}`);
   lines.push('}');
-  return lines;
+  return lines.join('\n');
 }
 
 /** The roles with a SwiftUI pattern, for the response: [{ id, name, role, pattern, items?, selected? }]. */
