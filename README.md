@@ -37,7 +37,7 @@ No Figma API calls. No rate limits.</p>
 
 figmcp is a local MCP server that gives your coding agent the Figma file you have open in Figma Desktop. A development plugin streams the file to a server on your machine over localhost, so reads never touch the Figma REST API: no access token, no quota, no rate limit.
 
-- **Design to code.** Flutter widgets for Flutter projects, React + Tailwind for everything else, with the assets and a screenshot to compare against.
+- **Design to code.** Flutter widgets for Flutter projects, SwiftUI views for Swift packages and Xcode projects, React + Tailwind for everything else, with the assets and a screenshot to compare against.
 - **Design in Figma.** The agent creates and edits frames in the open file with Figma plugin API scripts, one undo step per script.
 - **Your components.** Map design components to code components with Code Connect.
 - **Works offline.** Read saved snapshots when the plugin is closed.
@@ -89,7 +89,7 @@ build this frame as a React component with Tailwind, using our existing Button
 compare your screen with the Figma screenshot and fix the differences
 ```
 
-Projects with a `pubspec.yaml` get **Flutter** widgets, and SVGs and images are saved into the asset folders the pubspec declares. Everything else gets **React + Tailwind**. The code is a reference that your agent adapts to your project. [More →](https://figmcp.web.app/docs/design-to-code)
+Projects with a `pubspec.yaml` get **Flutter** widgets, and SVGs and images are saved into the asset folders the pubspec declares. Projects with a `Package.swift`, `.xcodeproj` or `.xcworkspace` get **SwiftUI** views built as a production screen would be (Buttons, selection state with a sliding indicator, snapping carousels, grids, pinned bars, Dynamic Type), with image sets for the asset catalog and a Structure block naming what each part is. Everything else gets **React + Tailwind**. The code is a reference that your agent adapts to your project. [More →](https://figmcp.web.app/docs/design-to-code)
 
 ### Design in Figma
 
@@ -140,7 +140,7 @@ Step-by-step for each client, on macOS and Windows: [figmcp.web.app/docs/configu
 
 | Tool | What it does |
 | --- | --- |
-| `get_design_context` | Reference code (Flutter or React + Tailwind), assets, a screenshot and variables for a node. The main tool. |
+| `get_design_context` | Reference code (Flutter, SwiftUI or React + Tailwind), assets, a screenshot and variables for a node. The main tool. |
 | `get_metadata` | Layer tree as XML: ids, types, names, positions and sizes. |
 | `get_screenshot` | PNG of a node or the selection. |
 | `get_variable_defs` | Variables and styles used by a node, resolved for its mode. |
@@ -174,7 +174,7 @@ Set these in the `env` of your MCP client config.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `FIGMA_LOCAL_MCP_DIR` | `~/.figma-local-mcp` | Data folder: plugin, pairing code, snapshots and assets. |
-| `FIGMA_LOCAL_MCP_FRAMEWORK` | | Force `flutter` or `react` when the client doesn't say. |
+| `FIGMA_LOCAL_MCP_FRAMEWORK` | | Force `flutter`, `swiftui` or `react` when the client doesn't say. |
 | `FIGMA_LOCAL_MCP_CODE_CONNECT` | `.figma-local/code-connect.json` | Path of the Code Connect mappings file. |
 | `FIGMA_LOCAL_MCP_ALLOW_ORIGINS` | | Comma separated extra origins the server accepts for the plugin. |
 

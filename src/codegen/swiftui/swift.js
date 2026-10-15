@@ -60,8 +60,9 @@ export function sType(name, fallback = 'Design') {
 }
 
 // Expression tree. A value is a number, boolean, null, or one of:
-//   { kind: 'call', name, args: [[label, value]], body, mods, view }
-//       name(args) { body } .mod(args)... ; body is a list of views or null,
+//   { kind: 'call', name, args: [[label, value]], body, trailing, mods, view }
+//       name(args) { body } label: { ... } .mod(args)... ; body is a list of
+//       views or null, trailing further labelled closures [{ label, body }],
 //       mods are { name, args, body } chained after it, each on its own
 //       line when [view] is set.
 //   { kind: 'array', items }
@@ -75,7 +76,7 @@ function argList(args) {
 
 /** A call: positional arguments under the label null, labelled ones by name. */
 export function call(name, args = [], { body = null, view = false, params = null } = {}) {
-  return { kind: 'call', name, args: argList(args), body, mods: [], view, params };
+  return { kind: 'call', name, args: argList(args), body, trailing: [], mods: [], view, params };
 }
 
 /** A view: its modifiers go on their own lines. [params] names the closure's parameters. */
@@ -88,6 +89,11 @@ export function mod(target, name, args = [], body = null) {
   if (!target) return target;
   const t = typeof target === 'object' && target.kind === 'call' ? target : view('', [[null, target]]);
   return { ...t, mods: [...t.mods, { name, args: argList(args), body }] };
+}
+
+/** [target] with a further trailing closure `label: { body }` after its body. */
+export function trailing(target, label, body) {
+  return { ...target, trailing: [...target.trailing, { label, body }] };
 }
 
 export function array(items) {
@@ -126,6 +132,7 @@ function printCall(e, indent) {
     ? print(e.args[0][1], indent)
     : `${e.name}${e.args.length || !e.body ? `(${printArgs(e.args, indent)})` : ''}`;
   if (e.body) out += `${e.args.length || e.name ? ' ' : ''}${printBody(e.body, indent, e.params)}`;
+  for (const t of e.trailing || []) out += ` ${t.label}: ${printBody(t.body, indent)}`;
   // Modifiers line up with a closing brace, else indent one level.
   const at = e.view && out.endsWith('}') ? indent : indent + 1;
   for (const m of e.mods) {

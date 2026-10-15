@@ -2,6 +2,7 @@
 // Figma's line height as line spacing plus half-leading.
 import { boxLineHeight, casedRuns, fontWeight, paragraphs, segmentsOf, SOFT_BREAK, topPaint } from '../text.js';
 import { effectsOf, gradient, shadowArgs } from './paint.js';
+import { textStyleFor } from './patterns.js';
 import { call, mod, print, raw, str, view } from './swift.js';
 
 const WEIGHTS = {
@@ -20,7 +21,11 @@ export function isSystemFamily(family) {
   return SYSTEM_FAMILY.test(String(family || ''));
 }
 
-/** The Font of a run: .custom(family, fixedSize:) or .system(size:), with weight and italic. */
+/**
+ * The Font of a run, with weight and italic: .custom(family, size:,
+ * relativeTo:) scales with Dynamic Type from the nearest text style;
+ * .system(size:) keeps its size.
+ */
 export function fontOf(seg, value) {
   const family = seg.fontName && seg.fontName.family;
   const size = typeof seg.fontSize === 'number' ? seg.fontSize : 17;
@@ -32,7 +37,7 @@ export function fontOf(seg, value) {
   if (!family || isSystemFamily(family)) {
     font = call('.system', [['size', sizeValue], ['weight', raw(`.${weight}`)]]);
   } else {
-    font = call('.custom', [[null, str(family)], ['fixedSize', sizeValue]]);
+    font = call('.custom', [[null, str(family)], ['size', sizeValue], ['relativeTo', raw(textStyleFor(size))]]);
     if (weight !== 'regular') font = mod(font, 'weight', [[null, raw(`.${weight}`)]]);
   }
   return italic ? mod(font, 'italic') : font;

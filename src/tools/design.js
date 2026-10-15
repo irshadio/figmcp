@@ -6,8 +6,9 @@ import { listMappings, lookup } from '../connect.js';
 import { toFlutter } from '../codegen/flutter/index.js';
 import { toMetadataXml } from '../codegen/metadata.js';
 import { countNodes, toReactTailwind } from '../codegen/react.js';
+import { toSwiftUI } from '../codegen/swiftui/index.js';
 import { systemUi } from '../codegen/system-ui.js';
-import { detectFramework, flutterAssetDirs, FRAMEWORKS, usesScreenUtil } from '../project.js';
+import { assetCatalog, detectFramework, flutterAssetDirs, FRAMEWORKS, usesScreenUtil } from '../project.js';
 import { ASSETS, imageExt, saveAsset, snapshotSummary } from '../store.js';
 import {
   assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, resolver, selectionBlock,
@@ -41,26 +42,40 @@ const FLUTTER_GUIDANCE =
   'as system UI belong to the phone, not the app: leave them out and keep ' +
   'their room with SafeArea. Compare the result with the screenshot.';
 
+const SWIFTUI_GUIDANCE =
+  'IMPORTANT: the code above is reference SwiftUI generated from the design, ' +
+  'written the way a production screen is built: adapt it to the project ' +
+  '(its design system, models, navigation and state) and keep what it ' +
+  'does. Every value is exact, in points at the design size: sizes, spacing, ' +
+  'radii, colours, fonts and line heights (lineSpacing with the vertical ' +
+  'padding reproduces Figma\'s line boxes). DesignTokens holds each design ' +
+  'variable used, with its Figma name: use the project\'s token of that name, ' +
+  'and give each colour a dark appearance in the asset catalog or a dynamic ' +
+  'Color. AppFonts holds each Figma text style, as .custom(_:size:relativeTo:) ' +
+  'so text follows Dynamic Type: keep that, and check the layout at larger ' +
+  'content sizes. The Structure block says what each part is; the code ' +
+  'already uses the matching pattern (Buttons with a press style, a sliding ' +
+  'matchedGeometryEffect selection indicator, selection haptics, LazyVGrid, ' +
+  'snapping carousels, pinned bars, the header trait on titles, accessibility ' +
+  'labels on icon buttons, decorative images hidden from VoiceOver). ' +
+  'Selection is @State initialised to the design; the screen tells its ' +
+  'owner what to do through its action enum: own that state in a view model ' +
+  'or the owning view, wire each case to real navigation (NavigationStack, ' +
+  'sheets, tab switching) and replace the literal data with the model\'s. ' +
+  'A phone-sized frame is drawn as a screen: it fills the screen and scrolls, ' +
+  'its top bar and bottom bar stay pinned with safeAreaInset, and layers ' +
+  'listed as system UI are left to the phone. Sections that span the width ' +
+  'stretch; other fixed sizes stay as designed, so check narrow phones. Add ' +
+  'the listed assets to the asset catalog and the fonts to the target, keep ' +
+  'the #Preview, and compare the result with the screenshot.';
+
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
-/** The Flutter response blocks after the code: assets, fonts, system UI, notes. */
-function flutterDetails(result, tree) {
+/** The response blocks every generator shares: screen note, system UI, Code Connect, rasterized layers, approximations. */
+function sharedDetails(result, tree) {
   const out = [];
-  const entries = Object.entries(result.assets);
-  if (entries.length) {
-    const dirs = [...new Set(entries.map(([asset]) => path.posix.dirname(asset)))];
-    const copy = [`mkdir -p ${dirs.map(shellQuote).join(' ')}`,
-      ...entries.map(([asset, file]) => `cp ${shellQuote(file)} ${shellQuote(asset)}`)].join('\n');
-    out.push(text('Assets used in the code (asset path -> file on disk). Copy them into the ' +
-      `project root and declare the folders under flutter: assets: in pubspec.yaml:\n${JSON.stringify(result.assets, null, 2)}\n\n${copy}`));
-  }
-  const fonts = Object.entries(result.fonts);
-  if (fonts.length) {
-    out.push(text(`Fonts used (declare each family and weight under flutter: fonts: in pubspec.yaml):\n${
-      fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
-  }
   if (result.screen) {
     out.push(text(`${result.className} is drawn as a phone screen: it fills the screen` +
       `${result.scrolls ? ' and scrolls (the design is taller than a phone)' : ', and scrolls on a phone too short for its layers'}.`));
@@ -85,6 +100,67 @@ function flutterDetails(result, tree) {
   return out;
 }
 
+/** The Flutter response blocks after the code: assets, fonts, then the shared notes. */
+function flutterDetails(result, tree) {
+  const out = [];
+  const entries = Object.entries(result.assets);
+  if (entries.length) {
+    const dirs = [...new Set(entries.map(([asset]) => path.posix.dirname(asset)))];
+    const copy = [`mkdir -p ${dirs.map(shellQuote).join(' ')}`,
+      ...entries.map(([asset, file]) => `cp ${shellQuote(file)} ${shellQuote(asset)}`)].join('\n');
+    out.push(text('Assets used in the code (asset path -> file on disk). Copy them into the ' +
+      `project root and declare the folders under flutter: assets: in pubspec.yaml:\n${JSON.stringify(result.assets, null, 2)}\n\n${copy}`));
+  }
+  const fonts = Object.entries(result.fonts);
+  if (fonts.length) {
+    out.push(text(`Fonts used (declare each family and weight under flutter: fonts: in pubspec.yaml):\n${
+      fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
+  }
+  return [...out, ...sharedDetails(result, tree)];
+}
+
+/** Shell commands that add [name] to the asset catalog [catalog] as an image set. */
+function imageSetCommands(catalog, name, info) {
+  const set = `${catalog}/${name}.imageset`;
+  const file = `${name}.${info.ext}`;
+  const contents = {
+    images: [{ filename: file, idiom: 'universal' }],
+    info: { author: 'xcode', version: 1 },
+    ...(info.vector ? { properties: { 'preserves-vector-representation': true } } : {}),
+  };
+  return [
+    `mkdir -p ${shellQuote(set)}`,
+    `cp ${shellQuote(info.source)} ${shellQuote(`${set}/${file}`)}`,
+    `printf '%s' ${shellQuote(JSON.stringify(contents))} > ${shellQuote(`${set}/Contents.json`)}`,
+  ].join('\n');
+}
+
+/** The SwiftUI response blocks after the code: asset catalog, fonts, structure, then the shared notes. */
+function swiftuiDetails(result, tree, catalog) {
+  const out = [];
+  const entries = Object.entries(result.assets);
+  if (entries.length) {
+    const map = Object.fromEntries(entries.map(([name, info]) => [name, info.source]));
+    out.push(text(`Assets used in the code, by asset catalog name (Image("name")) -> file on disk. Add each as an image set ` +
+      `of ${catalog} (SVGs keep their vector data; one-colour icons are tinted in code):\n${JSON.stringify(map, null, 2)}\n\n${
+      entries.map(([name, info]) => imageSetCommands(catalog, name, info)).join('\n')}`));
+  }
+  const fonts = Object.entries(result.fonts);
+  if (fonts.length) {
+    out.push(text('Fonts used (add each family\'s files to the app target and list them under UIAppFonts in Info.plist, ' +
+      `e.g. <key>UIAppFonts</key><array><string>${fonts[0][0].replace(/\s+/g, '')}-Regular.ttf</string></array>):\n${
+      fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
+  }
+  if (result.structure.length) {
+    out.push(text(`Structure (what each part is, and the SwiftUI pattern the code uses for it):\n${result.structure.map((r) => {
+      const facts = [r.role, r.items ? `${r.items} items` : null, r.selected ? `"${r.selected}" selected` : null,
+        r.label ? `"${r.label}"` : null, r.link ? `link "${r.link}"` : null].filter(Boolean).join(', ');
+      return `- ${r.id} "${r.name}": ${facts} -> ${r.pattern}`;
+    }).join('\n')}`));
+  }
+  return [...out, ...sharedDetails(result, tree)];
+}
+
 const GUIDANCE =
   'IMPORTANT: the code above is reference React + Tailwind generated from the ' +
   'design. Convert it to the target project\'s framework, components, tokens ' +
@@ -104,8 +180,11 @@ export function registerDesignTools(server, bridge, source) {
     description:
       'Get design context for a Figma node — the primary tool for design-to-code ' +
       'workflows. Returns reference code (Flutter widgets for Flutter projects, ' +
-      'React + Tailwind otherwise), the assets it uses, a screenshot and the ' +
-      'variables in the node. The code must be adapted to the target project. ' +
+      'SwiftUI views for Swift packages and Xcode projects, React + Tailwind ' +
+      'otherwise), the assets it uses, a screenshot and the variables in the ' +
+      'node. SwiftUI code comes with a Structure block naming what each part ' +
+      'is (tab bar, segmented control, chips, carousel, grid, buttons, fields) ' +
+      'and the pattern used for it. The code must be adapted to the target project. ' +
       'Use the nodeId parameter to specify a node id; from a URL like ' +
       'https://figma.com/design/:fileKey/:fileName?node-id=1-2 the node id is 1:2. ' +
       'With no nodeId the current selection in Figma is used. Large nodes return ' +
@@ -114,14 +193,16 @@ export function registerDesignTools(server, bridge, source) {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
       framework: z.enum(FRAMEWORKS).optional().describe(
-        'Code to generate: flutter or react. Default: from clientFrameworks / clientLanguages, ' +
-        'else FIGMA_LOCAL_MCP_FRAMEWORK, else flutter when the project has a pubspec.yaml, else react.'),
-      clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" (picks the framework).'),
-      clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" (picks the framework).'),
+        'Code to generate: flutter, swiftui or react. Default: from clientFrameworks / clientLanguages, ' +
+        'else FIGMA_LOCAL_MCP_FRAMEWORK, else flutter when the project has a pubspec.yaml, swiftui when it has a ' +
+        'Package.swift, .xcodeproj or .xcworkspace, else react.'),
+      clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" or "swift" (picks the framework).'),
+      clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" or "swiftui" (picks the framework).'),
       screen: z.boolean().optional().describe(
-        'Flutter: draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
+        'Flutter and SwiftUI: draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
       assetsDir: z.string().optional().describe(
-        'Flutter: folder of the asset paths in the code (default: the svg/png/images folders of the project\'s pubspec.yaml, else assets/figma).'),
+        'Flutter: folder of the asset paths in the code (default: the svg/png/images folders of the project\'s pubspec.yaml, else assets/figma). ' +
+        'SwiftUI: the asset catalog to add image sets to (default: the project\'s *.xcassets, else Assets.xcassets).'),
       screenUtil: z.boolean().optional().describe(
         'Flutter: write lengths with flutter_screenutil (.w, .h, .r, .sp) so the layout scales from the design size ' +
         '(default: when the project\'s pubspec.yaml depends on flutter_screenutil).'),
@@ -167,6 +248,10 @@ export function registerDesignTools(server, bridge, source) {
             'design, .r takes the smaller scale and .sp scales text. Keep the app\'s ScreenUtilInit designSize; ' +
             'when it differs from this frame, the frame\'s numbers still scale against it.'));
         }
+      } else if (framework === 'swiftui') {
+        const catalog = assetsDir ? assetsDir.replace(/\/+$/, '') : assetCatalog();
+        const result = toSwiftUI(node.tree, fileResolver(node.images), { connect, screen });
+        out = [text(result.code), ...swiftuiDetails(result, node.tree, catalog)];
       } else {
         const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });
         out = [text(result.code)];
@@ -203,7 +288,7 @@ export function registerDesignTools(server, bridge, source) {
     if (vars && vars.source === 'live' && Object.keys(vars.defs).length) {
       out.push(text(`These variables and styles are used in the design:\n${JSON.stringify(vars.defs, null, 2)}`));
     }
-    out.push(text(framework === 'flutter' ? FLUTTER_GUIDANCE : GUIDANCE));
+    out.push(text({ flutter: FLUTTER_GUIDANCE, swiftui: SWIFTUI_GUIDANCE }[framework] || GUIDANCE));
     // A node too large to render still gets its code.
     const shot = shotRead && await shotRead;
     if (shot) out.push(image(shot.png));

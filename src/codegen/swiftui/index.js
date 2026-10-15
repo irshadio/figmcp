@@ -6,6 +6,7 @@ import { linearTransform, rotationOf } from '../geometry.js';
 import { inFlow, isAutoLayout, isGrid, sizingOf } from '../layout.js';
 import { drawnAsSvg, hasImageFill, isTurned, straightLine, visibleChildren } from '../nodes.js';
 import { sideWeights } from '../paint.js';
+import { detectRoles, SWIFTUI_PATTERNS } from '../roles.js';
 import { isPhoneScreen, minPageHeight, TALL_SCREEN, WRAPPING_PARENTS } from '../screen.js';
 import { systemUi } from '../system-ui.js';
 import { autoLineRatios, fontWeight, segmentsOf } from '../text.js';
@@ -13,8 +14,9 @@ import { visiblePaints } from '../util.js';
 import {
   blendMode, blurs, composite, effectsOf, gradient, HELPERS, isRectangle, sColor, shadowArgs, shapeOf, swiftBlur,
 } from './paint.js';
+import { indicatorOf, PRESSABLE_STYLE, withIndicator } from './patterns.js';
 import { baseName, fieldsOf, mergeVariants, plural, runsOf } from './repeat.js';
-import { array, call, mod, print, raw, sIdent, sNum, sString, str, sType, view } from './swift.js';
+import { array, call, mod, print, raw, sIdent, sNum, sString, str, sType, trailing, view } from './swift.js';
 import { fontOf, isSystemFamily, textView } from './text.js';
 
 const H_ALIGN = { MIN: 'leading', CENTER: '', MAX: 'trailing', SPACE_BETWEEN: 'leading' };
@@ -37,6 +39,12 @@ const SWIFTUI_TYPES = new Set([
 ]);
 
 const NAMED_COLORS = { white: 'FFFFFF', black: '000000' };
+// Roles whose layer is a Button calling the screen's action, and roles whose
+// items select on tap.
+const TAPPABLE = new Set(['button', 'iconButton', 'field', 'link', 'listRow']);
+const SELECTABLE = new Set(['tabBar', 'tabs', 'segmented', 'chips']);
+const TAPPABLE_ITEMS = new Set(['card', 'field', 'button', 'listRow', 'iconButton', 'tab']);
+const HELPER_CODE = { ...HELPERS, pressable: PRESSABLE_STYLE };
 
 /** The one colour an SVG paints with, as a colour value through [color], or null. */
 function svgTint(text, color) {
@@ -145,6 +153,63 @@ class SwiftUIWriter {
     this.lets = [];
     this.typeNames = new Set();
     this.memberNames = new Set();
+    // Layer roles, the action enum's cases (name -> payload type), modifiers
+    // a stack gets from its items, rows that scroll under their parent's
+    // padding, and cells whose wide children stretch with them.
+    this.roles = new Map();
+    this.cases = new Map();
+    this.containerMods = new Map();
+    this.margins = new Map();
+    this.stretchCells = new Set();
+  }
+
+  roleOf(node) {
+    const r = node && this.roles.get(node.id);
+    return r ? r.role : null;
+  }
+
+  /** A case of the screen's action enum, unique by name, with its payload type. */
+  actionCase(label, payload = null) {
+    const base = sIdent(label, 'tap');
+    let name = base;
+    for (let i = 2; this.cases.has(name) && this.cases.get(name) !== payload; i++) name = `${base}${i}`;
+    this.cases.set(name, payload);
+    this.tapped = true;
+    return name;
+  }
+
+  /**
+   * [label] as a Button running [statements], with the press style and an
+   * accessibility label. The whole label takes taps, not only what it draws.
+   */
+  button(label, statements, { style = 'pressable', accessibilityLabel = null } = {}) {
+    if (style === 'pressable') this.helpers.add('pressable');
+    const hit = mod(label, 'contentShape', [[null, call('Rectangle')]]);
+    let b = trailing(view('Button', [], statements.map(raw)), 'label', [hit]);
+    b = mod(b, 'buttonStyle', [[null, raw(`.${style}`)]]);
+    if (accessibilityLabel) b = mod(b, 'accessibilityLabel', [[null, str(accessibilityLabel)]]);
+    return b;
+  }
+
+  /** The action case a tappable layer fires, from its role and label. */
+  actionName(node, role) {
+    switch (role.role) {
+      case 'button': case 'iconButton': return role.label;
+      case 'link': return `${node.characters} ${role.section || ''}`;
+      default: return node.name;
+    }
+  }
+
+  /** [core] made a Button or marked for accessibility by the layer's role. */
+  interactive(node, core) {
+    const role = this.roles.get(node.id);
+    const kind = role ? role.role : null;
+    if (kind === 'heading') return mod(core, 'accessibilityAddTraits', [[null, raw('.isHeader')]]);
+    if (this.inComponent) return core;
+    const given = this.actions[node.id];
+    if (!given && !TAPPABLE.has(kind)) return core;
+    const name = this.actionCase(given || this.actionName(node, role));
+    return this.button(core, [`action(.${name})`], { accessibilityLabel: kind === 'iconButton' ? role.label : null });
   }
 
   warn(node, message) {
@@ -271,11 +336,7 @@ class SwiftUIWriter {
     } finally {
       this.ancestors.pop();
     }
-    if (this.actions[node.id]) {
-      this.tapped = true;
-      core = mod(mod(core, 'contentShape', [[null, call('Rectangle')]]), 'onTapGesture', [],
-        raw(`action(${print(str(this.actions[node.id]))})`));
-    }
+    core = this.interactive(node, core);
     if (ctx.kind !== 'root' && !this.inComponent && EXTRACT_TYPES.has(node.type) && countVisible(node) >= EXTRACT_SIZE) core = this.extract(node, core);
     return this.wrapPlace(node, ctx, core);
   }
@@ -317,12 +378,16 @@ class SwiftUIWriter {
     const content = (axis) => (isAutoLayout(node) && ownSizing(node, axis) === 'HUG') || (axis === 'x' ? hugW : hugH);
     if (ctx.kind === 'root') return { w: W, h: H };
     if (ctx.kind === 'bar') return { w: 'inf', h: !fixed && (hugH || content('y')) ? null : H };
+    if (ctx.kind === 'cell') return { w: 'inf', h: !fixed && (hugH || content('y')) ? null : H };
     if (ctx.kind === 'flex') {
       const out = { w: null, h: null };
+      const inner = ctx.parent.width - (ctx.parent.paddingLeft || 0) - (ctx.parent.paddingRight || 0);
       for (const axis of ['x', 'y']) {
         const key = axis === 'x' ? 'w' : 'h';
         let mode = sizingOf(node, ctx.parent, axis);
         if (mode === 'FILL' && axis === ctx.axis && ctx.hugMain) mode = 'FIXED';
+        // A column's child as wide as the column fills it.
+        if (mode === 'FIXED' && axis === 'x' && ctx.axis === 'y' && !hugW && W >= inner - 0.5) mode = 'FILL';
         if (mode === 'FILL') out[key] = 'inf';
         else if (fixed || !(mode === 'HUG' && content(axis))) {
           if (!(axis === 'x' ? hugW : hugH) || fixed) out[key] = axis === 'x' ? W : H;
@@ -358,7 +423,8 @@ class SwiftUIWriter {
       ? node.constraints : { horizontal: 'MIN', vertical: 'MIN' };
     // On a phone screen, a section that spans the width or sits centred
     // with equal margins stretches with the screen.
-    if (parent === this.screen && cons.horizontal !== 'MAX' && cons.horizontal !== 'STRETCH' && !hugsWidth(node) &&
+    const stretchy = parent === this.screen || this.stretchCells.has(parent.id);
+    if (stretchy && cons.horizontal !== 'MAX' && cons.horizontal !== 'STRETCH' && !hugsWidth(node) &&
         node.width >= parent.width / 2 && Math.abs(x - (parent.width - x - node.width)) <= 2) {
       cons = { ...cons, horizontal: 'STRETCH' };
     }
@@ -547,10 +613,13 @@ class SwiftUIWriter {
     const { tile } = this.svgSource(node);
     const name = bound ? raw(bound) : str(this.svgAsset(node));
     // A one-colour icon is tinted in code, so its colour can change with state.
-    const tint = tile ? (this.tint(visibleChildren(node)) || svgTint(this.svgSource(node).text, (c) => this.color(c)))
-      : ['FRAME', 'INSTANCE', 'COMPONENT', 'GROUP'].includes(node.type) ? null : this.tint([node]);
+    const bare = ['FRAME', 'INSTANCE', 'COMPONENT', 'GROUP'].includes(node.type);
+    const plain = bare && !visiblePaints(node.fills).length && !visiblePaints(node.strokes).length;
+    const tint = tile || plain ? (this.tint(visibleChildren(node)) || svgTint(this.svgSource(node).text, (c) => this.color(c)))
+      : bare ? null : this.tint([node]);
     let image = mod(view('Image', [[null, name]]), 'resizable');
     if (tint) image = mod(mod(image, 'renderingMode', [[null, raw('.template')]]), 'foregroundStyle', [[null, tint]]);
+    image = mod(image, 'accessibilityHidden', [[null, true]]);
     if (!tile) return this.picture(node, size, node.svgBounds, image);
     const shape = shapeOf(node, (v, n) => this.value(v, n));
     const fill = this.fillItems(node)[0];
@@ -561,7 +630,8 @@ class SwiftUIWriter {
   render(node, size) {
     this.rasterized.push({ id: node.id, name: node.name, reason: node.rasterized });
     const name = this.asset(this.assets.render(node.render), 'image', node.name, 'png');
-    return this.picture(node, size, node.renderBounds, mod(view('Image', [[null, str(name)]]), 'resizable'));
+    const image = mod(mod(view('Image', [[null, str(name)]]), 'resizable'), 'accessibilityHidden', [[null, true]]);
+    return this.picture(node, size, node.renderBounds, image);
   }
 
   /** Visible fills bottom to top: { paint } or { image }, each with its blend; solids over solids merged. */
@@ -634,7 +704,7 @@ class SwiftUIWriter {
       layer = clip(mod(clear(), 'overlay', [], [mod(mod(image, 'resizable'), 'scaledToFill')]));
     }
     if (paint.opacity !== undefined && paint.opacity < 1) layer = mod(layer, 'opacity', [[null, round(paint.opacity)]]);
-    return layer;
+    return mod(layer, 'accessibilityHidden', [[null, true]]);
   }
 
   /** The node's strokes as an overlay view, or null. */
@@ -905,10 +975,14 @@ class SwiftUIWriter {
   /**
    * A run of layers built the same way as a ForEach over data: a model
    * struct with what differs between them, a view struct drawn from the
-   * first, and when one item is drawn differently, a selection state.
+   * first, and when one item is drawn differently, a selection state. By
+   * the run's role the items are Buttons that select (with a sliding
+   * indicator for a tab bar or segmented control) or fire an action.
    * Null when the items differ in more than values.
    */
   repeated(items, ctx, spread) {
+    const parent = ctx.parent;
+    const kind = this.roleOf(parent);
     const fields = fieldsOf(items);
     const idents = new Set();
     for (const f of fields) {
@@ -917,33 +991,39 @@ class SwiftUIWriter {
       idents.add(id);
       f.ident = id;
     }
-    const acts = items.map((n) => this.actions[n.id] || '');
-    const varied = new Set(acts).size > 1;
+    const cell = kind === 'grid';
     const render = (n) => {
       const index = items.indexOf(n);
       const saved = { actions: this.actions, inComponent: this.inComponent };
       for (const f of fields) this.bindings.set(f.nodes[index].id, `item.${f.ident}`);
       this.actions = {};
       this.inComponent = true;
+      if (cell) this.stretchCells.add(n.id);
       try {
-        return print(this.node(n, ctx), 2);
+        return this.node(n, cell ? { kind: 'cell', parent } : ctx);
       } finally {
         Object.assign(this, saved);
         for (const f of fields) this.bindings.delete(f.nodes[index].id);
       }
     };
-    const codes = items.map(render);
+    const trees = items.map(render);
+    const codes = trees.map((t) => (t ? print(t, 2) : ''));
     const kinds = [...new Set(codes)];
-    if (process.env.DEBUG_RUNS && kinds.length > 1) console.error("RUN", items.map((n) => n.name).join(","), kinds.length, kinds.map((k) => k.slice(0, 1500)).join("\n=====\n"));
     let body;
     let selected = -1;
+    let indicator = null;
     if (kinds.length === 1) body = codes[0];
     else if (kinds.length === 2) {
       const counts = kinds.map((k) => codes.filter((c) => c === k).length);
       const odd = counts[0] === 1 ? 0 : counts[1] === 1 ? 1 : -1;
       if (odd < 0) return null;
       selected = codes.indexOf(kinds[odd]);
-      body = mergeVariants(kinds[odd], kinds[1 - odd]);
+      const split = kind === 'tabBar' || kind === 'segmented'
+        ? indicatorOf(trees[selected], trees[codes.indexOf(kinds[1 - odd])]) : null;
+      if (split) {
+        indicator = split.indicator;
+        body = mergeVariants(print(split.on, 2), print(split.off, 2));
+      } else body = mergeVariants(kinds[odd], kinds[1 - odd]);
       if (!body) {
         const indent = (code) => code.split('\n').map((l, i) => (i ? `  ${l}` : l)).join('\n');
         body = `if isSelected {\n      ${indent(kinds[odd])}\n    } else {\n      ${indent(kinds[1 - odd])}\n    }`;
@@ -961,19 +1041,26 @@ class SwiftUIWriter {
       }
     }
     const label = baseName(items, this.ancestors);
-    const model = fields.length || varied ? this.typeName(label) : null;
+    const model = fields.length ? this.typeName(label) : null;
     const viewName = model ? `${model}View` : `${this.typeName(label)}View`;
     this.typeNames.add(viewName);
-    const props = [...(model ? [`  let item: ${model}`] : []), ...(selected >= 0 ? ['  var isSelected = false'] : [])];
+    let namespace = null;
+    if (indicator) {
+      namespace = this.member(`${label} indicator`, 'indicator');
+      this.states.push(`  @Namespace private var ${namespace}`);
+      body = withIndicator(body, indicator, 'namespace');
+    }
+    const props = [
+      model ? `  let item: ${model}` : null,
+      selected >= 0 ? '  var isSelected = false' : null,
+      indicator ? '  var namespace: Namespace.ID' : null,
+    ].filter(Boolean);
     this.components.push([`struct ${viewName}: View {`, ...props, '', '  var body: some View {', `    ${body}`, '  }', '}'].join('\n'));
     let data = null;
     if (model) {
-      const members = [...fields.map((f) => `  let ${f.ident}: String`), ...(varied ? ['  let action: String'] : [])];
-      this.models.push([`struct ${model}: Hashable {`, ...members, '}'].join('\n'));
+      this.models.push([`struct ${model}: Hashable {`, ...fields.map((f) => `  let ${f.ident}: String`), '}'].join('\n'));
       data = this.member(plural(sIdent(label, 'item')), 'items');
-      const rows = items.map((n, i) => `    ${model}(${[
-        ...fields.map((f) => `${f.ident}: ${sString(f.values[i])}`), ...(varied ? [`action: ${sString(acts[i])}`] : []),
-      ].join(', ')}),`);
+      const rows = items.map((n, i) => `    ${model}(${fields.map((f) => `${f.ident}: ${sString(f.values[i])}`).join(', ')}),`);
       this.lets.push([`  private let ${data}: [${model}] = [`, ...rows, '  ]'].join('\n'));
     }
     let state = null;
@@ -981,16 +1068,49 @@ class SwiftUIWriter {
       state = this.member(`selected ${label}`, 'selected');
       this.states.push(`  @State private var ${state} = ${selected}`);
     }
-    const tap = [state ? `${state} = index` : null, varied ? 'action(item.action)' : acts[0] ? `action(${sString(acts[0])})` : null]
-      .filter(Boolean).join('; ');
-    if (tap.includes('action(')) this.tapped = true;
-    let item = view(viewName, [...(model ? [['item', raw('item')]] : []), ...(state ? [['isSelected', raw(`index == ${state}`)]] : [])]);
-    if (tap) item = mod(mod(item, 'contentShape', [[null, call('Rectangle')]]), 'onTapGesture', [], raw(tap));
-    const indexed = state || spread;
+    // Tabs and cards tell the owner; segments and chips only select.
+    const tappable = SELECTABLE.has(kind) || TAPPABLE_ITEMS.has(this.roleOf(items[0])) || items.some((n) => this.actions[n.id]);
+    const fires = tappable && kind !== 'segmented' && kind !== 'chips';
+    const statements = [];
+    if (state) statements.push(`withAnimation(.snappy) { ${state} = index }`);
+    if (fires) statements.push(`action(.${this.actionCase(label, model || 'Int')}(${model ? 'item' : 'index'}))`);
+    if (state && SELECTABLE.has(kind)) {
+      this.containerMods.set(parent.id, [['sensoryFeedback', [[null, raw('.selection')], ['trigger', raw(state)]]]]);
+    }
+    let item = view(viewName, [
+      model ? ['item', raw('item')] : null,
+      state ? ['isSelected', raw(`index == ${state}`)] : null,
+      namespace ? ['namespace', raw(namespace)] : null,
+    ].filter(Boolean));
+    if (statements.length) {
+      item = this.button(item, statements, { style: SELECTABLE.has(kind) ? 'plain' : 'pressable' });
+      if (state) item = mod(item, 'accessibilityAddTraits', [[null, raw(`index == ${state} ? .isSelected : []`)]]);
+    }
+    const indexed = state || spread || (fires && !model);
     const body_ = [...(spread ? [raw('if index > 0 { Spacer(minLength: 0) }')] : []), item];
     if (!model) return view('ForEach', [[null, raw(`0..<${items.length}`)], ['id', raw('\\.self')]], body_, indexed ? 'index' : '_');
     if (indexed) return view('ForEach', [[null, raw(`Array(${data}.enumerated())`)], ['id', raw('\\.offset')]], body_, 'index, item');
     return view('ForEach', [[null, raw(data)], ['id', raw('\\.self')]], body_, 'item');
+  }
+
+  /**
+   * A row of chips wider than its box scrolls sideways under its parent's
+   * side padding, to the parent's edges, instead of overflowing. Null when
+   * the chips fit.
+   */
+  chipScroller(node, flow, v) {
+    if (node.layoutMode !== 'HORIZONTAL' || ownSizing(node, 'x') === 'HUG') return null;
+    const [, right, , left] = this.paddingValues(node);
+    const total = flow.reduce((t, c) => t + (c.width || 0), 0) + (node.itemSpacing || 0) * (flow.length - 1);
+    if (total <= node.width - left - right + 0.5) return null;
+    const parent = this.ancestors[this.ancestors.length - 2];
+    const bleed = parent && isAutoLayout(parent) ? Math.min(parent.paddingLeft || 0, parent.paddingRight || 0) : 0;
+    let out = view('ScrollView', [[null, raw('.horizontal')]], [v]);
+    if (bleed) {
+      out = mod(out, 'contentMargins', [[null, raw('.horizontal')], [null, round(bleed)], ['for', raw('.scrollContent')]]);
+      out = mod(out, 'padding', [[null, raw('.horizontal')], [null, -round(bleed)]]);
+    }
+    return mod(out, 'scrollIndicators', [[null, raw('.hidden')]]);
   }
 
   flex(node, children) {
@@ -1006,7 +1126,10 @@ class SwiftUIWriter {
     const between = node.primaryAxisAlignItems === 'SPACE_BETWEEN';
     const spacing = node.itemSpacing || 0;
     const ctx = { kind: 'flex', parent: node, axis, hugMain };
+    const role = this.roles.get(node.id);
+    const kind = role ? role.role : null;
     let v;
+    let padding = this.paddingValues(node);
     if (node.layoutWrap === 'WRAP') {
       const wctx = { kind: 'wrap', parent: node };
       const runs = this.inComponent ? [] : runsOf(flow);
@@ -1021,11 +1144,17 @@ class SwiftUIWriter {
       }
       if (!row) this.warn(node, 'a vertical wrap is drawn as rows');
       if (node.primaryAxisAlignItems && node.primaryAxisAlignItems !== 'MIN') this.warn(node, 'wrapped rows are drawn start aligned');
-      this.helpers.add('flow');
-      v = view('FlowLayout', [
-        ['spacing', spacing > 0 && !between ? this.value(spacing, vars.itemSpacing) : null],
-        ['lineSpacing', node.counterAxisSpacing ? this.value(node.counterAxisSpacing, vars.counterAxisSpacing) : null],
-      ], items.filter(Boolean));
+      const gap = spacing > 0 && !between ? this.value(spacing, vars.itemSpacing) : null;
+      const lineGap = node.counterAxisSpacing ? this.value(node.counterAxisSpacing, vars.counterAxisSpacing) : null;
+      if (kind === 'grid' && runs.length === 1 && runs[0].items.length === flow.length && items.length === 1) {
+        // Equal cards in columns that share the width.
+        const column = call('GridItem', [[null, raw('.flexible()')], ['spacing', gap]]);
+        const columns = call('Array', [['repeating', column], ['count', role.columns]]);
+        v = view('LazyVGrid', [['columns', columns], ['spacing', lineGap]], items);
+      } else {
+        this.helpers.add('flow');
+        v = view('FlowLayout', [['spacing', gap], ['lineSpacing', lineGap]], items.filter(Boolean));
+      }
     } else {
       const [top, right, bottom, left] = this.paddingValues(node);
       const availCross = row ? node.height - top - bottom : node.width - left - right;
@@ -1039,9 +1168,14 @@ class SwiftUIWriter {
         // the screen stretches it.
         const parent = this.ancestors[this.ancestors.length - 2];
         if (ownSizing(node, cross) === 'FIXED' && parent && !(this.screen && parent.id === this.screen.id)) return item;
-        // A row wider than its column scrolls sideways.
+        // A row wider than its column scrolls sideways; a carousel snaps to its cards.
         if (!row && c.layoutMode === 'HORIZONTAL') {
-          const scroller = mod(view('ScrollView', [[null, raw('.horizontal')], ['showsIndicators', false]], [item]), 'frame', [['height', round(c.height)]]);
+          let scroller = view('ScrollView', [[null, raw('.horizontal')]], [item]);
+          if (this.margins.has(c.id)) {
+            scroller = mod(scroller, 'contentMargins', [[null, raw('.horizontal')], [null, this.margins.get(c.id)], ['for', raw('.scrollContent')]]);
+            scroller = mod(scroller, 'scrollTargetBehavior', [[null, raw('.viewAligned')]]);
+          }
+          scroller = mod(mod(scroller, 'scrollIndicators', [[null, raw('.hidden')]]), 'frame', [['height', round(c.height)]]);
           // A scroll view would report its content's width to the layout: it is as wide as the column.
           return this.screen && node.width >= this.screen.width * 0.95
             ? mod(scroller, 'containerRelativeFrame', [[null, raw('.horizontal')]])
@@ -1070,18 +1204,29 @@ class SwiftUIWriter {
       }
       if (spacing < 0 && node.itemReverseZIndex) this.warn(node, 'the first child is drawn under the next ones, not above');
       const align = (row ? ROW_ALIGN : COLUMN_ALIGN)[node.counterAxisAlignItems];
-      v = view(row ? 'HStack' : 'VStack', [
+      const carousel = kind === 'carousel' && !spread;
+      v = view(carousel ? 'LazyHStack' : row ? 'HStack' : 'VStack', [
         ['alignment', align ? raw(align) : null],
         ['spacing', spread ? 0 : this.value(spacing, vars.itemSpacing)],
       ], items);
+      if (carousel) {
+        // The scroll view gets the side padding as content margins, so the
+        // cards snap to the margin and scroll edge to edge.
+        v = mod(v, 'scrollTargetLayout');
+        this.margins.set(node.id, left);
+        padding = [top, 0, bottom, 0];
+      }
       // Children that fill a hugging cross axis take the size of the largest child.
       if (hugCross && crossFill.some(Boolean)) v = mod(v, 'fixedSize', [['horizontal', !row], ['vertical', row]]);
     }
+    for (const [name, args] of this.containerMods.get(node.id) || []) v = mod(v, name, args);
     const main = node.primaryAxisAlignItems || 'MIN';
     const counter = node.counterAxisAlignItems === 'BASELINE' ? 'MIN' : node.counterAxisAlignItems || 'MIN';
     const align = row ? alignmentOf(H_ALIGN[main] ?? 'leading', V_ALIGN[counter] ?? 'top')
       : alignmentOf(H_ALIGN[counter] ?? 'leading', V_ALIGN[main] ?? 'top');
-    if (node.layoutWrap !== 'WRAP') v = this.overflow(node, flow, v, { row, hugMain, hugCross, crossFill, spacing, between, align });
+    const scroller = node.layoutWrap !== 'WRAP' && (kind === 'chips' || kind === 'tabs') ? this.chipScroller(node, flow, v) : null;
+    if (scroller) v = scroller;
+    else if (node.layoutWrap !== 'WRAP') v = this.overflow(node, flow, v, { row, hugMain, hugCross, crossFill, spacing, between, align });
     // Absolute layers before the first stacked one are drawn behind it.
     const first = children.findIndex((c) => inFlow(c, node));
     const layer = (list) => {
@@ -1089,7 +1234,7 @@ class SwiftUIWriter {
       return items.length ? view('ZStack', [['alignment', raw('.topLeading')]], items) : null;
     };
     return {
-      view: v, padding: this.paddingValues(node), align,
+      view: v, padding, align,
       underlay: layer(absolute.filter((c) => first >= 0 && children.indexOf(c) < first)),
       overlay: layer(absolute.filter((c) => first < 0 || children.indexOf(c) > first)),
     };
@@ -1113,8 +1258,12 @@ function printProperty(p) {
  * instance, or null. [screen] draws the root as a phone screen (it fills
  * the screen and tall frames scroll); by default portrait frames of a
  * phone's width are screens. [preview] adds a #Preview (default true).
- * [actions] maps node ids to names: tapping that layer calls the view's
- * `action` closure with the name.
+ * Layers with a role (buttons, fields, tabs, cards) are Buttons that call
+ * the view's `action` closure with a case of its action enum; [actions]
+ * names the case for given node ids instead.
+ *
+ * The result also lists `structure`: the roles found, each with the SwiftUI
+ * pattern the code uses for it.
  */
 export function toSwiftUI(root, assets, options = {}) {
   const writer = new SwiftUIWriter(assets, options);
@@ -1124,6 +1273,7 @@ export function toSwiftUI(root, assets, options = {}) {
   const structName = options.structName || sType(root.name, 'Design');
   writer.structName = structName;
   writer.typeNames.add(structName);
+  writer.roles = detectRoles(rootNode);
   let tree = null;
   if (screen) {
     writer.screen = rootNode;
@@ -1134,6 +1284,7 @@ export function toSwiftUI(root, assets, options = {}) {
       writer.screen = null;
       Object.assign(writer, {
         props: [], skip: new Set(), components: [], models: [], states: [], lets: [], propNames: new Set(['body']),
+        cases: new Map(), containerMods: new Map(), margins: new Map(), tapped: false,
       });
     }
   }
@@ -1144,7 +1295,7 @@ export function toSwiftUI(root, assets, options = {}) {
     ...[...writer.connected.values()].map((m) => `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`),
     ...(writer.connected.size ? [''] : []),
     `struct ${structName}: View {`,
-    ...(writer.tapped ? ['  var action: (String) -> Void = { _ in }'] : []),
+    ...(writer.tapped ? [`  var action: (${structName}Action) -> Void = { _ in }`] : []),
     ...writer.states,
     ...(writer.tapped || writer.states.length ? [''] : []),
     '  var body: some View {',
@@ -1153,6 +1304,7 @@ export function toSwiftUI(root, assets, options = {}) {
     ...writer.props.flatMap((p) => ['', printProperty(p)]),
     ...writer.lets.flatMap((l) => ['', l]),
     '}',
+    ...(writer.tapped ? ['', ...actionEnum(structName, writer.cases)] : []),
     ...writer.components.flatMap((c) => ['', c]),
     ...writer.models.flatMap((m) => ['', m]),
   ];
@@ -1173,8 +1325,8 @@ export function toSwiftUI(root, assets, options = {}) {
     }
     lines.push('}');
   }
-  for (const name of ['color', 'flow']) {
-    if (writer.helpers.has(name)) lines.push('', HELPERS[name]);
+  for (const name of ['color', 'flow', 'pressable']) {
+    if (writer.helpers.has(name)) lines.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};
   for (const [name, info] of writer.names) assetsMap[name] = info;
@@ -1191,5 +1343,40 @@ export function toSwiftUI(root, assets, options = {}) {
     connected: [...writer.connected.values()],
     rasterized: writer.rasterized,
     warnings: writer.warnings,
+    structure: structureOf(writer.roles, rootNode),
   };
+}
+
+/** The screen's action enum: what tapping its controls asks the owner to do. */
+function actionEnum(structName, cases) {
+  const lines = ['/// What the screen asks its owner to do.', `enum ${structName}Action: Hashable {`];
+  for (const [name, payload] of cases) lines.push(`  case ${name}${payload ? `(${payload})` : ''}`);
+  lines.push('}');
+  return lines;
+}
+
+/** The roles with a SwiftUI pattern, for the response: [{ id, name, role, pattern, items?, selected? }]. */
+function structureOf(roles, root) {
+  const nameOf = (id) => {
+    let found = null;
+    const walk = (n) => {
+      if (found || !n) return;
+      if (n.id === id) found = n;
+      else (n.children || []).forEach(walk);
+    };
+    walk(root);
+    return found ? found.name : id;
+  };
+  const out = [];
+  for (const r of roles.values()) {
+    const pattern = SWIFTUI_PATTERNS[r.role];
+    if (!pattern) continue;
+    const entry = { id: r.id, name: r.name, role: r.role, pattern };
+    if (r.items) entry.items = r.items.length;
+    if (typeof r.selected === 'number' && r.selected >= 0) entry.selected = nameOf(r.items[r.selected]);
+    if (r.label) entry.label = r.label;
+    if (r.role === 'sectionHeader') entry.link = r.link ? nameOf(r.link) : null;
+    out.push(entry);
+  }
+  return out;
 }
