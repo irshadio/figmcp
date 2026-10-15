@@ -154,8 +154,9 @@ struct CheckApp: App {
     let d = UserDefaults.standard
     guard let out = d.string(forKey: "out") else { return }
     let size = CGSize(width: d.double(forKey: "w"), height: d.double(forKey: "h"))
-    // The phone's own room above and below the screen.
+    // The phone's own room above and below the screen, at the design's text size, whatever the simulator's setting.
     let root = ${view}()
+      .dynamicTypeSize(.large)
       .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: d.double(forKey: "top")) }
       .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: d.double(forKey: "bottom")) }
     let host = UIHostingController(rootView: root)

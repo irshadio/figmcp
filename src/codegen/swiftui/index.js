@@ -121,6 +121,10 @@ function padded(v, [top, right, bottom, left]) {
   return mod(v, 'padding', [[null, call('EdgeInsets', [['top', top], ['leading', left], ['bottom', bottom], ['trailing', right]])]]);
 }
 
+function hasText(node) {
+  return node.visible !== false && (node.type === 'TEXT' || (node.children || []).some(hasText));
+}
+
 function holds(node, id) {
   return (node.children || []).some((c) => c.id === id || holds(c, id));
 }
@@ -181,6 +185,7 @@ class SwiftUIWriter {
     this.ratios = null;
     this.screen = null;
     this.viewport = null;
+    this.words = new Set();
     this.scrolls = false;
     // Layers left out (system UI, bars drawn apart), text and image
     // bindings of a repeated item, and what repeated items need.
@@ -365,6 +370,7 @@ class SwiftUIWriter {
     const axis = (key, max, s) => {
       if (s === 'inf') args.push([max, INFINITY]);
       else if (typeof s === 'number') args.push([key, round(s)]);
+      else if (s && typeof s.min === 'number') args.push([`min${key[0].toUpperCase()}${key.slice(1)}`, round(s.min)]);
     };
     axis('width', 'maxWidth', size.w);
     axis('height', 'maxHeight', size.h);
@@ -372,7 +378,7 @@ class SwiftUIWriter {
     // A fixed and a flexible axis go in two frames: one frame takes either
     // sizes or bounds.
     const fixed = args.filter(([k]) => k === 'width' || k === 'height');
-    const flexible = args.filter(([k]) => k.startsWith('max'));
+    const flexible = args.filter(([k]) => k.startsWith('max') || k.startsWith('min'));
     const align = alignment && alignment !== '.center' ? [['alignment', raw(alignment)]] : [];
     if (fixed.length && flexible.length) return mod(mod(v, 'frame', [...fixed, ...align]), 'frame', [...flexible, ...align]);
     return mod(v, 'frame', [...args, ...align]);
@@ -436,6 +442,34 @@ class SwiftUIWriter {
     return name;
   }
 
+  /** The environment's Dynamic Type size, declared once. */
+  dynamicTypeSize() {
+    if (!this.dynamicType) {
+      this.dynamicType = true;
+      this.states.push('  @Environment(\\.dynamicTypeSize) private var dynamicTypeSize');
+    }
+    return 'dynamicTypeSize';
+  }
+
+  /**
+   * A layout property for a row that stacks at accessibility text sizes,
+   * read from the environment's Dynamic Type size; its name.
+   */
+  adaptiveLayout(node, spacing, align) {
+    this.dynamicTypeSize();
+    const name = this.member(`${node.name} layout`, 'rowLayout');
+    const gap = sNum(round(spacing));
+    this.lets.push([
+      '  /// Side by side, or stacked when the text is set to an accessibility size.',
+      `  private var ${name}: AnyLayout {`,
+      '    dynamicTypeSize.isAccessibilitySize',
+      `      ? AnyLayout(VStackLayout(spacing: ${gap}))`,
+      `      : AnyLayout(HStackLayout(${align ? `alignment: ${align}, ` : ''}spacing: ${gap}))`,
+      '  }',
+    ].join('\n'));
+    return name;
+  }
+
   /** A view property holding [v], referenced by name. */
   extract(node, v) {
     const name = this.member(node.name, 'section');
@@ -469,6 +503,8 @@ class SwiftUIWriter {
         else if (fixed || !(mode === 'HUG' && content(axis))) {
           if (!(axis === 'x' ? hugW : hugH) || fixed) out[key] = axis === 'x' ? W : H;
         }
+        // An item of a control with a label keeps at least its width, and widens for a longer label.
+        if (axis === 'x' && typeof out.w === 'number' && !fixed && SELECTABLE.has(this.roleOf(ctx.parent)) && hasText(node)) out.w = { min: W };
       }
       return out;
     }
@@ -637,10 +673,13 @@ class SwiftUIWriter {
     // truncates; other text wraps and grows with Dynamic Type.
     const roles = this.ancestors.map((a) => this.roleOf(a));
     const parent = this.ancestors[this.ancestors.length - 2];
-    // A label wider than its control in the design overflows it there too.
-    const inner = parent && parent.width - (parent.paddingLeft || 0) - (parent.paddingRight || 0);
-    if (size.w === null && size.h === null && inner && node.width > inner + 0.5) v = mod(v, 'fixedSize');
-    else if (size.w === null && roles.some((r) => CONTROLS.has(r)) && !/\n/.test(node.characters || '')) {
+    // A single word never breaks.
+    const word = !/\s/.test(String(node.characters || '').trim());
+    const control = roles.some((r) => CONTROLS.has(r));
+    // Items drawn from data share one view: a value is one word when every item's is.
+    const single = this.bindings.has(node.id) ? this.words.has(node.id) : word;
+    if (size.w === null && size.h === null && single && !control) v = mod(v, 'lineLimit', [[null, 1]]);
+    else if (size.w === null && control && !/\n/.test(node.characters || '')) {
       v = mod(v, 'lineLimit', [[null, 1]]);
     } else if (size.h === null) {
       v = mod(v, 'fixedSize', [['horizontal', false], ['vertical', true]]);
@@ -904,7 +943,9 @@ class SwiftUIWriter {
     } else {
       v = content.view;
       if (content.padding) v = padded(v, content.padding);
-      v = this.frame(v, size, content.align);
+      // A box of text grows with it.
+      const grows = typeof size.h === 'number' && hasText(node);
+      v = this.frame(v, grows ? { ...size, h: { min: size.h } } : size, content.align);
       if (content.underlay) layers.push(content.underlay);
       if (layers.length) v = mod(v, 'background', layers.length > 1 || content.underlay ? [['alignment', raw('.topLeading')]] : [], layers);
       if (content.overlay) v = mod(v, 'overlay', [['alignment', raw('.topLeading')]], [content.overlay]);
@@ -1211,7 +1252,10 @@ class SwiftUIWriter {
     const render = (n) => {
       const index = items.indexOf(n);
       const saved = { actions: this.actions, inComponent: this.inComponent };
-      for (const f of fields) this.bindings.set(f.nodes[index].id, `item.${f.ident}`);
+      for (const f of fields) {
+        this.bindings.set(f.nodes[index].id, `item.${f.ident}`);
+        if (f.values && f.values.every((x) => !/\s/.test(String(x).trim()))) this.words.add(f.nodes[index].id);
+      }
       this.actions = {};
       this.inComponent = true;
       if (cell) this.stretchCells.add(n.id);
@@ -1368,7 +1412,9 @@ class SwiftUIWriter {
       if (kind === 'grid' && runs.length === 1 && runs[0].items.length === flow.length && items.length === 1) {
         // Equal cards in columns that share the width.
         const column = call('GridItem', [[null, raw('.flexible()')], ['spacing', gap]]);
-        const columns = call('Array', [['repeating', column], ['count', role.columns]]);
+        // One column when the text is set to an accessibility size.
+        const count = role.columns > 1 && !this.inComponent ? raw(`${this.dynamicTypeSize()}.isAccessibilitySize ? 1 : ${role.columns}`) : role.columns;
+        const columns = call('Array', [['repeating', column], ['count', count]]);
         v = view('LazyVGrid', [['columns', columns], ['spacing', lineGap]], items);
       } else {
         this.helpers.add('flow');
@@ -1379,12 +1425,16 @@ class SwiftUIWriter {
       const availCross = row ? node.height - top - bottom : node.width - left - right;
       const crossAt = { CENTER: '', MAX: row ? 'bottom' : 'trailing' }[node.counterAxisAlignItems] ?? (row ? 'top' : 'leading');
       const spread = between && !hugMain && flow.length > 1;
+      const flexibleRow = row && (spread || flow.some((c) => sizingOf(c, node, 'x') === 'FILL' ||
+        (/^spacer$/i.test(c.name) && !visibleChildren(c).length)));
       const one = (c) => {
         // An empty layer named Spacer in a stack that does not hug: the room between items.
         if (!hugMain && /^spacer$/i.test(c.name) && !visibleChildren(c).length && !visiblePaints(c.fills).length) {
           return view('Spacer', [['minLength', 0]]);
         }
-        const item = this.node(c, ctx);
+        let item = this.node(c, ctx);
+        // Beside a Spacer or a filling item, content with text takes its width first.
+        if (item && row && flexibleRow && c.type !== 'TEXT' && sizingOf(c, node, 'x') === 'HUG' && hasText(c)) item = mod(item, 'layoutPriority', [[null, 1]]);
         const extent = (row ? c.height : c.width) || 0;
         if (!item || hugCross || sizingOf(c, node, cross) === 'FILL' || extent <= availCross + 0.5) return item;
         // A frame of fixed size does not grow with what overflows it, unless
@@ -1398,7 +1448,7 @@ class SwiftUIWriter {
             scroller = mod(scroller, 'contentMargins', [[null, raw('.horizontal')], [null, this.margins.get(c.id)], ['for', raw('.scrollContent')]]);
             scroller = mod(scroller, 'scrollTargetBehavior', [[null, raw('.viewAligned')]]);
           }
-          scroller = mod(mod(scroller, 'scrollIndicators', [[null, raw('.hidden')]]), 'frame', [['height', round(c.height)]]);
+          scroller = mod(mod(scroller, 'scrollIndicators', [[null, raw('.hidden')]]), 'frame', [['minHeight', round(c.height)]]);
           // A scroll view would report its content's width to the layout: it is as wide as the column.
           return this.screen && node.width >= this.screen.width * 0.95
             ? mod(scroller, 'containerRelativeFrame', [[null, raw('.horizontal')]])
@@ -1428,7 +1478,11 @@ class SwiftUIWriter {
       if (spacing < 0 && node.itemReverseZIndex) this.warn(node, 'the first child is drawn under the next ones, not above');
       const align = (row ? ROW_ALIGN : COLUMN_ALIGN)[node.counterAxisAlignItems];
       const carousel = kind === 'carousel' && !spread;
-      v = view(carousel ? 'LazyHStack' : row ? 'HStack' : 'VStack', [
+      // Items side by side that each fill and hold text stack at accessibility text sizes.
+      if (row && !kind && !spread && !this.inComponent && flow.length >= 2 && flow.length <= 3 &&
+          flow.every((c) => sizingOf(c, node, 'x') === 'FILL' && hasText(c))) {
+        v = view(this.adaptiveLayout(node, spacing, align), [], items);
+      } else v = view(carousel ? 'LazyHStack' : row ? 'HStack' : 'VStack', [
         ['alignment', align ? raw(align) : null],
         ['spacing', spread ? 0 : this.value(spacing, vars.itemSpacing)],
       ], items);

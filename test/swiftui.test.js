@@ -232,7 +232,10 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.match(code, /\.scrollTargetLayout\(\)/);
   assert.match(code, /\.contentMargins\(\.horizontal, 16, for: \.scrollContent\)/);
   assert.match(code, /\.scrollTargetBehavior\(\.viewAligned\)/);
-  assert.match(code, /LazyVGrid\(columns: Array\(repeating: GridItem\(\.flexible\(\), spacing: 10\), count: 2\), spacing: 10\)/);
+  // Two columns, one at accessibility text sizes.
+  assert.match(code.replace(/\s+/g, ' '),
+    /LazyVGrid\( columns: Array\( repeating: GridItem\(\.flexible\(\), spacing: 10\), count: dynamicTypeSize\.isAccessibilitySize \? 1 : 2 \), spacing: 10 \)/);
+  assert.match(code, /@Environment\(\\\.dynamicTypeSize\) private var dynamicTypeSize/);
   assert.doesNotMatch(code, /FlowLayout/);
   assert.match(code, /Text\("Offers for you"\)[\s\S]*?\.accessibilityAddTraits\(\.isHeader\)/);
   assert.match(code, /\.custom\("Rubik", size: 13, relativeTo: \.footnote\)/);
@@ -299,7 +302,9 @@ test('toSwiftUI lays a freely placed screen out as a column that reflows', () =>
   assert.match(code, /\.frame\(maxWidth: \.infinity, minHeight: proxy\.size\.height, alignment: \.topLeading\)\n\s+\.background\(alignment: \.topLeading\)/);
   // Text wraps and grows instead of keeping one line.
   assert.match(code, /Text\("Organised wherever you are\."\)[\s\S]*?\.fixedSize\(horizontal: false, vertical: true\)/);
-  assert.doesNotMatch(code, /\.fixedSize\(\)/);
+  assert.doesNotMatch(code, /Text\("Organised wherever you are\."\)(\n\s+\.[^\n]+)*\n\s+\.fixedSize\(\)/);
+  // A single word never breaks.
+  assert.match(code, /Text\("Skip"\)(\n\s+\.[^\n]+)*\n\s+\.lineLimit\(1\)/);
 
   const home = toSwiftUI(screen(), assets).code;
   const body = home.slice(home.indexOf('var body'), home.indexOf('.safeAreaInset'));
