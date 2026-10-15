@@ -8,7 +8,8 @@ import test from 'node:test';
 import { toReactTailwind } from '../src/codegen/react.js';
 import { isGenericName } from '../src/codegen/semantics.js';
 import { snapClass, tokensCss, usedVariables } from '../src/codegen/tailwind.js';
-import { isReactNative, reactAssetDir, tailwindVersion } from '../src/project.js';
+import { toHtmlTailwind } from '../src/codegen/html.js';
+import { detectFramework, reactAssetDir, tailwindVersion } from '../src/project.js';
 import { pageScript } from '../tools/visual-check.js';
 import { faceOf } from '../tools/fonts.js';
 
@@ -238,7 +239,7 @@ test('assets are named after their layers in the asset folder', () => {
   assert.deepEqual(out.files['public/figma/arrow-right.svg'], { url: '/figma/arrow-right.svg', source: '/disk/16a.svg' });
 });
 
-test('the project tells the Tailwind version, the public folder and React Native', () => {
+test('the project tells the Tailwind version, the public folder and a static site', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'figmcp-react-'));
   const pkg = (deps) => fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ devDependencies: deps }));
   assert.equal(tailwindVersion(dir), null);
@@ -249,10 +250,12 @@ test('the project tells the Tailwind version, the public folder and React Native
   assert.equal(reactAssetDir(dir), 'public/figma');
   pkg({ '@sveltejs/kit': '^2.0.0' });
   assert.equal(reactAssetDir(dir), 'static/figma');
-  assert.equal(isReactNative({}, dir), false);
-  assert.equal(isReactNative({ clientFrameworks: 'react-native' }, dir), true);
-  pkg({ expo: '^52.0.0' });
-  assert.equal(isReactNative({}, dir), true);
+  assert.equal(detectFramework({}, dir), 'react');
+  assert.equal(detectFramework({ clientFrameworks: 'html' }, dir), 'html');
+  assert.equal(detectFramework({ clientFrameworks: 'html,react' }, dir), 'react');
+  fs.rmSync(path.join(dir, 'package.json'));
+  fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html>');
+  assert.equal(detectFramework({}, dir), 'html', 'a static site');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -359,4 +362,21 @@ test('Figma text styles used more than once are named class lists', () => {
   assert.match(out, /text-\[#ff0000\]`\}/, 'each keeps its own colour');
   assert.doesNotMatch(out, /textStyles\.body/, 'a style used once stays inline');
   assert.doesNotMatch(code(frame([styled('16:1', 'One', black), styled('16:2', 'Two', black)]), { textStyles: false }), /textStyles/);
+});
+
+test('HTML + Tailwind is the same markup as a static page', () => {
+  const data = JSON.parse(fs.readFileSync(new URL('./fixtures/sample-export.json', import.meta.url)));
+  const files = { svg: () => '/disk/a.svg', image: () => '/disk/p.png' };
+  const out = toHtmlTailwind(data.frames[0].tree, files, { assetDir: 'assets/figma' });
+  assert.match(out.code, /^<!-- SampleScreen -->\n<div class="relative w-\[200px\] h-\[120px\] flex flex-col gap-2[^"]*" data-name="Sample Screen" data-node-id="10:1">/);
+  assert.match(out.code, /<p class="[^"]*" data-name="Title" data-node-id="10:2">Hello \{you\}<\/p>/, 'text sits inline, unescaped braces');
+  assert.match(out.code, /<img alt="" class="block max-w-none size-full" src="assets\/figma\/arrow.svg">/);
+  assert.match(out.code, /<div aria-hidden="true" class="[^"]*"><\/div>/, 'no self-closing divs');
+  assert.doesNotMatch(out.code, /className|\{img|\.map\(|textStyles/);
+  assert.deepEqual(out.files['assets/figma/photo.png'], { url: 'assets/figma/photo.png', source: '/disk/p.png' });
+  // Line breaks, entities and styles.
+  const lines = toHtmlTailwind(frame([text('A & B\nC <d>', { textAutoResize: 'HEIGHT' }),
+    box('17:1', { strokeWeight: 2, strokes: [{ type: 'GRADIENT_LINEAR', visible: true, gradientTransform: [[1, 0, 0], [0, 1, 0]], gradientStops: [{ position: 0, color: black }, { position: 1, color: black }] }] })]), assets).code;
+  assert.match(lines, />A &amp; B\nC &lt;d&gt;<\/p>/);
+  assert.match(lines, /style="padding: 2px; background: linear-gradient\(90deg,#000000 0%,#000000 100%\); -webkit-mask: [^"]+; -webkit-mask-composite: xor; mask-composite: exclude"/);
 });

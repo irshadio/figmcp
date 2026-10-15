@@ -8,18 +8,21 @@
 //          [--fetch-fonts] [--tailwind 3|4] [--out <dir>] [--chrome <path>]
 //          [--export <design export.json>] [--snapshot <frame id>]
 //          [--code <component.jsx|tsx> [--assets <assets.json>]]
-//          [--viewport <width>x<height>]
+//          [--viewport <width>x<height>] [--html]
 // Reads live through the running MCP server (the plugin must be connected),
 // from a design export JSON with --export, or a saved snapshot with
 // --snapshot. With --code it renders that component (its default export)
 // instead of generating one; --assets maps the image constants or URLs it
 // uses to files ({ "imgLogo": "/path/logo.svg" } or { "<url>": "<path>" }).
 // With --viewport the page is laid out at that size and nothing is compared.
+// With --html it checks HTML + Tailwind instead (generated, or the page or
+// fragment given with --code).
 // React and Tailwind load from a CDN, so the check needs a network.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PNG } from 'pngjs';
+import { toHtmlTailwind } from '../src/codegen/html.js';
 import { toReactTailwind } from '../src/codegen/react.js';
 import { imageExt } from '../src/store.js';
 import { imageSize } from '../src/png.js';
@@ -61,6 +64,7 @@ function args(argv) {
     else if (a === '--chrome') out.chrome = argv[++i];
     else if (a === '--code') out.code = argv[++i];
     else if (a === '--assets') out.assets = argv[++i];
+    else if (a === '--html') out.html = true;
     else if (a === '--viewport') {
       const m = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/.exec(argv[++i] || '');
       if (!m) throw new Error('--viewport takes <width>x<height>, e.g. 390x844');
@@ -153,10 +157,18 @@ export function pageScript(code, assets = {}) {
   return body;
 }
 
-function page({ script, fontsCss, css = '', width, height, tailwind }) {
+function page({ script, markup = null, fontsCss, css = '', width, height, tailwind }) {
   const tw = tailwind === 4
     ? `<style type="text/tailwindcss">${css}</style>`
     : `<style>${css}</style>`;
+  if (markup !== null) {
+    return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>${fontsCss}\nhtml,body{margin:0;padding:0;background:transparent}#root{width:${width}px;min-height:${height}px}</style>
+<script src="${TAILWIND[tailwind]}"></script>
+${tw}
+</head><body><div id="root">${markup}</div></body></html>`;
+  }
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>${fontsCss}\nhtml,body{margin:0;padding:0;background:transparent}#root{width:${width}px;min-height:${height}px}</style>
@@ -202,12 +214,27 @@ async function capture(tab, rect) {
 }
 
 /**
+ * An HTML fragment or page as the markup to render: the body of a full
+ * page, with asset paths ([assets]: path or URL -> file) made file URLs.
+ */
+export function pageMarkup(html, assets = {}) {
+  const body = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html);
+  let markup = body ? body[1] : html;
+  for (const [key, file] of Object.entries(assets)) {
+    const href = /^[a-z]+:/i.test(file) ? file : pathToFileURL(path.resolve(file)).href;
+    markup = markup.split(`"${key}"`).join(`"${href}"`);
+  }
+  return markup.replace(/<script[\s\S]*?<\/script>/gi, '');
+}
+
+/**
  * Renders [code] (or the code generated from [design]) and compares it with
- * the design. Returns the report; files go to [out].
+ * the design: React, or HTML with [html]. Returns the report; files go to
+ * [out].
  */
 export async function reactCheck({
   design, out, fonts: fontDirs = [], fetchFonts = false, tailwind = 4, chrome, code = null, assets = null, css = '',
-  viewport = null,
+  viewport = null, html = false,
 }) {
   const puppeteer = await import('puppeteer-core').catch(() => {
     throw new Error('The React check needs puppeteer-core: run `npm install puppeteer-core` next to figma-local-mcp.');
@@ -219,17 +246,22 @@ export async function reactCheck({
   const tree = design.tree;
   let generated = null;
   if (!code) {
-    generated = toReactTailwind(tree, writeAssets(path.join(out, 'assets'), design.images));
+    const files = writeAssets(path.join(out, 'assets'), design.images);
+    generated = html ? toHtmlTailwind(tree, files) : toReactTailwind(tree, files);
     code = generated.code;
     css = generated.css || '';
   }
-  fs.writeFileSync(path.join(out, 'design.jsx'), code);
+  const codeFile = path.join(out, html ? 'design.html' : 'design.jsx');
+  fs.writeFileSync(codeFile, code);
   if (css) fs.writeFileSync(path.join(out, 'design.css'), css);
   const used = [...families(tree)];
   const fonts = await resolveFonts(used, fontDirs, { fetch: fetchFonts, exts: FONT_EXTS });
   const [width, height] = viewport || [tree.width, tree.height];
   const htmlFile = path.join(out, 'index.html');
-  fs.writeFileSync(htmlFile, page({ script: pageScript(code, assets || {}), fontsCss: fontFaceCss(fonts), css, width, height, tailwind }));
+  fs.writeFileSync(htmlFile, page({
+    ...(html ? { markup: pageMarkup(code, assets || {}) } : { script: pageScript(code, assets || {}) }),
+    fontsCss: fontFaceCss(fonts), css, width, height, tailwind,
+  }));
   if (design.render) fs.writeFileSync(path.join(out, 'design.png'), design.render);
 
   const browser = await puppeteer.default.launch({
@@ -307,7 +339,7 @@ export async function reactCheck({
       report = {
         ...base, viewport: { width, height }, pageSize: [state.page.width, state.page.height],
         horizontalOverflow: state.page.width > width + 0.5, offscreenLayers: offscreen,
-        files: { out, page: htmlFile, code: path.join(out, 'design.jsx'), rendered: path.join(out, 'rendered.png') },
+        files: { out, page: htmlFile, code: codeFile, rendered: path.join(out, 'rendered.png') },
       };
     } else {
       const rendered = await capture(tab, {
@@ -331,7 +363,7 @@ export async function reactCheck({
         } : {}),
         pixels: { ...pixels.sizes, differingPixels: pixels.differingPixels, differingPercent: pixels.differingPercent },
         files: {
-          out, page: htmlFile, code: path.join(out, 'design.jsx'), design: path.join(out, 'design.png'),
+          out, page: htmlFile, code: codeFile, design: path.join(out, 'design.png'),
           rendered: path.join(out, 'rendered.png'), diff: path.join(out, 'diff.png'),
         },
       };

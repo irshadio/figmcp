@@ -5,10 +5,11 @@ import { z } from 'zod';
 import { listMappings, lookup } from '../connect.js';
 import { toFlutter } from '../codegen/flutter/index.js';
 import { toMetadataXml } from '../codegen/metadata.js';
+import { toHtmlTailwind } from '../codegen/html.js';
 import { countNodes, toReactTailwind } from '../codegen/react.js';
 import { systemUi } from '../codegen/system-ui.js';
 import {
-  detectFramework, flutterAssetDirs, FRAMEWORKS, isReactNative, reactAssetDir, tailwindVersion, usesScreenUtil,
+  detectFramework, flutterAssetDirs, FRAMEWORKS, reactAssetDir, tailwindVersion, usesScreenUtil,
 } from '../project.js';
 import { ASSETS, imageExt, saveAsset, snapshotSummary } from '../store.js';
 import {
@@ -91,8 +92,8 @@ function systemUiBlock(tree) {
     chrome.map((c) => `- ${c.id} "${c.name}": ${c.kind}, ${c.box[2]}x${c.box[3]} at (${c.box[0]}, ${c.box[1]})`).join('\n')}`);
 }
 
-/** The React response blocks after the code: tokens, assets, fonts, notes. */
-function reactDetails(result, tree) {
+/** The React and HTML response blocks after the code: tokens, assets, fonts, notes. */
+function reactDetails(result, tree, { html = false } = {}) {
   const out = [];
   if (result.css) {
     out.push(text('Design variables used, as CSS: add them to the global stylesheet (or map each to the ' +
@@ -103,7 +104,7 @@ function reactDetails(result, tree) {
     const dirs = [...new Set(files.map(([file]) => path.posix.dirname(file)))];
     const copy = [`mkdir -p ${dirs.map(shellQuote).join(' ')}`,
       ...files.map(([file, { source }]) => `cp ${shellQuote(source)} ${shellQuote(file)}`)].join('\n');
-    out.push(text('Assets used in the code (project path -> file on disk). Copy them into the project root; ' +
+    out.push(text(`Assets used in the code (project path -> file on disk). Copy them into the ${html ? 'folder of the page' : 'project root'}; ` +
       `the code loads each from its URL:\n${JSON.stringify(Object.fromEntries(files.map(([file, { url, source }]) => [file, { url, source }])), null, 2)}\n\n${copy}`));
   } else if (Object.keys(result.assets).length) {
     const map = {};
@@ -120,8 +121,8 @@ function reactDetails(result, tree) {
         fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
   }
   if (result.textStyles.length) {
-    out.push(text('Figma text styles used (elements carry data-text-style; those used more than once are named ' +
-      `in the code's textStyles object; map each to the project's type scale):\n${
+    out.push(text(`Figma text styles used (elements carry data-text-style${html ? '' : '; those used more than once are named ' +
+      "in the code's textStyles object"}; map each to the project's type scale):\n${
       result.textStyles.map((s) => `- ${s.name}: ${s.classes}`).join('\n')}`));
   }
   if (result.screen) {
@@ -149,16 +150,19 @@ function reactDetails(result, tree) {
   return out.filter(Boolean);
 }
 
-function guidance({ tailwind, native }) {
+function guidance({ tailwind, html }) {
   return [
-    'IMPORTANT: the code above is reference React + Tailwind generated from the ' +
-    'design. Adapt it to the target project\'s framework, components, tokens ' +
+    `IMPORTANT: the code above is reference ${html ? 'HTML' : 'React'} + Tailwind generated from the ` +
+    'design. Adapt it to the target project\'s components, tokens ' +
     'and conventions instead of copying it. Values are exact, in CSS pixels at ' +
     'the design size: sizes, spacing, radii, colours, font families, weights ' +
     'and line heights. Theme classes (px-4, rounded-full, font-bold) are used ' +
     'only where they equal the design value at the default 16px root size; the classes work in Tailwind 3.4 and 4' +
     `${tailwind ? ` (the project uses Tailwind ${tailwind})` : ''}. var(--name,value) marks a design ` +
-    'variable: use the project token of that name. Elements carry data-node-id ' +
+    'variable: use the project token of that name. ' +
+    (html ? '' : 'Runs of repeated items are data arrays with .map(), and Figma text styles used more than once ' +
+      'are named in textStyles. ') +
+    'Elements carry data-node-id ' +
     '(call get_design_context on a child id for detail), data-component / ' +
     'data-variant, data-interactions (prototype actions) and data-rasterized ' +
     '(a layer shipped as an image). Buttons, links, landmarks and text inputs come ' +
@@ -167,9 +171,7 @@ function guidance({ tailwind, native }) {
     'system UI belong to the phone: leave them out. Frames without auto layout ' +
     'are absolutely positioned: rebuild such sections with flex or grid when ' +
     'they must reflow. Compare the result with the screenshot.',
-    native ? 'The client builds React Native: map div, p and img to View, Text and Image ' +
-      '(or use NativeWind for the classes), and drop web-only classes.' : null,
-  ].filter(Boolean).join('\n\n');
+  ].join('\n\n');
 }
 
 export function registerDesignTools(server, bridge, source) {
@@ -179,7 +181,7 @@ export function registerDesignTools(server, bridge, source) {
     description:
       'Get design context for a Figma node — the primary tool for design-to-code ' +
       'workflows. Returns reference code (Flutter widgets for Flutter projects, ' +
-      'React + Tailwind otherwise), the assets it uses, a screenshot and the ' +
+      'HTML + Tailwind for static sites, React + Tailwind otherwise), the assets it uses, a screenshot and the ' +
       'variables in the node. The code must be adapted to the target project. ' +
       'Use the nodeId parameter to specify a node id; from a URL like ' +
       'https://figma.com/design/:fileKey/:fileName?node-id=1-2 the node id is 1:2. ' +
@@ -189,8 +191,9 @@ export function registerDesignTools(server, bridge, source) {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
       framework: z.enum(FRAMEWORKS).optional().describe(
-        'Code to generate: flutter or react. Default: from clientFrameworks / clientLanguages, ' +
-        'else FIGMA_LOCAL_MCP_FRAMEWORK, else flutter when the project has a pubspec.yaml, else react.'),
+        'Code to generate: react, html or flutter. Default: from clientFrameworks / clientLanguages, ' +
+        'else FIGMA_LOCAL_MCP_FRAMEWORK, else flutter when the project has a pubspec.yaml, html for a ' +
+        'static site (index.html without package.json), else react.'),
       clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" (picks the framework).'),
       clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" (picks the framework).'),
       screen: z.boolean().optional().describe(
@@ -198,7 +201,7 @@ export function registerDesignTools(server, bridge, source) {
       assetsDir: z.string().optional().describe(
         'Folder of the asset files in the code. Flutter default: the svg/png/images folders of the project\'s ' +
         'pubspec.yaml, else assets/figma. React default: public/figma (static/figma for SvelteKit), loaded by URL ' +
-        '(/figma/name.svg).'),
+        '(/figma/name.svg). HTML default: assets/figma, relative to the page.'),
       screenUtil: z.boolean().optional().describe(
         'Flutter: write lengths with flutter_screenutil (.w, .h, .r, .sp) so the layout scales from the design size ' +
         '(default: when the project\'s pubspec.yaml depends on flutter_screenutil).'),
@@ -244,6 +247,10 @@ export function registerDesignTools(server, bridge, source) {
             'design, .r takes the smaller scale and .sp scales text. Keep the app\'s ScreenUtilInit designSize; ' +
             'when it differs from this frame, the frame\'s numbers still scale against it.'));
         }
+      } else if (framework === 'html') {
+        const dir = (assetsDir || 'assets/figma').replace(/^\.?\/+|\/+$/g, '');
+        const result = toHtmlTailwind(node.tree, fileResolver(node.images), { screen, assetDir: dir });
+        out = [text(result.code), ...reactDetails(result, node.tree, { html: true })];
       } else {
         const dir = (assetsDir || reactAssetDir()).replace(/^\.?\/+|\/+$/g, '');
         const result = toReactTailwind(node.tree, fileResolver(node.images), { connect, screen, assetDir: dir });
@@ -266,7 +273,7 @@ export function registerDesignTools(server, bridge, source) {
       out.push(text(`These variables and styles are used in the design:\n${JSON.stringify(vars.defs, null, 2)}`));
     }
     out.push(text(framework === 'flutter' ? FLUTTER_GUIDANCE
-      : guidance({ tailwind: tailwindVersion(), native: isReactNative(args) })));
+      : guidance({ tailwind: tailwindVersion(), html: framework === 'html' })));
     // A node too large to render still gets its code.
     const shot = shotRead && await shotRead;
     if (shot) out.push(image(shot.png));

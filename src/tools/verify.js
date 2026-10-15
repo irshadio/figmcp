@@ -42,12 +42,13 @@ const IMAGE_FILE = /\.(svg|png|jpe?g|webp|gif|avif)$/i;
  */
 function componentAssets(code, file, project) {
   const out = {};
-  for (const m of code.matchAll(/["'`](\/[^"'`\s]+)["'`]/g)) {
+  for (const m of code.matchAll(/["'`]([^"'`\s:]+)["'`]/g)) {
     if (!IMAGE_FILE.test(m[1])) continue;
-    for (const dir of ['public', 'static']) {
-      const hit = path.join(project, dir, m[1]);
-      if (fs.existsSync(hit)) out[m[1]] = hit;
-    }
+    // A root path is served from the public folder; a relative one sits by the file.
+    const hits = m[1].startsWith('/') ? ['public', 'static'].map((dir) => path.join(project, dir, m[1]))
+      : [path.resolve(path.dirname(file), m[1])];
+    const hit = hits.find((h) => fs.existsSync(h));
+    if (hit) out[m[1]] = hit;
   }
   for (const m of code.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/gm)) {
     if (!IMAGE_FILE.test(m[2])) continue;
@@ -115,9 +116,9 @@ export function registerVerifyTools(server, bridge, source) {
       'node. Returns analyzer or runtime errors (overflows, missing assets, ' +
       'broken images), the share of differing pixels and a diff image (the ' +
       'design in grey, differing pixels in red).\n\n' +
-      'React: without `file` it checks the code get_design_context generates ' +
+      'React and HTML: without `file` it checks the code get_design_context generates ' +
       'and compares every layer\'s box too. With `file` (a .jsx or .tsx under ' +
-      'a folder with package.json) it renders that file\'s default export: it ' +
+      'a folder with package.json, or an .html page) it renders that file\'s default export or page: it ' +
       'must be self-contained apart from React and image imports; images load ' +
       'from the project\'s public folder. Pass `css` for the stylesheet with ' +
       'its tokens. React and Tailwind load from a CDN and the fonts from the ' +
@@ -135,7 +136,7 @@ export function registerVerifyTools(server, bridge, source) {
     inputSchema: {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
-      framework: z.enum(['flutter', 'react']).optional().describe(
+      framework: z.enum(['flutter', 'react', 'html']).optional().describe(
         'flutter or react (default: from the file, else as get_design_context picks: the client, then the project).'),
       clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" (picks the framework).'),
       clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" (picks the framework).'),
@@ -155,9 +156,9 @@ export function registerVerifyTools(server, bridge, source) {
   }, guard(async (input) => {
     // Flutter-only inputs pick Flutter; then the file's language, then the client and the project.
     const framework = input.framework || (input.flutter || input.widget ? 'flutter'
-      : input.file ? (/\.(jsx|tsx|js|ts)$/i.test(input.file) ? 'react' : 'flutter')
+      : input.file ? (/\.(jsx|tsx|js|ts)$/i.test(input.file) ? 'react' : /\.html?$/i.test(input.file) ? 'html' : 'flutter')
         : detectFramework(input));
-    if (framework === 'react') return verifyReact(source, input);
+    if (framework === 'react' || framework === 'html') return verifyReact(source, { ...input, html: framework === 'html' });
     const { nodeId, file, widget, viewport, fonts = [], flutter } = input;
     const tool = flutterTool(flutter);
     if (!tool) throw new Error('The flutter tool was not found: pass `flutter` with its path, or set FLUTTER.');
@@ -226,7 +227,7 @@ export function registerVerifyTools(server, bridge, source) {
   }));
 }
 
-async function verifyReact(source, { nodeId, file, viewport, fonts = [], css, tailwind }) {
+async function verifyReact(source, { nodeId, file, viewport, fonts = [], css, tailwind, html = false }) {
   const size = viewport ? viewport.split('x').map(Number) : null;
   if (size && size.some((v) => v < 1 || v > 10000)) throw new Error('Each side of `viewport` must be between 1 and 10000.');
   const { id } = await source.resolveId(nodeId);
@@ -243,16 +244,16 @@ async function verifyReact(source, { nodeId, file, viewport, fonts = [], css, ta
   if (file) {
     const absolute = path.resolve(file);
     project = projectOf(fs.existsSync(absolute) ? absolute : path.join(process.cwd(), 'x'), 'package.json');
-    const inProject = fs.existsSync(absolute) ? absolute : project && path.resolve(project, file);
-    if (!inProject || !fs.existsSync(inProject)) throw new Error(`${file} does not exist.`);
+    const inProject = fs.existsSync(absolute) ? absolute : path.resolve(project || process.cwd(), file);
+    if (!fs.existsSync(inProject)) throw new Error(`${file} does not exist.`);
     project = projectOf(inProject, 'package.json') || path.dirname(inProject);
     code = fs.readFileSync(inProject, 'utf8');
     assets = componentAssets(code, inProject, project);
   }
   const slug = id.replace(/[^0-9A-Za-z]+/g, '_');
-  const out = path.join(DATA_DIR, 'verify', `${slug}_react${file ? '_project' : ''}${viewport ? `_${viewport}` : ''}`);
+  const out = path.join(DATA_DIR, 'verify', `${slug}_${html ? 'html' : 'react'}${file ? '_project' : ''}${viewport ? `_${viewport}` : ''}`);
   const report = await oneAtATime(() => runReactCheck({
-    design, out, code, assets, viewport: size,
+    design, out, code, assets, viewport: size, html,
     css: css ? pageCss(path.resolve(project || process.cwd(), css)) : '',
     fonts: [...fonts, ...(project ? [path.join(project, 'public'), path.join(project, 'src', 'fonts'), path.join(project, 'assets', 'fonts')] : [])],
     fetchFonts: true,

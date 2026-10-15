@@ -4,22 +4,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const FRAMEWORKS = ['react', 'flutter'];
+export const FRAMEWORKS = ['react', 'html', 'flutter'];
 const DEFAULT_ASSETS = 'assets/figma';
 
 /**
- * 'flutter' or 'react': the explicit [framework], then the client's
- * frameworks and languages, then FIGMA_LOCAL_MCP_FRAMEWORK, then a
- * pubspec.yaml in [cwd]; React otherwise.
+ * 'flutter', 'html' or 'react': the explicit [framework], then the
+ * client's frameworks and languages, then FIGMA_LOCAL_MCP_FRAMEWORK, then
+ * the project in [cwd] (a pubspec.yaml is Flutter; a static site, an
+ * index.html without a package.json, is HTML); React otherwise.
  */
 export function detectFramework({ framework, clientFrameworks, clientLanguages } = {}, cwd = process.cwd()) {
   if (FRAMEWORKS.includes(framework)) return framework;
   const said = `${clientFrameworks || ''} ${clientLanguages || ''}`.toLowerCase();
   if (/flutter|dart/.test(said)) return 'flutter';
-  if (/react|next|vue|svelte|angular|html|tailwind|javascript|typescript/.test(said)) return 'react';
+  if (/\bhtml\b/.test(said) && !/react|next|vue|svelte|angular|jsx|tsx/.test(said)) return 'html';
+  if (/react|next|vue|svelte|angular|tailwind|javascript|typescript/.test(said)) return 'react';
   const env = String(process.env.FIGMA_LOCAL_MCP_FRAMEWORK || '').toLowerCase();
   if (FRAMEWORKS.includes(env)) return env;
-  return fs.existsSync(path.join(cwd, 'pubspec.yaml')) ? 'flutter' : 'react';
+  if (fs.existsSync(path.join(cwd, 'pubspec.yaml'))) return 'flutter';
+  if (fs.existsSync(path.join(cwd, 'index.html')) && !fs.existsSync(path.join(cwd, 'package.json'))) return 'html';
+  return 'react';
 }
 
 /** Whether the project's pubspec.yaml depends on flutter_screenutil. */
@@ -75,13 +79,6 @@ export function tailwindVersion(cwd = process.cwd()) {
   if (deps['@tailwindcss/postcss'] || deps['@tailwindcss/vite'] || deps['@tailwindcss/cli']) return 4;
   const m = /(\d+)/.exec(String(deps.tailwindcss || ''));
   return m ? Number(m[1]) : null;
-}
-
-/** Whether the client or the project builds React Native (Expo) apps. */
-export function isReactNative({ clientFrameworks, clientLanguages } = {}, cwd = process.cwd()) {
-  if (/react[ -]?native|expo/i.test(`${clientFrameworks || ''} ${clientLanguages || ''}`)) return true;
-  const deps = dependencies(packageJson(cwd));
-  return Boolean(deps['react-native'] || deps.expo);
 }
 
 /**
