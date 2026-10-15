@@ -8,14 +8,14 @@ export const metadata: Metadata = pageMeta({
   title: "Design to code",
   path: "/docs/design-to-code",
   description:
-    "Turn Figma frames into Flutter widgets or React + Tailwind components with your coding agent, with assets saved to your project and a screenshot to compare against.",
+    "Turn Figma frames into Flutter widgets, React + Tailwind components or HTML + Tailwind pages with your coding agent, with assets saved to your project and a screenshot to compare against.",
 });
 
 export default function Page() {
   return (
     <>
       <h1>Design to code</h1>
-      <p className="text-lg text-muted">Turn a frame into Flutter or React + Tailwind code.</p>
+      <p className="text-lg text-muted">Turn a frame into Flutter, React + Tailwind or HTML + Tailwind code.</p>
 
       <h2>Pick a frame</h2>
       <p>Select a frame in Figma and ask your agent:</p>
@@ -41,16 +41,18 @@ export default function Page() {
         and your conventions.
       </Callout>
 
-      <h2 id="framework">Flutter or React</h2>
+      <h2 id="framework">Flutter, React or HTML</h2>
       <p>The framework is chosen in this order:</p>
       <ol>
-        <li>The <code>framework</code> argument, when the agent passes one.</li>
-        <li>The client&apos;s languages and frameworks (for example <code>dart</code> or <code>flutter</code>).</li>
         <li>
-          The <code>FIGMA_LOCAL_MCP_FRAMEWORK</code> environment variable (<code>flutter</code> or <code>react</code>).
+          The <code>framework</code> argument, when the agent passes one (<code>flutter</code>, <code>react</code> or{" "}
+          <code>html</code>).
         </li>
+        <li>The client&apos;s languages and frameworks (for example <code>dart</code> or <code>html</code>).</li>
+        <li>The <code>FIGMA_LOCAL_MCP_FRAMEWORK</code> environment variable.</li>
         <li>
-          A <code>pubspec.yaml</code> in the working directory means Flutter. Anything else gets React + Tailwind.
+          The working directory: a <code>pubspec.yaml</code> means Flutter, and an <code>index.html</code> without a{" "}
+          <code>package.json</code> means a static HTML site. Anything else gets React + Tailwind.
         </li>
       </ol>
 
@@ -85,16 +87,61 @@ export default function Page() {
 
       <h2 id="react">React + Tailwind</h2>
       <p>
-        Every project without a <code>pubspec.yaml</code> gets React with Tailwind classes: Next.js, Vite, Remix or plain
-        React. Auto layout frames become flex boxes, grids become CSS grids, and everything else is placed by its
-        constraints. Colours and sizes that don&apos;t match the Tailwind scale use arbitrary values like{" "}
-        <code>text-[#0a1f44]</code>.
+        Every other project gets a React component with Tailwind classes: Next.js, Vite, Remix or plain React. Auto
+        layout frames become flex boxes, grids become CSS grids, and everything else is placed by its constraints. The
+        classes work in Tailwind 3.4 and 4.
       </p>
-      <p>
-        Using Vue, Svelte or plain HTML? The React output still works as a reference: ask the agent to convert it to
-        your stack.
-      </p>
+      <ul>
+        <li>
+          <strong>Exact values.</strong> Sizes, spacing, radii, colours, fonts and line heights match the design. Theme
+          classes like <code>px-4</code> or <code>rounded-full</code> are used only where they equal the design value;
+          everything else uses arbitrary values like <code>text-[#0a1f44]</code>.
+        </li>
+        <li>
+          <strong>Real fonts.</strong> Classes name the font family itself, and the response lists the families and
+          weights to load.
+        </li>
+        <li>
+          <strong>Design tokens.</strong> Variables appear as <code>var(--name,value)</code>, and the response includes
+          the CSS that declares them, with a Tailwind 4 <code>@theme</code> that turns them into utilities.
+        </li>
+        <li>
+          <strong>Readable code.</strong> Repeated items (cards, list rows, tabs) become a data array with{" "}
+          <code>.map()</code>, and Figma text styles used more than once are named in a <code>textStyles</code>{" "}
+          object.
+        </li>
+        <li>
+          <strong>Semantic markup.</strong> Prototype taps and layer names give buttons, links, navigation, headers and
+          footers; heading text styles give <code>h1</code>–<code>h6</code>; placeholders give text inputs; content
+          images get alt text.
+        </li>
+        <li>
+          <strong>Screens and pages.</strong> Phone frames fill the screen and scroll; rows wider than the screen scroll
+          sideways. Frames 768 wide or more are web pages: full-width sections stretch across the screen and the rest
+          stays in a centred column. The agent can turn these off with <code>screen</code> and <code>page</code>.
+        </li>
+        <li>
+          <strong>Assets in your project.</strong> SVGs and images are named after their layers, with the commands to
+          copy them into <code>public/figma</code> (<code>static/figma</code> for SvelteKit).
+        </li>
+      </ul>
       <Code code="implement the selected Figma frame as a React component with Tailwind" title="Prompt" copy={false} />
+
+      <h2 id="html">HTML + Tailwind</h2>
+      <p>
+        Static sites get the same markup as plain HTML with Tailwind classes, ready to paste into a page that builds its
+        CSS with the Tailwind CLI. Assets go to <code>assets/figma</code> beside the page.
+      </p>
+      <Code code="implement the selected Figma frame as an HTML page with Tailwind" title="Prompt" copy={false} />
+
+      <h2 id="verify">Check the result</h2>
+      <p>
+        <code>verify_code</code> renders the code in headless Chrome and compares it with Figma&apos;s own render of the
+        frame: layout mismatches, differing pixels and a diff image. It checks the generated code, a component or page
+        from your project with its stylesheet, or a layout on a phone-sized screen. It needs Chrome, and loads React and
+        Tailwind from a CDN.
+      </p>
+      <Code code="check my component against the Figma frame with verify_code" title="Prompt" copy={false} />
 
       <h2>Large frames</h2>
       <p>

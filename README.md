@@ -37,7 +37,7 @@ No Figma API calls. No rate limits.</p>
 
 figmcp is a local MCP server that gives your coding agent the Figma file you have open in Figma Desktop. A development plugin streams the file to a server on your machine over localhost, so reads never touch the Figma REST API: no access token, no quota, no rate limit.
 
-- **Design to code.** Flutter widgets for Flutter projects, React + Tailwind for everything else, with the assets and a screenshot to compare against.
+- **Design to code.** Flutter widgets for Flutter projects, HTML + Tailwind for static sites, React + Tailwind for everything else, with the assets and a screenshot to compare against.
 - **Design in Figma.** The agent creates and edits frames in the open file with Figma plugin API scripts, one undo step per script.
 - **Your components.** Map design components to code components with Code Connect.
 - **Works offline.** Read saved snapshots when the plugin is closed.
@@ -89,7 +89,7 @@ build this frame as a React component with Tailwind, using our existing Button
 compare your screen with the Figma screenshot and fix the differences
 ```
 
-Projects with a `pubspec.yaml` get **Flutter** widgets, and SVGs and images are saved into the asset folders the pubspec declares. Everything else gets **React + Tailwind**. React output uses the real font families, declares the design's variables as CSS (with a Tailwind 4 `@theme`), names assets after their layers with copy commands for `public/figma`, turns prototype taps and layer names into buttons, links and landmarks, and draws phone frames as screens that fill the viewport. Its classes work in Tailwind 3.4 and 4. The code is a reference that your agent adapts to your project. [More →](https://figmcp.web.app/docs/design-to-code)
+Projects with a `pubspec.yaml` get **Flutter** widgets, and SVGs and images are saved into the asset folders the pubspec declares. Static sites get **HTML + Tailwind**, and everything else gets **React + Tailwind**. React output uses the real font families, declares the design's variables as CSS (with a Tailwind 4 `@theme`), writes repeated items as data with `.map()` and names reused text styles, names assets after their layers with copy commands for `public/figma`, turns prototype taps, layer names and placeholders into buttons, links, landmarks and inputs, draws phone frames as screens that fill the viewport and desktop frames as pages whose full-width sections stretch. Its classes work in Tailwind 3.4 and 4. The code is a reference that your agent adapts to your project. [More →](https://figmcp.web.app/docs/design-to-code)
 
 ### Design in Figma
 
@@ -145,7 +145,7 @@ Step-by-step for each client, on macOS and Windows: [figmcp.web.app/docs/configu
 | `get_screenshot` | PNG of a node or the selection. |
 | `get_variable_defs` | Variables and styles used by a node, resolved for its mode. |
 | `download_assets` | Exported renders, original image fills and vector SVGs. |
-| `verify_code` | Render Flutter code with `flutter test`, or React + Tailwind in headless Chrome, and compare it with Figma's render: errors, layout mismatches, differing pixels and a diff image. |
+| `verify_code` | Render Flutter code with `flutter test`, or React or HTML + Tailwind in headless Chrome, and compare it with Figma's render: errors, layout mismatches, differing pixels and a diff image. |
 | `use_figma` | Run Figma plugin API scripts to create and edit designs. |
 | `search_design_system` | Components (with properties and variants), styles and variables of the open file, to reuse while designing. |
 | `place_image` | Put a local PNG, JPG, GIF or SVG into the open file, as a new layer or a layer's fill. |
@@ -174,7 +174,7 @@ Set these in the `env` of your MCP client config.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `FIGMA_LOCAL_MCP_DIR` | `~/.figma-local-mcp` | Data folder: plugin, pairing code, snapshots and assets. |
-| `FIGMA_LOCAL_MCP_FRAMEWORK` | | Force `flutter` or `react` when the client doesn't say. |
+| `FIGMA_LOCAL_MCP_FRAMEWORK` | | Force `flutter`, `react` or `html` when the client doesn't say. |
 | `FIGMA_LOCAL_MCP_CODE_CONNECT` | `.figma-local/code-connect.json` | Path of the Code Connect mappings file. |
 | `FIGMA_LOCAL_MCP_ALLOW_ORIGINS` | | Comma separated extra origins the server accepts for the plugin. |
 
