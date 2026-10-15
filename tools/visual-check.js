@@ -127,10 +127,27 @@ export function pageScript(code, assets = {}) {
       body = body.replace(new RegExp(`^import\\s+${key}\\s+from\\s+['"][^'"]+['"];?\\s*$`, 'm'), `const ${key} = ${JSON.stringify(href)};`);
     } else body = body.split(key).join(href);
   }
+  // React comes from the page: its imports become reads of the global.
+  body = body.replace(/^import\s+(?:type\s+)?([^;]*?)\s+from\s+['"]react['"];?\s*$/gm, (m, what) => {
+    if (/^type\s/.test(m.slice(7))) return '';
+    const parts = [];
+    const named = /\{([^}]*)\}/.exec(what);
+    const head = what.replace(/\{[^}]*\}/, '').replace(/,\s*$/, '').trim();
+    const star = /^\*\s+as\s+(\w+)$/.exec(head);
+    if (star && star[1] !== 'React') parts.push(`const ${star[1]} = React;`);
+    else if (head && !star && head !== 'React') parts.push(`const ${head} = React;`);
+    if (named) {
+      const names = named[1].split(',').map((n) => n.trim()).filter((n) => n && !/^type\s/.test(n))
+        .map((n) => n.replace(/\s+as\s+/, ': '));
+      if (names.length) parts.push(`const { ${names.join(', ')} } = React;`);
+    }
+    return parts.join('\n');
+  });
   body = body
     .replace(/^import\s[^;]*?from\s+['"][^'"]+['"];?\s*$/gm, '')
     .replace(/^import\s+['"][^'"]+['"];?\s*$/gm, '')
-    .replace(/^export\s+default\s+function\s+(\w+)/m, 'function Design')
+    .replace(/^export\s+default\s+function\s*(\w*)\s*\(/m, 'function Design(')
+    .replace(/^export\s+default\s+(\(|async\s*\()/m, 'const Design = $1')
     .replace(/^export\s+default\s+(\w+);?\s*$/m, 'const Design = $1;')
     .replace(/^export\s+(const|function|let)\s/gm, '$1 ');
   return body;

@@ -155,7 +155,7 @@ function guidance({ tailwind, native }) {
     'and conventions instead of copying it. Values are exact, in CSS pixels at ' +
     'the design size: sizes, spacing, radii, colours, font families, weights ' +
     'and line heights. Theme classes (px-4, rounded-full, font-bold) are used ' +
-    'only where they equal the design value; the classes work in Tailwind 3.4 and 4' +
+    'only where they equal the design value at the default 16px root size; the classes work in Tailwind 3.4 and 4' +
     `${tailwind ? ` (the project uses Tailwind ${tailwind})` : ''}. var(--name,value) marks a design ` +
     'variable: use the project token of that name. Elements carry data-node-id ' +
     '(call get_design_context on a child id for detail), data-component / ' +

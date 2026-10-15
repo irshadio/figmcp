@@ -8,10 +8,12 @@ const TYPE_NAMES = /^(frame|group|rectangle|ellipse|vector|line|polygon|star|uni
 const KIND_NAMES = /^(image|img|photo|picture|pic|icon|arrow|shape|path|layer|text|container|div|bg|background|graphic|mask|copy|placeholder|thumbnail)( (\d+|copy))*$/i;
 const NUMBERED = / \d+$/;
 // File-like or generated names ("81Y8+2cuWEL 1", "IMG_2041", "image 7747",
-// "ChatGPT Image Sep 22, 2026, 12_30_14 PM 1").
+// "Generated Image Sep 22, 2026, 12_30_14 PM 1").
 const GENERATED_NAMES = [
   /^(?=[^ ]*\d)(?=[^ ]*[A-Za-z])[A-Za-z0-9+_=-]{6,}( \d+)?$/,
-  /^(img|dsc|pxl|screenshot|screen shot|photo|image|chatgpt image|unsplash|pexels)[\s_-]/i,
+  /^(img|dsc|pxl|screenshot|screen shot|photo|image|unsplash|pexels)[\s_-]/i,
+  // A capture or export time in the name.
+  /\b\d{1,2}[_.:]\d{2}[_.:]\d{2}( ?[AP]M)?\b/i,
   /\.(png|jpe?g|webp|gif|svg|avif|heic)( \d+)?$/i,
 ];
 const BUTTON_NAMES = /(^|[\s/_-])(button|btn|cta)([\s/_-]|$)/i;

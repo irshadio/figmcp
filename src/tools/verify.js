@@ -136,7 +136,9 @@ export function registerVerifyTools(server, bridge, source) {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
       framework: z.enum(['flutter', 'react']).optional().describe(
-        'flutter or react (default: as get_design_context picks, from the file or the project).'),
+        'flutter or react (default: from the file, else as get_design_context picks: the client, then the project).'),
+      clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" (picks the framework).'),
+      clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" (picks the framework).'),
       file: z.string().optional().describe(
         'Flutter: the .dart file with the widget, under the project\'s lib/. React: the .jsx/.tsx component file. ' +
         'Absolute, or relative to the project.'),
@@ -151,10 +153,10 @@ export function registerVerifyTools(server, bridge, source) {
       flutter: z.string().optional().describe('Path of the flutter tool, when it is not on PATH.'),
     },
   }, guard(async (input) => {
-    // Flutter-only inputs pick Flutter; then the file's language, then the project.
+    // Flutter-only inputs pick Flutter; then the file's language, then the client and the project.
     const framework = input.framework || (input.flutter || input.widget ? 'flutter'
       : input.file ? (/\.(jsx|tsx|js|ts)$/i.test(input.file) ? 'react' : 'flutter')
-        : detectFramework({}));
+        : detectFramework(input));
     if (framework === 'react') return verifyReact(source, input);
     const { nodeId, file, widget, viewport, fonts = [], flutter } = input;
     const tool = flutterTool(flutter);

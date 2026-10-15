@@ -261,6 +261,14 @@ test('the render check runs module code and finds font weights in file names', (
     'export default function Card() { return <img src={logo} />; }',
   ].join('\n'), { logo: '/tmp/logo.svg' });
   assert.match(script, /const logo = "file:\/\/\/tmp\/logo.svg";/);
+  const hooks = pageScript([
+    "import React, { useState, useEffect as useFx, type FC } from 'react';",
+    "import type { ReactNode } from 'react';",
+    'export default () => { const [n] = useState(0); useFx(() => {}); return <p>{n}</p>; };',
+  ].join('\n'));
+  assert.match(hooks, /^const \{ useState, useEffect: useFx \} = React;$/m);
+  assert.doesNotMatch(hooks, /ReactNode|FC/);
+  assert.match(hooks, /^const Design = \(\) =>/m);
   assert.match(script, /^function Design\(\)/m);
   assert.doesNotMatch(script, /^import /m);
   assert.deepEqual(faceOf('Plus Jakarta Sans', '/f/PlusJakartaSans-SemiBoldItalic.ttf'), { weight: '600', italic: true });
