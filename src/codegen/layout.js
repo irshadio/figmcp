@@ -69,7 +69,10 @@ export function gridAnchor(node, parent, key) {
  * Where a child sits in its parent.
  * [opts.fixedSize] gives hugging nodes their size too (an <img> has no
  * content size of its own); [opts.index] is the child's position among the
- * siblings the layout places, [opts.count] their number.
+ * siblings the layout places, [opts.count] their number. On a phone screen,
+ * [opts.stretch] stretches a positioned child across the width,
+ * [opts.narrow] lets a fixed width shrink to the column and [opts.shrink]
+ * lets a child of a row shrink when the row is too narrow.
  */
 export function positionClasses(node, parent, opts = {}) {
   const vars = node.vars || {};
@@ -84,7 +87,7 @@ export function positionClasses(node, parent, opts = {}) {
   const out = [];
 
   if (inFlow(node, parent)) {
-    out.push('relative', 'shrink-0');
+    out.push('relative', opts.shrink ? 'min-w-0' : 'shrink-0');
     const row = parent.layoutMode === 'HORIZONTAL';
     let sizeW = sizingOf(node, parent, 'x');
     let sizeH = sizingOf(node, parent, 'y');
@@ -111,7 +114,7 @@ export function positionClasses(node, parent, opts = {}) {
       }
     } else {
       if (sizeW === 'FILL') out.push(...(row ? ['flex-[1_0_0]', 'min-w-px'] : ['w-full']));
-      else if (sizeW === 'FIXED' && !hugsWidth) out.push(w);
+      else if (sizeW === 'FIXED' && !hugsWidth) out.push(...(opts.narrow && !row ? ['w-full', size('max-w', node.width, vars.width)] : [w]));
       if (sizeH === 'FILL') out.push(...(row ? ['self-stretch'] : ['flex-[1_0_0]', 'min-h-px']));
       else if (sizeH === 'FIXED' && !hugsHeight) out.push(h);
       if (parent.itemSpacing < 0 && opts.index > 0) {
@@ -133,8 +136,9 @@ export function positionClasses(node, parent, opts = {}) {
   const y = node.y - parent.y;
   const pw = parent.width;
   const ph = parent.height;
-  const cons = !WRAPPING_PARENTS.has(parent.type) && node.constraints
+  let cons = !WRAPPING_PARENTS.has(parent.type) && node.constraints
     ? node.constraints : { horizontal: 'MIN', vertical: 'MIN' };
+  if (opts.stretch) cons = { ...cons, horizontal: 'STRETCH' };
 
   switch (cons.horizontal) {
     case 'MAX':
@@ -222,6 +226,27 @@ function track(t) {
   return `minmax(0,${num(t.value || 1)}fr)`;
 }
 
+/**
+ * The placement of a lone child of a space-between layout, from where it
+ * is: Figma starts it, but files whose layout was not recomputed since
+ * (imports, older versions) draw it centred or at the end.
+ */
+function loneChildJustify(node, row) {
+  if (node.primaryAxisAlignItems !== 'SPACE_BETWEEN') return null;
+  const flow = (node.children || []).filter((c) => c && c.visible !== false && !c.isMask && inFlow(c, node));
+  if (flow.length !== 1) return null;
+  const c = flow[0];
+  const offset = row ? c.x - node.x : c.y - node.y;
+  const size = row ? node.width : node.height;
+  const length = row ? c.width : c.height;
+  const before = (row ? node.paddingLeft : node.paddingTop) || 0;
+  const after = (row ? node.paddingRight : node.paddingBottom) || 0;
+  if (Math.abs(offset - before) < 0.5) return 'justify-start';
+  if (Math.abs(offset - (before + (size - before - after - length) / 2)) < 0.5) return 'justify-center';
+  if (Math.abs(offset - (size - after - length)) < 0.5) return 'justify-end';
+  return null;
+}
+
 export function containerClasses(node) {
   const vars = node.vars || {};
   if (isGrid(node)) {
@@ -249,7 +274,7 @@ export function containerClasses(node) {
   } else if (spacing) {
     out.push(`gap-[${tw(spacing)}]`);
   }
-  out.push(JUSTIFY[node.primaryAxisAlignItems] || 'justify-start');
+  out.push(loneChildJustify(node, row) || JUSTIFY[node.primaryAxisAlignItems] || 'justify-start');
   out.push(ITEMS[node.counterAxisAlignItems] || 'items-start');
   return [...out, ...padding(node)];
 }

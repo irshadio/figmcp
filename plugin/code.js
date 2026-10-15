@@ -60,6 +60,7 @@ const SEGMENT_EXTRA_FIELDS = [
   'listOptions', 'indentation', 'textDecorationStyle',
   'textDecorationOffset', 'textDecorationThickness', 'textDecorationColor',
 ];
+const SEGMENT_FEATURE_FIELDS = ['openTypeFeatures'];
 
 function clean(value) {
   if (value === figma.mixed) return 'mixed';
@@ -304,13 +305,18 @@ async function renderPng(node) {
 }
 
 // Older Figma versions reject fields they do not know, which would drop all
-// text styling; retry with the base fields.
+// text styling; retry with fewer fields.
 function styledSegments(node) {
-  try {
-    return node.getStyledTextSegments(SEGMENT_FIELDS.concat(SEGMENT_EXTRA_FIELDS));
-  } catch (e) {
-    return node.getStyledTextSegments(SEGMENT_FIELDS);
+  const tiers = [
+    SEGMENT_FIELDS.concat(SEGMENT_EXTRA_FIELDS, SEGMENT_FEATURE_FIELDS),
+    SEGMENT_FIELDS.concat(SEGMENT_EXTRA_FIELDS),
+  ];
+  for (const fields of tiers) {
+    try {
+      return node.getStyledTextSegments(fields);
+    } catch (e) { /* try fewer fields */ }
   }
+  return node.getStyledTextSegments(SEGMENT_FIELDS);
 }
 
 async function textDetails(ctx, node, out) {
@@ -332,6 +338,7 @@ async function textDetails(ctx, node, out) {
       if (!seg.hyperlink) delete seg.hyperlink;
       if (seg.listOptions && seg.listOptions.type === 'NONE') delete seg.listOptions;
       if (!seg.indentation) delete seg.indentation;
+      if (!seg.openTypeFeatures || !Object.keys(seg.openTypeFeatures).length) delete seg.openTypeFeatures;
       out.segments.push(seg);
     }
   } catch (e) {

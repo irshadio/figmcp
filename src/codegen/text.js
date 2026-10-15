@@ -11,6 +11,11 @@ const CASE = {
 };
 const DECORATION = { UNDERLINE: 'underline', STRIKETHROUGH: 'line-through' };
 const DECORATION_STYLE = { WAVY: 'decoration-wavy', DOTTED: 'decoration-dotted', DASHED: 'decoration-dashed' };
+const STYLE_WEIGHTS = [
+  [/thin|hairline/i, 100], [/extra ?light|ultra ?light/i, 200], [/light/i, 300], [/medium/i, 500],
+  [/semi ?bold|demi ?bold/i, 600], [/extra ?bold|ultra ?bold/i, 800], [/bold/i, 700],
+  [/black|heavy/i, 900],
+];
 // A line break inside a paragraph (Shift+Enter in Figma).
 export const SOFT_BREAK = '\u2028';
 const LINE_BREAKS = /\n|\u2028/;
@@ -102,6 +107,29 @@ function leading(seg, node, vars, ratios) {
   return lh ? 'leading-[normal]' : null;
 }
 
+// Superscript and subscript as fonts without such glyphs draw them: smaller
+// and moved, by the usual OS/2 proportions.
+const SCRIPT_SCALE = 0.65;
+const SCRIPT_SHIFT = { SUPS: -0.35, SUBS: 0.14 };
+
+function features(seg) {
+  const all = seg.openTypeFeatures && typeof seg.openTypeFeatures === 'object' ? seg.openTypeFeatures : {};
+  return Object.entries(all).filter(([tag, on]) => /^[A-Za-z0-9]{4}$/.test(tag) && typeof on === 'boolean');
+}
+
+/** 'SUPS' or 'SUBS' when the run is raised or lowered. */
+export function scriptOf(seg) {
+  const on = features(seg).filter(([, v]) => v).map(([tag]) => tag.toUpperCase());
+  return on.includes('SUPS') ? 'SUPS' : on.includes('SUBS') ? 'SUBS' : null;
+}
+
+/** OpenType features turned on or off on a run ({ LIGA: false, TNUM: true }). */
+function featureClasses(seg) {
+  const list = features(seg).filter(([tag]) => !SCRIPT_SHIFT[tag.toUpperCase()]);
+  if (!list.length) return [];
+  return [`[font-feature-settings:${list.map(([tag, on]) => `'${tag.toLowerCase()}'_${on ? 1 : 0}`).join(',')}]`];
+}
+
 function decorationClasses(seg) {
   const out = [];
   if (!DECORATION[seg.textDecoration]) return out;
@@ -118,20 +146,48 @@ function decorationClasses(seg) {
   return out;
 }
 
+/** The weight a font style name stands for ('SemiBold Italic' -> 600). */
+export function styleWeight(style) {
+  const hit = STYLE_WEIGHTS.find(([re]) => re.test(style || ''));
+  return hit ? hit[1] : 400;
+}
+
+/** The CSS weight of a run: the exported weight, else the style's. */
+export function cssWeight(seg) {
+  if (typeof seg.fontWeight === 'number' && seg.fontWeight > 0) return seg.fontWeight;
+  return styleWeight(seg.fontName && seg.fontName.style);
+}
+
+/**
+ * A font-family class for [family]: the family's own name, which web fonts
+ * are loaded under. Tailwind reads underscores as spaces, so real ones are
+ * escaped, as are quotes (a double quote as a CSS escape: the class sits in
+ * a double-quoted attribute).
+ */
+export function familyClass(family) {
+  const name = String(family).replace(/\\/g, '\\\\').replace(/_/g, '\\_').replace(/'/g, "\\'")
+    .replace(/"/g, '\\000022').trim().replace(/\s+/g, '_');
+  return `font-['${name}',sans-serif]`;
+}
+
 export function fontClasses(seg, node, ratios = null) {
   const vars = seg.vars || {};
   const out = [];
   const font = seg.fontName || {};
-  if (font.family) out.push(`font-['${tw(`${font.family}:${font.style || 'Regular'}`)}',sans-serif]`);
-  if (seg.fontWeight) {
-    out.push(vars.fontWeight ? `[font-weight:${tw(withVar(vars.fontWeight, seg.fontWeight))}]` : `font-[${seg.fontWeight}]`);
-  }
+  if (font.family) out.push(familyClass(font.family));
+  const weight = cssWeight(seg);
+  if (vars.fontWeight) out.push(`[font-weight:${tw(withVar(vars.fontWeight, weight))}]`);
+  else if (font.family || seg.fontWeight) out.push(`font-[${weight}]`);
   if (font.style && /italic/i.test(font.style)) out.push('italic');
-  if (typeof seg.fontSize === 'number') {
+  const script = scriptOf(seg);
+  if (typeof seg.fontSize === 'number' && script) {
+    // No line height of its own, so the smaller run leaves the line box as is.
+    out.push(`text-[${px(seg.fontSize * SCRIPT_SCALE)}]`, 'leading-[0]', 'relative', `top-[${px(seg.fontSize * SCRIPT_SHIFT[script])}]`);
+  } else if (typeof seg.fontSize === 'number') {
     out.push(vars.fontSize ? `text-[length:${tw(withVar(vars.fontSize, px(seg.fontSize)))}]`
       : `text-[${px(seg.fontSize)}]`);
   }
-  const lead = leading(seg, node, vars, ratios);
+  const lead = script ? null : leading(seg, node, vars, ratios);
   if (lead) out.push(lead);
   const ls = seg.letterSpacing;
   if (ls && ls.value) {
@@ -139,6 +195,7 @@ export function fontClasses(seg, node, ratios = null) {
     out.push(`tracking-[${tw(withVar(vars.letterSpacing, value))}]`);
   }
   if (CASE[seg.textCase]) out.push(CASE[seg.textCase]);
+  out.push(...featureClasses(seg));
   out.push(...decorationClasses(seg));
   const paint = topPaint(seg.fills);
   if (paint && paint.type !== 'SOLID') {
