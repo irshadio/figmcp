@@ -1198,7 +1198,16 @@ class SwiftUIWriter {
     // The visible height, for a page whose bottom layers stay at the bottom.
     if (this.viewport) out = view('GeometryReader', [], [out], 'proxy');
     if (header) out = mod(out, 'safeAreaInset', [['edge', raw('.top')], ['spacing', 0]], [header]);
-    if (bottomBar) out = mod(out, 'safeAreaInset', [['edge', raw('.bottom')], ['spacing', 0]], [bar(bottomBar, rel(bottomBar).bottom >= H - 2 ? inset : 0)]);
+    if (bottomBar) {
+      let footer = bar(bottomBar, rel(bottomBar).bottom >= H - 2 ? inset : 0);
+      const screenPaint = this.fillItems(node).find((f) => f.paint);
+      if (!filled(bottomBar) && screenPaint) {
+        // A bar without a fill of its own takes the screen's, so the content scrolls under it unseen.
+        footer = mod(footer, 'background', [], [mod(view('', [[null, mod(view('Rectangle'), 'fill', [[null, screenPaint.paint]])]]),
+          'ignoresSafeArea', [['edges', raw('.bottom')]])]);
+      }
+      out = mod(out, 'safeAreaInset', [['edge', raw('.bottom')], ['spacing', 0]], [footer]);
+    }
     const over = [...floating, ...pinned].map((c) => apart(c, { kind: 'stack', parent: { ...node, height: H - inset } })).filter(Boolean);
     this.skip = new Set(chrome.map((c) => c.id));
     if (over.length) out = mod(out, 'overlay', [['alignment', raw('.topLeading')]], [view('ZStack', [['alignment', raw('.topLeading')]], over)]);

@@ -417,6 +417,19 @@ test('toSwiftUI draws text inputs as fields bound to state, with their content t
   assert.match(code, /\.submitLabel\(\.send\)/);
 });
 
+test('toSwiftUI gives a pinned bar without a fill the screen background', () => {
+  const root = frame('Chat', {
+    w: 390, h: 844, fills: [solid({ r: 0.94, g: 0.91, b: 0.87, a: 1 })],
+    children: [
+      { ...text('Hello', { x: 16, y: 100, size: 16 }) },
+      frame('Input Bar', { y: 786, w: 390, h: 58, mode: 'HORIZONTAL', paddingLeft: 6, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+        children: [text('Message', { x: 20, y: 802, size: 16 })] }),
+    ],
+  });
+  const { code } = toSwiftUI(root, assets);
+  assert.match(code, /\.safeAreaInset\(edge: \.bottom, spacing: 0\) \{[\s\S]*?\.background \{\n\s+Rectangle\(\)\n\s+\.fill\(Color\(hex: 0xF0E8DE\)\)\n\s+\.ignoresSafeArea\(edges: \.bottom\)/);
+});
+
 test('toSwiftUI puts what screens share in DesignSystem.swift', () => {
   const { shared } = toSwiftUI(screen(), assets);
   assert.match(shared, /^import SwiftUI\n/);
