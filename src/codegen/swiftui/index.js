@@ -216,8 +216,9 @@ function withoutSystemUi(c, screen, chrome) {
 }
 
 class SwiftUIWriter {
-  constructor(assets, { connect = null, actions = null } = {}) {
+  constructor(assets, { connect = null, actions = null, probe = false } = {}) {
     this.assets = assets;
+    this.probe = Boolean(probe);
     this.connect = connect;
     this.actions = actions || {};
     this.tapped = false;
@@ -502,6 +503,8 @@ class SwiftUIWriter {
     }
     core = this.limits(node, size, core);
     core = this.interactive(node, core);
+    // For the render check: each layer reports where it was laid out.
+    if (this.probe && !this.inComponent) core = mod(core, 'checkProbe', [[null, str(node.id)]]);
     if (ctx.kind !== 'root' && !this.inComponent && EXTRACT_TYPES.has(node.type) && countVisible(node) >= EXTRACT_SIZE) core = this.extract(node, core);
     return this.wrapPlace(node, ctx, core);
   }
@@ -1195,9 +1198,15 @@ class SwiftUIWriter {
       if (content.padding) v = padded(v, content.padding);
       // A box of text grows with it, unless layers pinned to its bottom or
       // centre would then stretch it to all the room it is offered.
-      const grows = typeof size.h === 'number' && hasText(node) &&
-        (isAutoLayout(node) || visibleChildren(node).every((c) => !inFlow(c, node) || this.stackPlacement(c, node).v.mode === 'min'));
-      v = this.frame(v, grows ? { ...size, h: { min: size.h } } : size, content.align);
+      const placed = isAutoLayout(node) ? visibleChildren(node).filter((c) => !inFlow(c, node)) : visibleChildren(node);
+      const grows = typeof size.h === 'number' && hasText(node) && placed.every((c) => this.stackPlacement(c, node).v.mode === 'min') &&
+        this.fitsHeight(node);
+      if (!isAutoLayout(node) && !grows && (size.w === 'inf' || size.h === 'inf')) {
+        // Children never size a frame without auto layout: its layers lie
+        // over a box of its size, so a large one cannot stretch what fills.
+        const box = this.frame(clear(), { w: size.w ?? node.width, h: size.h ?? node.height });
+        v = mod(box, 'overlay', [['alignment', raw(content.align || '.topLeading')]], [v]);
+      } else v = this.frame(v, grows ? { ...size, h: { min: size.h } } : size, content.align);
       if (node.clipsContent) {
         // Figma clips the children, not the frame's own fills and shadows.
         const topLeading = [['alignment', raw('.topLeading')]];
@@ -1463,6 +1472,21 @@ class SwiftUIWriter {
     return {
       view: view('ZStack', [['alignment', raw('.topLeading')]], items), padding: null, align: '.topLeading', overlay: null,
     };
+  }
+
+  /**
+   * Whether [node]'s content fits its design height: a box whose content
+   * already overflows it in the design keeps its height, as Figma does.
+   */
+  fitsHeight(node) {
+    const kids = visibleChildren(node);
+    if (!isAutoLayout(node)) return kids.every((c) => c.y + c.height <= node.y + node.height + 0.5);
+    const flow = kids.filter((c) => inFlow(c, node));
+    const [top, , bottom] = this.paddingValues(node);
+    const content = node.layoutMode === 'VERTICAL'
+      ? flow.reduce((t, c) => t + c.height, 0) + (node.primaryAxisAlignItems === 'SPACE_BETWEEN' ? 0 : (node.itemSpacing || 0) * Math.max(0, flow.length - 1))
+      : Math.max(0, ...flow.map((c) => c.height));
+    return top + content + bottom <= node.height + 0.5;
   }
 
   /** Padding (top, right, bottom, left), with the strokes when they are part of the layout. */

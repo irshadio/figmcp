@@ -180,7 +180,16 @@ async function verifySwiftUI({ id, exported, file, view, fonts, device }) {
     return [text({ ...summary, device: report.device }), text(`The code compiled, but rendering failed: ${report.renderError}`)];
   }
   if (!report.pixels) return [text(summary), text(FAILED_AT[report.failedAt] || FAILED_AT.compile)];
-  Object.assign(summary, { device: report.device, renderedSize: report.renderedSize, pixels: report.pixels, systemUiLeftOut: report.systemUiLeftOut });
+  Object.assign(summary, {
+    device: report.device, renderedSize: report.renderedSize, pixels: report.pixels,
+    ...(report.checkedBoxes ? {
+      checkedLayers: report.checkedBoxes,
+      layoutMismatches: brief(report.layoutMismatches),
+      textRoundingMismatches: report.textRoundingMismatches.length,
+      ...(report.fontMismatches.length ? { fontMismatches: report.fontMismatches.length } : {}),
+    } : {}),
+    systemUiLeftOut: report.systemUiLeftOut,
+  });
   return [
     text(summary),
     text('Diff (the design in grey, differing pixels in red, system UI left out in blue):'),
@@ -208,8 +217,8 @@ export function registerVerifyTools(server, bridge, source) {
       'DesignSystem.swift and asset catalogs, so it must build without the ' +
       'rest of the project. The ' +
       'widget or view needs an init without arguments. Without `file`, it ' +
-      'checks the reference code get_design_context generates (and, for ' +
-      'Flutter, compares every layer\'s box). Use it after implementing a ' +
+      'checks the reference code get_design_context generates and compares ' +
+      'every layer\'s box with the design. Use it after implementing a ' +
       'frame, and fix what it reports. Text in fonts it cannot find is drawn ' +
       'in a fallback font, and emoji have no colour font in the Flutter test, ' +
       'so text after them shifts. The design\'s status bar and home indicator ' +

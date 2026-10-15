@@ -29,7 +29,7 @@ import { pathToFileURL } from 'node:url';
 import { toSwiftUI } from '../src/codegen/swiftui/index.js';
 import { systemUi } from '../src/codegen/system-ui.js';
 import { DATA_DIR, imageExt } from '../src/store.js';
-import { families, loadDesign, pixelDiff } from './compare.js';
+import { compareBoxes, expectedBoxes, families, loadDesign, pixelDiff } from './compare.js';
 import { familyFiles, fetchGoogleFont, FONT_CACHE, fontFiles, SYSTEM_FONTS } from './flutter-check.js';
 
 const CHECK_DIR = path.join(DATA_DIR, 'swiftui-check');
@@ -179,6 +179,7 @@ function writeCatalog(dir, assets) {
 const HARNESS_APP = 'FigmcpCheckHarnessApp';
 const HARNESS_RENDER = 'FigmcpCheckHarnessRender';
 const HARNESS_FILE = 'FigmcpCheckHarness.swift';
+const HARNESS_PROBE = 'FigmcpCheckProbe';
 
 /**
  * The harness app's launcher: -out <png> -w <w> -h <h> [-top <pt>]
@@ -200,8 +201,27 @@ struct ${HARNESS_APP}: App {
   }
 }
 
+let ${HARNESS_PROBE}Space = "${HARNESS_PROBE}"
+
+/// Where each probed layer was laid out, by its Figma id.
+struct ${HARNESS_PROBE}Key: PreferenceKey {
+  static var defaultValue: [String: CGRect] { [:] }
+  static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+    value.merge(nextValue()) { first, _ in first }
+  }
+}
+
+extension View {
+  func checkProbe(_ id: String) -> some View {
+    background(GeometryReader { proxy in
+      Color.clear.preference(key: ${HARNESS_PROBE}Key.self, value: [id: proxy.frame(in: .named(${HARNESS_PROBE}Space))])
+    })
+  }
+}
+
 @MainActor enum ${HARNESS_RENDER} {
   static var window: UIWindow?
+  static var frames: [String: CGRect] = [:]
 
   static func run() {
     let d = UserDefaults.standard
@@ -219,6 +239,8 @@ struct ${HARNESS_APP}: App {
       .dynamicTypeSize(.large)
       .environment(\\.colorScheme, .light)
       .environment(\\.displayScale, 2)
+      .coordinateSpace(.named(${HARNESS_PROBE}Space))
+      .onPreferenceChange(${HARNESS_PROBE}Key.self) { ${HARNESS_RENDER}.frames = $0 }
     let host = UIHostingController(rootView: root)
     host.safeAreaRegions = []
     host.overrideUserInterfaceStyle = .light
@@ -243,6 +265,10 @@ struct ${HARNESS_APP}: App {
       guard let data = image.pngData() else {
         FileHandle.standardError.write(Data("figmcp-check: the render could not be encoded as PNG\\n".utf8))
         exit(2)
+      }
+      let boxes = frames.mapValues { ["x": $0.minX, "y": $0.minY, "width": $0.width, "height": $0.height] }
+      if let json = try? JSONSerialization.data(withJSONObject: boxes) {
+        try? json.write(to: URL(fileURLWithPath: out + ".layout.json"), options: .atomic)
       }
       do {
         try data.write(to: URL(fileURLWithPath: out), options: .atomic)
@@ -538,7 +564,7 @@ async function check(opts, design, out, sdk) {
       image: (hash) => (image(hash) ? save(`img:${hash}`, imageExt(image(hash)), image(hash)) : null),
       imageExt: (hash) => (image(hash) ? imageExt(image(hash)) : 'png'),
       render: (r) => save(`r:${r.base64}`, 'png', Buffer.from(r.base64, 'base64')),
-    }, { preview: false });
+    }, { preview: false, probe: true });
     code = generated.code;
     shared = generated.shared;
     view = generated.structName;
@@ -566,7 +592,7 @@ async function check(opts, design, out, sdk) {
     files: { out, code: codeFile, design: path.join(out, 'design.png'), harness: build },
   };
   fs.writeFileSync(path.join(out, 'design.png'), design.render);
-  for (const f of ['rendered.png', 'diff.png']) fs.rmSync(path.join(out, f), { force: true });
+  for (const f of ['rendered.png', 'rendered.png.layout.json', 'diff.png']) fs.rmSync(path.join(out, f), { force: true });
   if (!built.errors.length) {
     const chrome = systemUi(tree);
     const top = Math.max(0, ...chrome.filter((c) => c.kind === 'status bar').map((c) => c.box[1] + c.box[3]));
@@ -595,6 +621,20 @@ async function check(opts, design, out, sdk) {
     });
     report.files.rendered = rendered;
     report.files.diff = path.join(out, 'diff.png');
+    const layout = `${rendered}.layout.json`;
+    if (generated && fs.existsSync(layout)) {
+      // Layers the screen draws itself (items drawn from data are not probed), outside the phone's own UI.
+      const rects = JSON.parse(fs.readFileSync(layout, 'utf8'));
+      const chromeIds = new Set(chrome.map((c) => c.id));
+      const boxes = expectedBoxes(tree, { skip: (n) => chromeIds.has(n.id) }).filter((b) => rects[b.id]);
+      const cmp = compareBoxes(boxes, rects, new Set(fontFamilies.filter((f) => !fontsNotBundled.includes(f))), tree);
+      Object.assign(report, {
+        checkedBoxes: boxes.length,
+        layoutMismatches: cmp.mismatches,
+        textRoundingMismatches: cmp.roundingMismatches,
+        fontMismatches: cmp.fontMismatches,
+      });
+    }
   }
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
   return report;

@@ -616,6 +616,9 @@ test('swiftui-check renders a plain design pixel for pixel', { skip: iphone ? fa
     assert.deepEqual(report.compiler.errors, []);
     assert.ok(report.pixels.differingPercent < 0.5, JSON.stringify(report.pixels));
     assert.equal(report.pixels.sizeMismatch, undefined);
+    // Every layer the screen draws reports its box, and each is where Figma has it.
+    assert.equal(report.checkedBoxes, 2);
+    assert.deepEqual(report.layoutMismatches, []);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

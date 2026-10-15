@@ -284,3 +284,12 @@ test('a later screen\'s design system merges into the project\'s file', { skip }
   assert.equal(mergeDesignSystem(merged.text, b.shared).added.length, 0);
   assert.equal(typecheck([a, b].map((r) => ({ ...r, shared: null })).concat([{ structName: 'DesignSystem', code: merged.text, shared: null }])), '');
 });
+
+test('a box whose text already overflows it in the design keeps its height', () => {
+  const link = { ...frame('Button', { w: 50, h: 15, mode: 'HORIZONTAL', primaryAxisAlignItems: 'CENTER', layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'FIXED', children: [{ ...text('Resend', { size: 14 }), height: 24 }] }), type: 'INSTANCE' };
+  const r = generate(column('Card', [link], { h: 100 }));
+  const at = r.code.indexOf('Text("Resend")');
+  assert.match(r.code.slice(at), /\.frame\(height: 15\)/);
+  assert.doesNotMatch(r.code.slice(at), /minHeight: 15/);
+});
