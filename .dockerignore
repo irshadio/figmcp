@@ -1,0 +1,10 @@
+node_modules
+.git
+.github
+web
+listing
+launch
+test
+*.log
+.DS_Store
+UI_CONVERSION_REPORT.md
