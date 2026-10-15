@@ -155,7 +155,7 @@ test('Xcode projects get SwiftUI with image sets, fonts, the shared design syste
   assert.doesNotMatch(screen, /extension Color|enum AppFonts|enum DesignTokens/);
   assert.match(ctx, /Shared design system \(DesignSystem\.swift\)[\s\S]*import SwiftUI/);
   assert.match(ctx, /iOS 17 or later/);
-  assert.match(ctx, /DesignSystem\.swift block[\s\S]*merge/);
+  assert.match(ctx, /Merge DesignSystem\.swift into the target once/);
   assert.doesNotMatch(ctx, /undefined/);
   // A React Native client still gets React.
   const rn = texts(await client.callTool({ name: 'get_design_context', arguments: {

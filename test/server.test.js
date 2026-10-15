@@ -164,3 +164,22 @@ test('images the server saved are not sent again', async () => {
   plugin.stop();
   await transport.close();
 });
+
+test('a long call reports progress when the client asks for it', async (t) => {
+  const { guard } = await import('../src/tools/common.js');
+  t.mock.timers.enable(['setInterval']);
+  const sent = [];
+  let finish;
+  const call = guard(() => new Promise((resolve) => { finish = resolve; }))({}, {
+    _meta: { progressToken: 'p1' }, sendNotification: async (n) => sent.push(n),
+  });
+  t.mock.timers.tick(10000);
+  t.mock.timers.tick(10000);
+  finish([{ type: 'text', text: 'done' }]);
+  const result = await call;
+  t.mock.timers.tick(30000);
+  assert.equal(result.content[0].text, 'done');
+  assert.equal(sent.length, 2);
+  assert.deepEqual(sent.map((n) => [n.method, n.params.progressToken, n.params.progress]),
+    [['notifications/progress', 'p1', 1], ['notifications/progress', 'p1', 2]]);
+});

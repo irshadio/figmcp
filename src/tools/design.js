@@ -49,41 +49,20 @@ const FLUTTER_GUIDANCE =
   'their room with SafeArea. Compare the result with the screenshot.';
 
 const SWIFTUI_GUIDANCE =
-  'IMPORTANT: the code above is reference SwiftUI generated from the design, ' +
-  'written the way a production screen is built: adapt it to the project ' +
-  '(its design system, models, navigation and state) and keep what it ' +
-  'does. Every value is exact, in points at the design size: sizes, spacing, ' +
-  'radii, colours, fonts and line heights (lineSpacing with the vertical ' +
-  'padding reproduces Figma\'s line boxes). DesignTokens holds each design ' +
-  'variable used, with its Figma name: use the project\'s token of that name, ' +
-  'and give each colour a dark appearance in the asset catalog or a dynamic ' +
-  'Color. AppFonts holds each Figma text style, as .custom(_:size:relativeTo:) ' +
-  'so text follows Dynamic Type: keep that, and check the layout at larger ' +
-  'content sizes. The Structure block says what each part is; the code ' +
-  'already uses the matching pattern (Buttons with a press style, a sliding ' +
-  'matchedGeometryEffect selection indicator, selection haptics, LazyVGrid, ' +
-  'snapping carousels, pinned bars, the header trait on titles, accessibility ' +
-  'labels on icon buttons, decorative images hidden from VoiceOver). ' +
-  'Selection is @State initialised to the design; the screen tells its ' +
-  'owner what to do through its nested Action enum (the screen\'s `action` closure; types only the ' +
-  'screen uses, like its item models, are nested in it too): own that state in a view model ' +
-  'or the owning view, wire each case to real navigation (NavigationStack, ' +
-  'sheets, tab switching) and replace the literal data with the model\'s. ' +
-  'A phone-sized frame is drawn as a screen: it fills the screen and scrolls, ' +
-  'its top bar and bottom bar stay pinned with safeAreaInset, and layers ' +
-  'listed as system UI are left to the phone. Its sections follow each ' +
-  'other in a VStack with the design\'s gaps, so text that grows pushes ' +
-  'what is below it down; rows of fields stack and grids drop to one column ' +
-  'at accessibility text sizes. Sections that span the width stretch; other ' +
-  'fixed sizes stay as designed, so check narrow phones. A control drawn like ' +
-  'the system one is the system control (Picker(.segmented)); the Structure ' +
-  'block says, with each role\'s confidence and evidence, why the others stay ' +
-  'custom. A designer can set a role by tagging a layer name, e.g. ' +
-  '"Pay [button]", "Filters [chips]", or keep a layer plain with "[no-role]". Add ' +
-  'the listed assets to the asset catalog and the fonts to the target. The ' +
-  'shared DesignSystem.swift block (Color(hex:), the button style, DesignTokens, ' +
-  'AppFonts) goes into the target once: merge later screens\' tokens into it ' +
-  'rather than adding copies. Keep the #Preview, and compare the result with the screenshot.';
+  'IMPORTANT: the code above is reference SwiftUI, written the way a production screen is built: adapt it to the ' +
+  'project (its design system, models, navigation and state) and keep what it does. Values are exact, in points: ' +
+  'fonts are named by PostScript face and scale with Dynamic Type; .designLineHeight sets Figma\'s line boxes. ' +
+  'DesignTokens holds the design variables by their Figma names: use the project\'s tokens, and give colours a dark ' +
+  'appearance. The Structure block says what each part is and the pattern the code uses (press-style Buttons, a ' +
+  'sliding selection indicator, haptics, LazyVGrid, snapping carousels, pinned bars, header traits, accessibility ' +
+  'labels, a focus chain through text fields, Reduce Motion), with each role\'s confidence and evidence; a layer ' +
+  'name tag such as "Pay [button]" or "[no-role]" sets or clears a role. Selection is @State set to the design; ' +
+  'the screen asks its owner to act through its nested Action enum (types only it uses are nested too): move that ' +
+  'state to a view model, wire each case to real navigation and replace the literal data with the model\'s. A ' +
+  'phone-sized frame fills the screen and scrolls, with pinned bars in safeAreaInset and system UI left to the ' +
+  'phone; sections follow each other in a VStack, so growing text pushes the rest down, and rows and grids ' +
+  'stack at accessibility sizes. Fixed sizes stay as designed: check narrow phones. Merge DesignSystem.swift into ' +
+  'the target once. Keep the #Preview, check the result with verify_code or against the screenshot.';
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;

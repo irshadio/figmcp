@@ -64,7 +64,7 @@ export function registerConnectTools(server, bridge, source) {
       fileKey: fileKeySchema,
       componentName: z.string().min(1).describe('Code component name, e.g. AppPrimaryButton.'),
       source: z.string().min(1).describe('Path of the code component in the project.'),
-      label: z.string().optional().describe('Framework, e.g. Flutter or React.'),
+      label: z.string().optional().describe('Framework, e.g. Flutter, SwiftUI or React.'),
     },
   }, guard(async ({ nodeId, componentName, source: src, label }) => {
     const { id } = await source.resolveId(nodeId);

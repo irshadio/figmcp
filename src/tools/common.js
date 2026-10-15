@@ -37,13 +37,40 @@ export function selectionBlock(info) {
     info.selection.map((n) => `- ${n.id} "${n.name}" (${n.type})`).join('\n'));
 }
 
+// How often a call that runs long tells a client asking for progress that it is still working.
+const PROGRESS_EVERY = 10000;
+
+/**
+ * Sends progress for [extra]'s request every few seconds while it runs,
+ * when the client asked for progress, so a client that resets its timeout
+ * on progress does not give up on a check that takes minutes. Returns a stop function.
+ */
+function heartbeat(extra) {
+  const token = extra && extra._meta && extra._meta.progressToken;
+  if (token === undefined || !extra.sendNotification) return () => {};
+  const started = Date.now();
+  let progress = 0;
+  const timer = setInterval(() => {
+    progress += 1;
+    extra.sendNotification({
+      method: 'notifications/progress',
+      params: { progressToken: token, progress, message: `still working (${Math.round((Date.now() - started) / 1000)} s)` },
+    }).catch(() => {});
+  }, PROGRESS_EVERY);
+  if (timer.unref) timer.unref();
+  return () => clearInterval(timer);
+}
+
 export function guard(fn) {
-  return async (args) => {
+  return async (args, extra) => {
+    const stop = heartbeat(extra);
     try {
-      return { content: (await fn(args)).filter(Boolean) };
+      return { content: (await fn(args, extra)).filter(Boolean) };
     } catch (e) {
       const message = e instanceof NotFound ? e.message : `Error: ${e.message}`;
       return { content: [text(message)], isError: true };
+    } finally {
+      stop();
     }
   };
 }
