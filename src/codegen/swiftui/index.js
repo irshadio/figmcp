@@ -678,6 +678,12 @@ class SwiftUIWriter {
     if (line) return this.line(node, size, line);
     if (drawnAsSvg(node)) return this.svg(node, size);
     if (node.render && this.assets.render) return this.render(node, size);
+    const role = this.roles.get(node.id);
+    if (role && role.role === 'segmented' && role.native && role.native.use && !this.inComponent) {
+      const flow = visibleChildren(node).filter((c) => inFlow(c, node));
+      const picker = this.repeated(flow, { kind: 'flex', parent: node, axis: 'x', hugMain: false }, false);
+      if (picker && print(picker, 0).startsWith('Picker')) return this.frame(picker, { w: size.w, h: null });
+    }
     return this.box(node, size);
   }
 
@@ -1368,6 +1374,22 @@ class SwiftUIWriter {
     }
     const label = baseName(items, this.ancestors, this.label(parent, 'item', { text: false }));
     const model = fields.length ? this.typeName(label) : null;
+    const role = this.roles.get(parent.id);
+    const title = fields.find((f) => f.kind === 'text');
+    if (kind === 'segmented' && role.native && role.native.use && model && title && selected >= 0) {
+      // Drawn like the system control: the system control.
+      this.models.push([`struct ${model}: Hashable {`, ...fields.map((f) => `  let ${f.ident}: String`), '}'].join('\n'));
+      const data = this.member(plural(sIdent(label, 'item')), 'items');
+      const rows = items.map((n, i) => `    ${model}(${fields.map((f) => `${f.ident}: ${sString(f.values[i])}`).join(', ')}),`);
+      this.lets.push([`  private let ${data}: [${model}] = [`, ...rows, '  ]'].join('\n'));
+      const state = this.member(`selected ${label}`, 'selected');
+      this.states.push(`  @State private var ${state} = ${selected}`);
+      const option = mod(view('Text', [[null, raw(`item.${title.ident}`)]]), 'tag', [[null, raw('index')]]);
+      const picker = view('Picker', [[null, str(label)], ['selection', raw(`$${state}`)]], [
+        view('ForEach', [[null, raw(`Array(${data}.enumerated())`)], ['id', raw('\\.offset')]], [option], 'index, item'),
+      ]);
+      return mod(mod(picker, 'pickerStyle', [[null, raw('.segmented')]]), 'labelsHidden');
+    }
     const viewName = model ? `${model}View` : `${this.typeName(label)}View`;
     this.typeNames.add(viewName);
     let namespace = null;
@@ -1730,7 +1752,10 @@ function structureOf(roles, root) {
   for (const r of roles.values()) {
     const pattern = SWIFTUI_PATTERNS[r.role];
     if (!pattern) continue;
-    const entry = { id: r.id, name: r.name, role: r.role, pattern };
+    const native = r.native && r.native.use;
+    const entry = { id: r.id, name: r.name, role: r.role, pattern: native ? `system control: ${r.native.control}` : pattern };
+    if (r.confidence) Object.assign(entry, { confidence: r.confidence, evidence: r.evidence });
+    if (r.native) entry.native = r.native;
     if (r.items) entry.items = r.items.length;
     if (typeof r.selected === 'number' && r.selected >= 0) entry.selected = nameOf(r.items[r.selected]);
     if (r.label) entry.label = r.label;

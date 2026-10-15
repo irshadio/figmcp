@@ -10,6 +10,9 @@ import { visiblePaints } from './util.js';
 
 const ICON_NAMES = /back|close|bell|notif|swap|edit|share|heart|like|fav|menu|search|filter|more|settings|cart|plus|add|minus|info|mic|camera|send/i;
 const DISCLOSURE = /chevron|arrow|disclosure|caret/i;
+// A role tag in a layer name, or [no-role] to keep a layer plain.
+const TAG = /\s*\[([A-Za-z-]+)\]\s*/;
+const FORCED = ['tabBar', 'tabs', 'segmented', 'chips', 'carousel', 'grid', 'listRow', 'field', 'button', 'iconButton', 'card'];
 const CLOSE = /close|dismiss|cross|^x$/i;
 const SWAP = /swap|exchange|reverse|switch/i;
 
@@ -66,6 +69,13 @@ function oddFilled(items) {
   return on === 1 ? has.indexOf(true) : -1;
 }
 
+/** How many boxes with a fill [n] holds (frames and shapes, not glyphs or text). */
+function boxes(n) {
+  if (!n || n.visible === false) return 0;
+  const own = ['FRAME', 'INSTANCE', 'COMPONENT', 'RECTANGLE', 'ELLIPSE'].includes(n.type) && filled(n) ? 1 : 0;
+  return own + (n.children || []).reduce((t, c) => t + boxes(c), 0);
+}
+
 /** A vector layer (not a tile holding one). */
 function hasIconOnly(n) {
   return isIcon(n) && !visibleChildren(n).length;
@@ -98,12 +108,31 @@ function oddItem(items) {
 export function detectRoles(root, { screenWidth = root.width, screenHeight = root.height } = {}) {
   const roles = new Map();
   const ry = root.y || 0;
-  const set = (n, role, extra = {}) => {
-    if (!roles.has(n.id)) roles.set(n.id, { role, id: n.id, name: n.name, ...extra });
+  const set = (n, role, extra = {}, confidence = null, evidence = null) => {
+    if (!roles.has(n.id)) roles.set(n.id, { role, id: n.id, name: n.name, ...extra, ...(confidence ? { confidence, evidence } : {}) });
   };
+  const suppressed = new Set();
   const innerWidth = (p) => p.width - (p.paddingLeft || 0) - (p.paddingRight || 0);
   const wide = (n) => n.width >= screenWidth * 0.6;
   const containers = [];
+  // A role set in the layer's name: "Pay [button]", "Filters [chips]".
+  const force = (n, tag, flow) => {
+    const role = FORCED.find((r) => r.toLowerCase() === tag.toLowerCase());
+    if (!role) return;
+    const why = ['set by name', `"[${tag}]" in the layer name`];
+    const label = n.name.replace(TAG, '').trim();
+    const items = { tabBar: 'tab', tabs: 'tab', segmented: 'segment', chips: 'chip', carousel: 'card', grid: 'card' }[role];
+    if (items) {
+      const gap = n.itemSpacing || 0;
+      const extra = { items: flow.map((c) => c.id) };
+      if (role === 'grid') extra.columns = Math.max(1, Math.floor((innerWidth(n) + gap) / ((flow[0] || n).width + gap)));
+      else if (role !== 'carousel') extra.selected = role === 'segmented' ? oddFilled(flow) : oddItem(flow);
+      set(n, role, extra, ...why);
+      flow.forEach((c) => set(c, items));
+    } else if (role === 'button') set(n, role, { primary: filled(n), label: texts(n).length ? texts(n)[0].characters : label }, ...why);
+    else if (role === 'iconButton') set(n, role, { label }, ...why);
+    else set(n, role, {}, ...why);
+  };
   const walk = (n, parent) => {
     if (!n || n.visible === false) return;
     const kids = visibleChildren(n);
@@ -114,28 +143,55 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
     const labelled = (c) => texts(c).length === 1;
     const iconRow = allSame && row && flow.length >= 3 && flow.length <= 6 && flow.every((c) => hasIcon(c) && labelled(c));
     const atBottom = (n.y - ry) + n.height >= screenHeight - 40;
+    const tag = TAG.exec(n.name || '');
+    if (tag && tag[1].toLowerCase() === 'no-role') suppressed.add(n.id);
+    else if (tag) force(n, tag[1], flow);
+    const selectedName = (i) => (i >= 0 ? `"${texts(flow[i]).length ? texts(flow[i])[0].characters : flow[i].name}" drawn apart` : 'none drawn apart');
     if (iconRow && n.width >= screenWidth * 0.9 && flow.length <= 5 && (atBottom || /tab ?bar|bottom ?nav/i.test(n.name))) {
-      set(n, 'tabBar', { items: flow.map((c) => c.id), selected: oddItem(flow) });
+      const sel = oddItem(flow);
+      // The system tab bar tells tabs apart by colour alone; an indicator behind the selected tab is the design's own.
+      const indicator = sel >= 0 && boxes(flow[sel]) > boxes(flow[(sel + 1) % flow.length]);
+      set(n, 'tabBar', {
+        items: flow.map((c) => c.id), selected: sel,
+        native: indicator
+          ? { use: false, control: 'TabView with .tabItem', reason: 'the selected tab has its own indicator behind it, which the system tab bar cannot draw' }
+          : { use: false, control: 'TabView with .tabItem', reason: 'tabs that differ by colour, as the system tab bar: make TabView the app\'s root and drop this bar' },
+      }, atBottom && /tab ?bar|bottom ?nav/i.test(n.name) ? 'high' : 'medium',
+      `${flow.length} equal icon + label items across the ${atBottom ? 'bottom' : 'screen'}, ${selectedName(sel)}`);
       flow.forEach((c) => set(c, 'tab'));
     } else if (iconRow && oddItem(flow) >= 0) {
-      set(n, 'tabs', { items: flow.map((c) => c.id), selected: oddItem(flow) });
+      set(n, 'tabs', { items: flow.map((c) => c.id), selected: oddItem(flow) }, 'medium',
+        `${flow.length} equal icon + label items, ${selectedName(oddItem(flow))}`);
       flow.forEach((c) => set(c, 'tab'));
     } else if (allSame && row && flow.length >= 2 && flow.length <= 5 && filled(n) && radius(n) > 0 &&
         flow.every((c) => labelled(c) && !hasIcon(c)) && oddFilled(flow) >= 0) {
-      set(n, 'segmented', { items: flow.map((c) => c.id), selected: oddFilled(flow) });
+      const sel = oddFilled(flow);
+      const r = radius(n);
+      const thumb = radius(flow[sel]);
+      // The system control: a grey track with slightly rounded corners and a white thumb.
+      const system = r <= 10 && thumb <= 9 && n.height <= 44;
+      const shape = (x, k) => (k >= x.height / 2 - 1 ? 'pill' : `radius ${k}`);
+      set(n, 'segmented', {
+        items: flow.map((c) => c.id), selected: sel,
+        native: system
+          ? { use: true, control: 'Picker with .pickerStyle(.segmented)', reason: `a track of radius ${r} with a plain thumb, as the system control` }
+          : { use: false, control: 'Picker with .pickerStyle(.segmented)', reason: `a ${shape(n, r)} track and ${shape(flow[sel], thumb)} thumb the system control does not draw` },
+      }, 'high', `${flow.length} equal text items on a filled rounded track, ${selectedName(sel)}`);
       flow.forEach((c) => set(c, 'segment'));
     } else if (sameShape(flow) && (row || n.layoutWrap === 'WRAP') && flow.every((c) => texts(c).length >= 1 &&
         texts(c).length <= 2 && c.height <= 44 && (radius(c) >= c.height / 2 - 1 || /chip|tag|pill/i.test(c.name))) &&
         (stroked(flow[0]) || filled(flow[0]))) {
-      set(n, 'chips', { items: flow.map((c) => c.id), selected: oddItem(flow) });
+      set(n, 'chips', { items: flow.map((c) => c.id), selected: oddItem(flow) }, /chip|tag|pill/i.test(flow[0].name) ? 'high' : 'medium',
+        `${flow.length} ${stroked(flow[0]) ? 'outlined' : 'filled'} pill items of one or two labels, ${selectedName(oddItem(flow))}`);
       flow.forEach((c) => set(c, 'chip'));
     } else if (n.layoutWrap === 'WRAP' && sameShape(flow) && row) {
       const gap = n.itemSpacing || 0;
       const columns = Math.max(1, Math.floor((innerWidth(n) + gap) / (flow[0].width + gap)));
-      set(n, 'grid', { items: flow.map((c) => c.id), columns });
+      set(n, 'grid', { items: flow.map((c) => c.id), columns }, 'high', `a wrapping row of ${flow.length} equal items, ${columns} per line`);
       flow.forEach((c) => set(c, 'card'));
     } else if (row && parent && isAutoLayout(n) && flow.length >= 2 && n.width > innerWidth(parent) + 0.5) {
-      set(n, 'carousel', { items: flow.map((c) => c.id) });
+      set(n, 'carousel', { items: flow.map((c) => c.id) }, sameShape(flow) ? 'high' : 'medium',
+        `a row of ${flow.length}${sameShape(flow) ? ' equal' : ''} items wider than its column`);
       flow.forEach((c) => set(c, 'card'));
     } else if (row && wide(n) && !filled(n) && !stroked(n) && flow.length >= 1 && flow.length <= 2 && texts(n).length >= 1 && parent) {
       const [a, b] = flow;
@@ -144,7 +200,8 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
       const others = texts(n).filter((t) => t !== title && t !== link);
       if (title && (!b || link) && fontSize(title) >= 16 && others.every((t) => fontSize(t) < fontSize(title)) &&
           (!link || fontSize(title) > fontSize(link))) {
-        set(n, 'sectionHeader', { title: title.id, link: link ? link.id : null });
+        set(n, 'sectionHeader', { title: title.id, link: link ? link.id : null }, link ? 'high' : 'medium',
+          `a ${fontSize(title)}pt title${link ? ' and a short smaller link beside it' : ' over the section'}`);
         set(title, 'heading');
         if (link) set(link, 'link', { section: title.characters });
       }
@@ -156,18 +213,24 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
       const pFlow = isAutoLayout(parent) ? visibleChildren(parent).filter((c) => inFlow(c, parent)) : [];
       const topBar = parent.layoutMode === 'HORIZONTAL' && wide(parent) && parent.height <= 72 && parent.y - ry <= 160;
       if (small && isIcon(n) && ICON_NAMES.test(n.name)) {
-        set(n, 'iconButton', { label: n.name.split('/').pop().trim() });
+        set(n, 'iconButton', { label: n.name.split('/').pop().trim() }, 'high', `a ${Math.round(n.width)}pt icon named "${n.name}"`);
       } else if (small && isIcon(n) && topBar && (pFlow[0] === n || (pFlow[pFlow.length - 1] === n && CLOSE.test(n.name)))) {
         // The leading icon of a top bar goes back; a trailing cross closes.
-        set(n, 'iconButton', { label: CLOSE.test(n.name) ? 'Close' : 'Back' });
+        set(n, 'iconButton', { label: CLOSE.test(n.name) ? 'Close' : 'Back' }, 'medium',
+          `a ${Math.round(n.width)}pt icon ${pFlow[0] === n ? 'leading' : 'trailing'} a top bar`);
       } else if (isAutoLayout(n) && ts.length === 1 && n.height >= 36 && n.height <= 64 && (filled(n) || stroked(n)) &&
           radius(n) > 0 && kids.every((c) => c.type === 'TEXT' || isIcon(c))) {
-        set(n, 'button', { primary: filled(n), label: ts[0].characters });
+        set(n, 'button', { primary: filled(n), label: ts[0].characters }, 'high',
+          `a ${filled(n) ? 'filled' : 'outlined'} rounded frame ${Math.round(n.height)}pt high with one label`);
       } else if (row && isAutoLayout(n) && flow.length >= 2 && ts.length >= 1 && last && isIcon(last) && DISCLOSURE.test(last.name)) {
-        set(n, 'listRow');
+        set(n, 'listRow', {}, 'medium', `a row ending in "${last.name}"`);
       } else if (isAutoLayout(n) && hasIcon(n) && ts.length >= 2 && ts.length <= 3 && n.height <= 80 && kids.some(isIcon)) {
         const sizes = ts.map(fontSize);
-        if (sizes[1] > sizes[0] || /from|to|date|departure|return|traveller|guest|field|input/i.test(n.name)) set(n, 'field');
+        const named = /from|to|date|departure|return|traveller|guest|field|input/i.test(n.name);
+        if (sizes[1] > sizes[0] || named) {
+          set(n, 'field', {}, sizes[1] > sizes[0] && named ? 'high' : 'medium',
+            `an icon with a small label over a ${sizes[1] > sizes[0] ? 'larger ' : ''}value${named ? `, named "${n.name}"` : ''}`);
+        }
       }
     }
     kids.forEach((c) => walk(c, n));
@@ -179,8 +242,14 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
     const fields = kids.filter((c) => roles.get(c.id) && roles.get(c.id).role === 'field');
     const button = kids.find((c) => roles.get(c.id) && roles.get(c.id).role === 'iconButton' && SWAP.test(c.name));
     if (fields.length === 2 && button && sameShape(fields) && !roles.has(n.id)) {
-      set(n, 'swapFields', { fields: fields.map((c) => c.id), button: button.id });
+      set(n, 'swapFields', { fields: fields.map((c) => c.id), button: button.id }, 'high',
+        `two fields of one shape and a "${button.name}" button between them`);
     }
+  }
+  for (const id of suppressed) {
+    const r = roles.get(id);
+    if (r && r.items) r.items.forEach((i) => roles.delete(i));
+    roles.delete(id);
   }
   return roles;
 }

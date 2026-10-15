@@ -64,8 +64,15 @@ const SWIFTUI_GUIDANCE =
   'sheets, tab switching) and replace the literal data with the model\'s. ' +
   'A phone-sized frame is drawn as a screen: it fills the screen and scrolls, ' +
   'its top bar and bottom bar stay pinned with safeAreaInset, and layers ' +
-  'listed as system UI are left to the phone. Sections that span the width ' +
-  'stretch; other fixed sizes stay as designed, so check narrow phones. Add ' +
+  'listed as system UI are left to the phone. Its sections follow each ' +
+  'other in a VStack with the design\'s gaps, so text that grows pushes ' +
+  'what is below it down; rows of fields stack and grids drop to one column ' +
+  'at accessibility text sizes. Sections that span the width stretch; other ' +
+  'fixed sizes stay as designed, so check narrow phones. A control drawn like ' +
+  'the system one is the system control (Picker(.segmented)); the Structure ' +
+  'block says, with each role\'s confidence and evidence, why the others stay ' +
+  'custom. A designer can set a role by tagging a layer name, e.g. ' +
+  '"Pay [button]", "Filters [chips]", or keep a layer plain with "[no-role]". Add ' +
   'the listed assets to the asset catalog and the fonts to the target. The ' +
   'shared DesignSystem.swift block (Color(hex:), the button style, DesignTokens, ' +
   'AppFonts) goes into the target once: merge later screens\' tokens into it ' +
@@ -175,10 +182,13 @@ function swiftuiDetails(result, tree, catalog) {
   out.push(text('The code needs iOS 17 or later (scrollTargetBehavior, contentMargins, containerRelativeFrame, sensoryFeedback, ' +
     'onGeometryChange): set the deployment target to 17.0 or higher.'));
   if (result.structure.length) {
-    out.push(text(`Structure (what each part is, and the SwiftUI pattern the code uses for it):\n${result.structure.map((r) => {
+    out.push(text(`Structure (what each part is, how sure the detection is and why, and the SwiftUI pattern the code uses for it; ` +
+      `a layer name tag such as "[button]" or "[no-role]" sets or clears a role):\n${result.structure.map((r) => {
       const facts = [r.role, r.items ? `${r.items} items` : null, r.selected ? `"${r.selected}" selected` : null,
         r.label ? `"${r.label}"` : null, r.link ? `link "${r.link}"` : null].filter(Boolean).join(', ');
-      return `- ${r.id} "${r.name}": ${facts} -> ${r.pattern}`;
+      const sure = r.confidence ? ` [${r.confidence}: ${r.evidence}]` : '';
+      const native = r.native ? `; ${r.native.use ? 'uses' : 'not'} ${r.native.control}: ${r.native.reason}` : '';
+      return `- ${r.id} "${r.name}": ${facts}${sure} -> ${r.pattern}${native}`;
     }).join('\n')}`));
   }
   return [...out, ...sharedDetails(result, tree)];

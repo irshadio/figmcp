@@ -343,6 +343,40 @@ test('toSwiftUI draws a pattern of many small vectors as one image', () => {
   assert.match(pattern, /<svg x="50" y="0" width="20" height="20"/);
 });
 
+test('detectRoles gives each role its confidence and evidence, and layer name tags set or clear roles', () => {
+  const root = screen();
+  const roles = detectRoles(root);
+  const tabBar = byName(roles, 'Tab bar');
+  assert.equal(tabBar.confidence, 'high');
+  assert.match(tabBar.evidence, /4 equal icon \+ label items across the bottom, "Home" drawn apart/);
+  // The selected tab's tile is the design's own indicator: the bar stays custom.
+  assert.equal(tabBar.native.use, false);
+  assert.match(tabBar.native.reason, /indicator/);
+  assert.match(byName(roles, 'Trip type').native.reason, /pill track/);
+
+  const header = root.children[0];
+  header.children[0].name = 'tripora [no-role]';
+  header.name = 'Header [button]';
+  root.children.find((c) => c.name === 'Fares').name = 'Fares [no-role]';
+  const tagged = detectRoles(root);
+  assert.deepEqual([byName(tagged, 'Header [button]').role, byName(tagged, 'Header [button]').confidence], ['button', 'set by name']);
+  assert.equal(byName(tagged, 'Fares [no-role]'), undefined);
+  assert.equal([...tagged.values()].filter((r) => r.role === 'chip').length, 0);
+});
+
+test('toSwiftUI uses the system segmented control when the design draws one', () => {
+  const root = screen();
+  const track = root.children.find((c) => c.name === 'Trip type');
+  track.cornerRadius = 8;
+  track.children.forEach((c) => { c.cornerRadius = 7; });
+  const { code, structure } = toSwiftUI(root, assets);
+  assert.match(code, /Picker\("Trip type", selection: \$selectedTripType\) \{\n\s+ForEach\(Array\(tripTypes\.enumerated\(\)\), id: \\\.offset\) \{ index, item in\n\s+Text\(item\.title\)\n\s+\.tag\(index\)/);
+  assert.match(code, /\.pickerStyle\(\.segmented\)\n\s+\.labelsHidden\(\)/);
+  assert.doesNotMatch(code, /struct TripTypeView/);
+  const entry = structure.find((r) => r.role === 'segmented');
+  assert.equal(entry.pattern, 'system control: Picker with .pickerStyle(.segmented)');
+});
+
 test('toSwiftUI puts what screens share in DesignSystem.swift', () => {
   const { shared } = toSwiftUI(screen(), assets);
   assert.match(shared, /^import SwiftUI\n/);
