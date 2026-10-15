@@ -68,6 +68,8 @@ const brief = (list, n = 15) => (list.length > n ? [...list.slice(0, n), `… ${
 
 export function registerVerifyTools(server, bridge, source) {
   server.registerTool('verify_code', {
+    title: 'Verify Flutter Code',
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description:
       'Check Flutter code against the design: analyzes it, renders it with ' +
       '`flutter test` at 2x, and compares the render with Figma\'s own 2x ' +

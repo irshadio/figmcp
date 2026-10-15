@@ -32,6 +32,8 @@ function isExport(file) {
 
 export function registerStatusTools(server, bridge, source) {
   server.registerTool('whoami', {
+    title: 'Connection Status',
+    annotations: { readOnlyHint: true, openWorldHint: false },
     description:
       'Status of the local Figma connection: whether the plugin is connected, ' +
       'the pairing code it needs, the open file, page and selection, the ' +
@@ -59,6 +61,8 @@ export function registerStatusTools(server, bridge, source) {
   }));
 
   server.registerTool('import_design_export', {
+    title: 'Import Design Export',
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description:
       'Save a design export JSON (frames with node trees, as the plugin ' +
       'produces) as a snapshot, so its nodes can be read without the plugin. ' +
@@ -74,6 +78,8 @@ export function registerStatusTools(server, bridge, source) {
   }));
 
   server.registerTool('save_design_export', {
+    title: 'Save Design Export',
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description:
       'Write a full design export of a node (default: the selection) to a JSON ' +
       'file: the node tree with every layout, paint, text, variable, style, ' +

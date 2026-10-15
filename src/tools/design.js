@@ -99,6 +99,8 @@ const GUIDANCE =
 
 export function registerDesignTools(server, bridge, source) {
   server.registerTool('get_design_context', {
+    title: 'Get Design Context',
+    annotations: { readOnlyHint: true, openWorldHint: false },
     description:
       'Get design context for a Figma node — the primary tool for design-to-code ' +
       'workflows. Returns reference code (Flutter widgets for Flutter projects, ' +
@@ -210,6 +212,8 @@ export function registerDesignTools(server, bridge, source) {
   }));
 
   server.registerTool('get_metadata', {
+    title: 'Get Metadata',
+    annotations: { readOnlyHint: true, openWorldHint: false },
     description:
       'IMPORTANT: Always prefer to use get_design_context. Get metadata for a ' +
       'node or page in XML format: node IDs, layer types, names, positions and ' +
@@ -235,6 +239,8 @@ export function registerDesignTools(server, bridge, source) {
   }));
 
   server.registerTool('get_screenshot', {
+    title: 'Get Screenshot',
+    annotations: { readOnlyHint: true, openWorldHint: false },
     description:
       'Generate a screenshot for a given node or the currently selected node ' +
       'in Figma. maxDimension (default 1024) caps the longer edge of the PNG ' +
@@ -273,6 +279,8 @@ export function registerDesignTools(server, bridge, source) {
   }));
 
   server.registerTool('get_variable_defs', {
+    title: 'Get Variable Definitions',
+    annotations: { readOnlyHint: true, openWorldHint: false },
     description:
       "Get variable definitions for a given node id. E.g. {'icon/default/secondary': #949494}. " +
       'Variables and styles are reusable values applied to colours, fonts, ' +
@@ -292,6 +300,8 @@ export function registerDesignTools(server, bridge, source) {
   }));
 
   server.registerTool('download_assets', {
+    title: 'Download Assets',
+    annotations: { readOnlyHint: true, openWorldHint: false },
     description:
       'Download assets for a single node: an exported render (`export`), the ' +
       'original images used as fills (`rawImages`, up to 20) and SVGs of the ' +

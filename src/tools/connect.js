@@ -16,6 +16,8 @@ function instances(tree) {
 
 export function registerConnectTools(server, bridge, source) {
   server.registerTool('get_code_connect_map', {
+    title: 'Get Code Connect Mapping',
+    annotations: { readOnlyHint: true, openWorldHint: false },
     description:
       'Get the mapping from the component instances in a node to code ' +
       'components: { nodeId: { codeConnectName, codeConnectSrc, label } }, plus ' +
@@ -51,6 +53,8 @@ export function registerConnectTools(server, bridge, source) {
   }));
 
   server.registerTool('add_code_connect_map', {
+    title: 'Add Code Connect Mapping',
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description:
       'Map a design component to a code component, so get_design_context names ' +
       'the code component for every instance of it. Pass an instance, component ' +
@@ -70,6 +74,8 @@ export function registerConnectTools(server, bridge, source) {
   }));
 
   server.registerTool('remove_code_connect_map', {
+    title: 'Remove Code Connect Mapping',
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     description:
       'Remove the code component mapping saved by add_code_connect_map, so ' +
       'get_design_context stops naming that code component. Pass an instance, ' +

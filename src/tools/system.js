@@ -130,6 +130,8 @@ export function searchScript(params) {
 
 export function registerSystemTools(server, bridge) {
   server.registerTool('search_design_system', {
+    title: 'Search Design System',
+    annotations: { readOnlyHint: true, openWorldHint: false },
     description:
       'Search the design system of the file open in Figma Desktop: local ' +
       'components and component sets (with their properties and variant ' +

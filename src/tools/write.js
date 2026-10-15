@@ -68,6 +68,8 @@ return { node, ...(size ? { image: { width: size.width, height: size.height } } 
 
 export function registerWriteTools(server, bridge) {
   server.registerTool('use_figma', {
+    title: 'Edit Design',
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     description:
       'Create or edit designs in the file open in Figma Desktop by running ' +
       'JavaScript against the Figma plugin API. `code` is the body of an ' +
@@ -116,6 +118,8 @@ export function registerWriteTools(server, bridge) {
   }));
 
   server.registerTool('place_image', {
+    title: 'Place Image',
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     description:
       'Put an image file from this computer into the file open in Figma ' +
       'Desktop: a PNG, JPG or GIF becomes a rectangle with the image fill ' +
