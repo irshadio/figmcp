@@ -130,6 +130,12 @@ function reactDetails(result, tree, { html = false } = {}) {
       `design's ${tree.width}px, is at least as tall as the screen` +
       `${result.scrolls ? ' and scrolls (the design is taller than a phone)' : ', and scrolls on a phone too short for its layers'}.`));
   }
+  if (result.page) {
+    out.push(text(`${result.componentName} is drawn as a web page: it fills the viewport and is never narrower than ` +
+      `the design's ${tree.width}px (narrower screens scroll sideways). Layers spanning the design's width stretch ` +
+      'across the screen; layers on its left or right edge stay there; everything else keeps its place in a centred ' +
+      `column (left-[calc(50%-...)]). Pass page: false for the fixed ${tree.width}px artboard.`));
+  }
   out.push(systemUiBlock(tree));
   if (result.connected.length) {
     out.push(text('Mapped components used (Code Connect). Each sits in a wrapper with its position; set its ' +
@@ -198,6 +204,9 @@ export function registerDesignTools(server, bridge, source) {
       clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" (picks the framework).'),
       screen: z.boolean().optional().describe(
         'Draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
+      page: z.boolean().optional().describe(
+        'React and HTML: draw the node as a web page that fills the viewport, never narrower than the design, with ' +
+        'full-width sections stretching (default: frames 768 or more wide).'),
       assetsDir: z.string().optional().describe(
         'Folder of the asset files in the code. Flutter default: the svg/png/images folders of the project\'s ' +
         'pubspec.yaml, else assets/figma. React default: public/figma (static/figma for SvelteKit), loaded by URL ' +
@@ -211,7 +220,7 @@ export function registerDesignTools(server, bridge, source) {
       skillNames: z.string().optional().describe('Accepted for compatibility (logging only).'),
     },
   }, guard(async (args) => {
-    const { nodeId, excludeScreenshot, forceCode, disableCodeConnect, assetsDir, screen } = args;
+    const { nodeId, excludeScreenshot, forceCode, disableCodeConnect, assetsDir, screen, page } = args;
     const scaled = args.screenUtil ?? usesScreenUtil();
     const { id } = await source.resolveId(nodeId);
     // Variables and the screenshot are read while the layers are.
@@ -249,11 +258,11 @@ export function registerDesignTools(server, bridge, source) {
         }
       } else if (framework === 'html') {
         const dir = (assetsDir || 'assets/figma').replace(/^\.?\/+|\/+$/g, '');
-        const result = toHtmlTailwind(node.tree, fileResolver(node.images), { screen, assetDir: dir });
+        const result = toHtmlTailwind(node.tree, fileResolver(node.images), { screen, page, assetDir: dir });
         out = [text(result.code), ...reactDetails(result, node.tree, { html: true })];
       } else {
         const dir = (assetsDir || reactAssetDir()).replace(/^\.?\/+|\/+$/g, '');
-        const result = toReactTailwind(node.tree, fileResolver(node.images), { connect, screen, assetDir: dir });
+        const result = toReactTailwind(node.tree, fileResolver(node.images), { connect, screen, page, assetDir: dir });
         out = [text(result.code), ...reactDetails(result, node.tree)];
       }
     } catch (e) {

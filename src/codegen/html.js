@@ -119,8 +119,8 @@ function inlineText(lines, urls) {
  * Assets resolve relative to the page ('assets/figma/logo.svg') with
  * [assetDir]. Code Connect is not used: HTML has no components.
  */
-export function toHtmlTailwind(root, assets, { screen, assetDir = null } = {}) {
-  const result = toReactTailwind(root, assets, { screen, assetDir, repeats: false, textStyles: false });
+export function toHtmlTailwind(root, assets, { screen, page, assetDir = null } = {}) {
+  const result = toReactTailwind(root, assets, { screen, page, assetDir, repeats: false, textStyles: false });
   const urls = new Map();
   const files = {};
   for (const [id, url] of Object.entries(result.assets)) {

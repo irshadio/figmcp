@@ -244,6 +244,7 @@ export async function reactCheck({
   fs.mkdirSync(out, { recursive: true });
   for (const stale of ['rendered.png', 'diff.png', 'report.json']) fs.rmSync(path.join(out, stale), { force: true });
   const tree = design.tree;
+  if (!viewport && !design.render) throw new Error('The design has no render to compare with: pass a viewport to lay the code out instead.');
   let generated = null;
   if (!code) {
     const files = writeAssets(path.join(out, 'assets'), design.images);

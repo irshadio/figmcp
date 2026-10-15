@@ -73,7 +73,9 @@ export function gridAnchor(node, parent, key) {
  * [opts.stretch] stretches a positioned child across the width,
  * [opts.narrow] lets a fixed width shrink to the column and [opts.shrink]
  * lets a child of a row shrink when the row is too narrow. On a web page,
- * [opts.center] keeps a positioned child in the page's centred column.
+ * [opts.center] keeps a positioned child in the page's centred column,
+ * [opts.pin] ('MIN' or 'MAX') keeps it on an edge, [opts.fill] makes a
+ * child of a column fill it and [opts.indent] is a left margin.
  */
 export function positionClasses(node, parent, opts = {}) {
   const vars = node.vars || {};
@@ -90,7 +92,7 @@ export function positionClasses(node, parent, opts = {}) {
   if (inFlow(node, parent)) {
     out.push('relative', opts.shrink ? 'min-w-0' : 'shrink-0');
     const row = parent.layoutMode === 'HORIZONTAL';
-    let sizeW = sizingOf(node, parent, 'x');
+    let sizeW = opts.fill && !row ? 'FILL' : sizingOf(node, parent, 'x');
     let sizeH = sizingOf(node, parent, 'y');
     if (opts.fixedSize) {
       if (sizeW === 'HUG') sizeW = 'FIXED';
@@ -122,6 +124,7 @@ export function positionClasses(node, parent, opts = {}) {
         out.push(`${row ? 'ml' : 'mt'}-[${px(parent.itemSpacing)}]`);
       }
     }
+    if (opts.indent) out.push(`ml-[${opts.indent}]`);
     if (parent.itemReverseZIndex && typeof opts.index === 'number') {
       out.push(`z-[${(opts.count || 0) - opts.index}]`);
     }
@@ -141,6 +144,7 @@ export function positionClasses(node, parent, opts = {}) {
     ? node.constraints : { horizontal: 'MIN', vertical: 'MIN' };
   if (opts.stretch) cons = { ...cons, horizontal: 'STRETCH' };
   else if (opts.center) cons = { ...cons, horizontal: 'CENTER' };
+  else if (opts.pin) cons = { ...cons, horizontal: opts.pin };
 
   switch (cons.horizontal) {
     case 'MAX':

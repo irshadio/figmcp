@@ -18,7 +18,7 @@ export async function loadDesign(opts) {
   if (opts.export) {
     const data = JSON.parse(fs.readFileSync(opts.export, 'utf8'));
     const frame = data.frames[0];
-    return { tree: frame.tree, images: data.images || {}, render: Buffer.from(frame.previewPng2x, 'base64') };
+    return { tree: frame.tree, images: data.images || {}, render: frame.previewPng2x ? Buffer.from(frame.previewPng2x, 'base64') : null };
   }
   if (opts.snapshot) {
     const hit = findSnapshotNode(opts.snapshot.replace(/-/g, ':'), { preview: true });

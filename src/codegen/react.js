@@ -552,6 +552,7 @@ class Writer {
   /** Screen-mode placement options for a child of [parent]. */
   screenOpts(node, parent, siblings, scroller = false) {
     if (this.page && this.sections.has(parent) && !inFlow(node, parent)) return this.pageOpts(node, parent);
+    if (this.page && parent === this.page && inFlow(node, parent) && parent.layoutMode === 'VERTICAL') return this.pageFlowOpts(node, parent);
     if (!this.screen || !parent) return {};
     const out = {};
     if (parent === this.screen && !inFlow(node, parent)) {
@@ -702,14 +703,45 @@ class Writer {
    * whatever its constraints: the column is the design.
    */
   pageOpts(node, section) {
-    if (spansPage(node, section) && !(node.type === 'TEXT' && node.textAutoResize === 'WIDTH_AND_HEIGHT')) {
+    const hug = node.type === 'TEXT' && node.textAutoResize === 'WIDTH_AND_HEIGHT';
+    if (spansPage(node, section) && !hug) {
       // A full-width layer stretches, and so do the layers spanning it; a
       // full-width layout keeps its content in the column with its padding.
-      if (!isAutoLayout(node) && !isGrid(node)) this.sections.add(node);
-      else this.columns.add(node);
+      this.spanning(node);
       return { stretch: true };
     }
+    // Layers on an edge stay there (a sidebar, a rail); a layer reaching
+    // from a left-edge layer to the right edge fills the rest.
+    const x = node.x - section.x;
+    const right = section.width - x - node.width;
+    if (x <= 1) return { pin: 'MIN' };
+    if (right <= 1 && !hug) {
+      const after = visibleChildren(section).some((c) => c !== node && c.x - section.x <= 1 &&
+        Math.abs(c.x + c.width - node.x) <= 1 && c.y < node.y + node.height && c.y + c.height > node.y);
+      return after ? { stretch: true } : { pin: 'MAX' };
+    }
     return { center: true };
+  }
+
+  /** A full-width layer's own children follow the page rules too. */
+  spanning(node) {
+    if (!isAutoLayout(node) && !isGrid(node)) this.sections.add(node);
+    else this.columns.add(node);
+  }
+
+  /**
+   * A child of a page laid out as a column: full-width ones fill the
+   * viewport; the rest of a start-aligned column keeps to the centred
+   * column with a margin that is 0 at the design width.
+   */
+  pageFlowOpts(node, page) {
+    const room = page.width - (page.paddingLeft || 0) - (page.paddingRight || 0);
+    if (node.width >= room - 1) {
+      this.spanning(node);
+      return { fill: true };
+    }
+    if (page.counterAxisAlignItems && page.counterAxisAlignItems !== 'MIN') return {};
+    return { indent: `max(0px,calc(50%-${px(room / 2)}))` };
   }
 
   rootClasses(node) {
