@@ -225,6 +225,7 @@ class SwiftUIWriter {
     this.screen = null;
     this.viewport = null;
     this.words = new Set();
+    this.metrics = new Map();
     this.scrolls = false;
     // Layers left out (system UI, bars drawn apart), text and image
     // bindings of a repeated item, and what repeated items need.
@@ -409,6 +410,7 @@ class SwiftUIWriter {
     const axis = (key, max, s) => {
       if (s === 'inf') args.push([max, INFINITY]);
       else if (typeof s === 'number') args.push([key, round(s)]);
+      else if (s && s.kind === 'raw') args.push([key, s]);
       else if (s && typeof s.min === 'number') args.push([`min${key[0].toUpperCase()}${key.slice(1)}`, round(s.min)]);
     };
     axis('width', 'maxWidth', size.w);
@@ -478,6 +480,17 @@ class SwiftUIWriter {
     let name = base;
     for (let i = 2; this.typeNames.has(name) || this.typeNames.has(`${name}View`); i++) name = `${base}${i}`;
     this.typeNames.add(name);
+    return name;
+  }
+
+  /** A length that scales with Dynamic Type, declared once per view struct; its name. */
+  scaledMetric(value) {
+    const name = `iconSize${sNum(round(value)).replace('.', '_')}`;
+    if (!this.metrics.has(name)) {
+      // Item views keep a memberwise init the screen can call.
+      this.metrics.set(name, `  @ScaledMetric(relativeTo: .body) ${this.inComponent ? '' : 'private '}var ${name}: CGFloat = ${sNum(round(value))}`);
+      if (!this.inComponent) this.states.push(this.metrics.get(name));
+    }
     return name;
   }
 
@@ -847,6 +860,13 @@ class SwiftUIWriter {
     let image = mod(view('Image', [[null, name]]), 'resizable');
     if (tint) image = mod(mod(image, 'renderingMode', [[null, raw('.template')]]), 'foregroundStyle', [[null, tint]]);
     image = mod(image, 'accessibilityHidden', [[null, true]]);
+    const b = node.svgBounds;
+    const exact = !b || (Math.abs(b.width - node.width) < 0.01 && Math.abs(b.height - node.height) < 0.01);
+    if (!tile && tint && exact && typeof size.w === 'number' && size.w === size.h && size.w <= 32) {
+      // A glyph grows with the text beside it.
+      const metric = raw(this.scaledMetric(size.w));
+      return this.picture(node, { w: metric, h: metric }, null, image);
+    }
     if (!tile) return this.picture(node, size, node.svgBounds, image);
     const shape = shapeOf(node, (v, n) => this.value(v, n));
     const fill = this.fillItems(node)[0];
@@ -1338,7 +1358,11 @@ class SwiftUIWriter {
         for (const f of fields) this.bindings.delete(f.nodes[index].id);
       }
     };
+    const screenMetrics = this.metrics;
+    this.metrics = new Map();
     const trees = items.map(render);
+    const itemMetrics = [...this.metrics.values()];
+    this.metrics = screenMetrics;
     const codes = trees.map((t) => (t ? print(t, 2) : ''));
     const kinds = [...new Set(codes)];
     let body;
@@ -1399,6 +1423,7 @@ class SwiftUIWriter {
       body = withIndicator(body, indicator, 'namespace');
     }
     const props = [
+      ...itemMetrics,
       model ? `  let item: ${model}` : null,
       selected >= 0 ? '  var isSelected = false' : null,
       indicator ? '  var namespace: Namespace.ID' : null,

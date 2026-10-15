@@ -314,6 +314,9 @@ test('toSwiftUI lays a freely placed screen out as a column that reflows', () =>
   assert.match(body, /\.padding\(\.top, \d+\)/);
   // Section heights grow from the design's.
   assert.match(body, /\.frame\(minHeight: \d+, alignment: \.top\)/);
+  // Glyphs beside text grow with it.
+  assert.match(home, /@ScaledMetric\(relativeTo: \.body\) private var iconSize20: CGFloat = 20/);
+  assert.match(home, /\.frame\(width: iconSize20, height: iconSize20\)/);
   // Tab bar items show the large content viewer; control labels keep one line.
   assert.match(home, /\.accessibilityShowsLargeContentViewer\(\)/);
   assert.match(home, /Text\(item\.title\)[\s\S]*?\.lineLimit\(1\)/);
