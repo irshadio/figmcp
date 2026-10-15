@@ -120,14 +120,17 @@ export function compareBoxes(boxes, rects, bundled, tree = null) {
     const missingFonts = box.families.filter((f) => !bundled.has(f));
     missingFonts.forEach((f) => unbundled.add(f));
     const tol = box.text ? TEXT_TOLERANCE : BOX_TOLERANCE;
-    const d = ['x', 'y', 'width', 'height'].map((k) => Math.round((got[k] - box[k]) * 100) / 100);
+    // A scroller is compared by its box or by its scroll width, whichever the design has.
+    const width = typeof got.scrollWidth === 'number' && Math.abs(got.scrollWidth - box.width) < Math.abs(got.width - box.width)
+      ? got.scrollWidth : got.width;
+    const d = ['x', 'y', 'width', 'height'].map((k) => Math.round(((k === 'width' ? width : got[k]) - box[k]) * 100) / 100);
     if (d.some((v) => Math.abs(v) > tol)) {
       const rounding = sensitive.get(box.id) && Math.abs(d[0]) <= ROUNDING && Math.abs(d[2]) <= ROUNDING &&
         Math.abs(d[1]) <= tol && Math.abs(d[3]) <= tol;
       (missingFonts.length ? fontMismatches : rounding ? roundingMismatches : mismatches).push({
         id: box.id, name: box.name, type: box.type,
         expected: [box.x, box.y, box.width, box.height].map((v) => Math.round(v * 100) / 100),
-        actual: [got.x, got.y, got.width, got.height].map((v) => Math.round(v * 100) / 100),
+        actual: [got.x, got.y, width, got.height].map((v) => Math.round(v * 100) / 100),
         delta: d, ...(missingFonts.length ? { cause: `text in ${missingFonts.join(', ')}, which is not bundled` } : {}),
       });
     }

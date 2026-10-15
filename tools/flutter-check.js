@@ -26,31 +26,20 @@
 // --fetch-fonts downloads missing Google Fonts families into the data folder.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { toFlutter } from '../src/codegen/flutter/index.js';
 import { DATA_DIR, imageExt } from '../src/store.js';
 import { compareBoxes, expectedBoxes, families, loadDesign, pixelDiff } from './compare.js';
+import { FONT_CACHE, SYSTEM_FONTS, familyFiles, fetchGoogleFont, fontFiles } from './fonts.js';
 
 const HARNESS_DIR = path.join(DATA_DIR, 'flutter-check');
 let HARNESS = HARNESS_DIR;
-const FONT_CACHE = path.join(DATA_DIR, 'fonts');
 const ASSET_DIR = 'assets/check';
-const SYSTEM_FONTS = [
-  path.join(os.homedir(), 'Library/Fonts'), '/Library/Fonts', '/System/Library/Fonts',
-  path.join(os.homedir(), '.fonts'), path.join(os.homedir(), '.local/share/fonts'), '/usr/share/fonts',
-  path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts'),
-];
 // Windows runs flutter.bat, which needs a shell.
 const SHELL = process.platform === 'win32';
 // Below the 10 minutes verify_code waits, so the run cleans up first.
 const TEST_TIMEOUT = 540000;
-const STYLE_NAMES = {
-  100: 'Thin', 200: 'ExtraLight', 300: 'Light', 400: 'Regular', 500: 'Medium',
-  600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold', 900: 'Black',
-};
-const STYLE_TAIL = /^(display|text)?(thin|hairline|extralight|ultralight|light|regular|book|normal|medium|semibold|demibold|bold|extrabold|ultrabold|black|heavy)?(italic|oblique)?(\d{3})?(i)?$/;
 
 function args(argv) {
   const out = { fonts: [], target: null };
@@ -75,55 +64,6 @@ function args(argv) {
     else out.target = a;
   }
   return out;
-}
-
-function norm(s) {
-  return String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function fontFiles(dirs) {
-  const out = [];
-  for (const dir of dirs) {
-    if (!fs.existsSync(dir)) continue;
-    for (const file of fs.readdirSync(dir, { recursive: true })) {
-      if (/\.(ttf|otf)$/i.test(file)) out.push({ file: path.join(dir, file), stem: norm(path.basename(file).replace(/\.(ttf|otf)$/i, '')) });
-    }
-  }
-  return out;
-}
-
-/**
- * Font files of [family]: file names made of the family and a style
- * (Inter-SemiBold.ttf, SF-Pro-Display-Medium.otf, Onest-600.ttf). Static
- * files win over variable ones, which Flutter would draw at one weight.
- */
-function familyFiles(family, files) {
-  const key = norm(family);
-  const hits = files.filter((f) => f.stem.startsWith(key) && STYLE_TAIL.test(f.stem.slice(key.length)));
-  const statics = hits.filter((f) => f.stem.slice(key.length) !== '' && !/variable|vf|wght/.test(f.stem));
-  const chosen = statics.length ? statics : hits;
-  const seen = new Set();
-  return chosen.filter((f) => !seen.has(f.stem) && seen.add(f.stem)).map((f) => f.file);
-}
-
-async function fetchGoogleFont(family) {
-  const dir = path.join(FONT_CACHE, family.replace(/[^A-Za-z0-9]+/g, '_'));
-  if (fs.existsSync(dir) && fs.readdirSync(dir).length) return;
-  const weights = [100, 200, 300, 400, 500, 600, 700, 800, 900];
-  const query = `family=${encodeURIComponent(family)}:ital,wght@${[0, 1].flatMap((i) => weights.map((w) => `${i},${w}`)).join(';')}`;
-  const res = await fetch(`https://fonts.googleapis.com/css2?${query}`, { signal: AbortSignal.timeout(20000) });
-  if (!res.ok) return;
-  const css = await res.text();
-  const faces = [...css.matchAll(/font-style:\s*(\w+);\s*font-weight:\s*(\d+);[^}]*?url\(([^)]+\.ttf)\)/g)];
-  if (!faces.length) return;
-  fs.mkdirSync(dir, { recursive: true });
-  for (const [, style, weight, url] of faces) {
-    // Family-Style names, as font folders use (Onest-SemiBold.ttf).
-    const name = style === 'italic' ? (weight === '400' ? 'Italic' : `${STYLE_NAMES[weight]}Italic`) : STYLE_NAMES[weight];
-    const file = path.join(dir, `${family.replace(/\s+/g, '')}-${name || weight}.ttf`);
-    const bytes = Buffer.from(await (await fetch(url, { signal: AbortSignal.timeout(30000) })).arrayBuffer());
-    fs.writeFileSync(file, bytes);
-  }
 }
 
 /** The flutter tool: [explicit], or the one on PATH; null when there is none. */
