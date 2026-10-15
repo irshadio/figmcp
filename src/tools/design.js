@@ -120,7 +120,8 @@ function reactDetails(result, tree) {
         fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
   }
   if (result.textStyles.length) {
-    out.push(text(`Figma text styles used (elements carry data-text-style; map each to the project's type scale):\n${
+    out.push(text('Figma text styles used (elements carry data-text-style; those used more than once are named ' +
+      `in the code's textStyles object; map each to the project's type scale):\n${
       result.textStyles.map((s) => `- ${s.name}: ${s.classes}`).join('\n')}`));
   }
   if (result.screen) {

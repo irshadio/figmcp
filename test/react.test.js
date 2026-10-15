@@ -348,3 +348,15 @@ test('three or more siblings that differ only in content become data and a .map(
   assert.doesNotMatch(code(row([tab('20:2', 'Trips', 29), tab('20:3', 'Offers', 37)])), /\.map\(/);
   assert.doesNotMatch(toReactTailwind(row([tab('20:2', 'Trips', 29), tab('20:3', 'Offers', 37), tab('20:4', 'Account', 52)]), files, { repeats: false }).code, /\.map\(/);
 });
+
+test('Figma text styles used more than once are named class lists', () => {
+  const styled = (id, characters, color) => text(characters, { id, name: characters },
+    { fontName: { family: 'Rubik', style: 'Medium' }, textStyle: 'App/Caption Strong', fills: [solid(color)] });
+  const out = code(frame([styled('16:1', 'One', black), styled('16:2', 'Two', { r: 1, g: 0, b: 0, a: 1 }),
+    text('Solo', { id: '16:3' }, { textStyle: 'App/Body' })], { layoutMode: 'VERTICAL' }));
+  assert.match(out, /^const textStyles = \{\n {2}\/\/ App\/Caption Strong\n {2}captionStrong: "font-\['Rubik',sans-serif\] font-medium text-\[16px\] leading-\[20px\]",\n\};/m);
+  assert.match(out, /<p className=\{`\$\{textStyles\.captionStrong\} relative shrink-0 min-w-\[100px\] whitespace-nowrap text-black`\}/);
+  assert.match(out, /text-\[#ff0000\]`\}/, 'each keeps its own colour');
+  assert.doesNotMatch(out, /textStyles\.body/, 'a style used once stays inline');
+  assert.doesNotMatch(code(frame([styled('16:1', 'One', black), styled('16:2', 'Two', black)]), { textStyles: false }), /textStyles/);
+});

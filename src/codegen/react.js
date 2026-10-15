@@ -17,6 +17,7 @@ import {
   altText, containerElement, fieldPlaceholder, headingTag, isGenericName, readableName,
 } from './semantics.js';
 import { collapseRuns } from './runs.js';
+import { applyTextStyles } from './text-styles.js';
 import { mergeEdges, snapClass, tokensCss } from './tailwind.js';
 import {
   autoLineRatios, cssWeight, fontClasses, jsxText, paragraphs, scriptOf, segmentsOf, textBlockClasses,
@@ -790,9 +791,12 @@ function componentNameFor(root, taken) {
  * [connect] returns a mapping ({ componentName, source, label }) for an
  * instance, or null. [screen] draws a phone-sized frame as a screen that
  * fills the viewport (default: portrait frames 300-480 wide). [repeats]
- * writes runs of repeated siblings as a data array and a .map().
+ * writes runs of repeated siblings as a data array and a .map();
+ * [textStyles] names the classes of Figma text styles used more than once.
  */
-export function toReactTailwind(root, assets, { connect = null, screen, assetDir = null, repeats = true } = {}) {
+export function toReactTailwind(root, assets, {
+  connect = null, screen, assetDir = null, repeats = true, textStyles = true,
+} = {}) {
   const tree = { ...root, x: root.x ?? 0, y: root.y ?? 0 };
   // A root shipped as one image is a picture, not a screen to lay out.
   const asScreen = screen ?? (isPhoneScreen(tree) && !tree.render && !drawnAsSvg(tree));
@@ -804,6 +808,8 @@ export function toReactTailwind(root, assets, { connect = null, screen, assetDir
     `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`);
   const consts = [...writer.consts.values()].map(({ id, url }) => `const ${id} = ${JSON.stringify(url)};`);
   for (const data of writer.arrays) consts.push(...(consts.length ? [''] : []), ...data);
+  const styled = textStyles ? applyTextStyles(writer.lines) : { lines: writer.lines, declaration: [] };
+  if (styled.declaration.length) consts.push(...(consts.length ? [''] : []), ...styled.declaration);
   const componentName = componentNameFor(tree, new Set(writer.connected.keys()));
   const code = [
     ...header,
@@ -812,7 +818,7 @@ export function toReactTailwind(root, assets, { connect = null, screen, assetDir
     ...(consts.length ? [''] : []),
     `export default function ${componentName}() {`,
     '  return (',
-    ...writer.lines,
+    ...styled.lines,
     '  );',
     '}',
   ].join('\n');
