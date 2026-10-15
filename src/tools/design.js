@@ -26,7 +26,10 @@ const FORCED_NODE_LIMIT = 30000;
 const ASSET_CAP = 20;
 // Responses stay within what clients take in one tool result (about 25k
 // tokens); longer code is asked for part by part.
-const CODE_CHARS = 80000;
+const CODE_CHARS = 60000;
+// All text blocks of a response together.
+const RESPONSE_CHARS = 90000;
+const DESIGN_SYSTEM_CHARS = 8000;
 const METADATA_CHARS = 60000;
 const SCREENSHOT_MAX = 4096;
 
@@ -66,6 +69,34 @@ const SWIFTUI_GUIDANCE =
   'phone; sections follow each other in a VStack, so growing text pushes the rest down, and rows and grids ' +
   'stack at accessibility sizes. Fixed sizes stay as designed: check narrow phones. Merge DesignSystem.swift into ' +
   'the target once (later screens return the project\'s file with what it lacks added). Keep the #Preview, check the result with verify_code or against the screenshot.';
+
+// Blocks a response can lose first when it is too long, most expendable first.
+const EXPENDABLE = [
+  [/^These variables and styles are used in the design:/, 'The variables used are in DesignTokens in the code; call get_variable_defs for all of them.'],
+  [/^Approximations \(the design has more than this code draws\):/, null],
+  [/^Structure \(/, null],
+  [/^The plugin could not read some layers/, null],
+];
+
+/**
+ * [blocks] cut to [max] characters of text: the most expendable blocks are
+ * shortened first (to their first lines, or a pointer), never the code,
+ * assets or the design system.
+ */
+export function withinBudget(blocks, max) {
+  const size = () => blocks.reduce((n, b) => n + (b && b.type === 'text' ? b.text.length : 0), 0);
+  for (const [pattern, pointer] of EXPENDABLE) {
+    if (size() <= max) break;
+    const i = blocks.findIndex((b) => b && b.type === 'text' && pattern.test(b.text));
+    if (i < 0) continue;
+    const over = size() - max;
+    const t = blocks[i].text;
+    blocks[i] = text(pointer || (t.length - over > 400
+      ? `${t.slice(0, t.length - over - 120).replace(/\n[^\n]*$/, '')}\n… cut to fit the response (${t.split('\n').length} lines in all).`
+      : `${t.split('\n')[0]} (left out to fit the response)`));
+  }
+  return blocks;
+}
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
@@ -198,10 +229,17 @@ function swiftuiDetails(result, tree, catalog, pkg = false) {
       out.push(text(`The project's ${file} already declares everything this screen uses from the design system.` +
         (merged.conflicts.length ? ` It differs from the design in: ${merged.conflicts.join('; ')}.` : '')));
     } else {
-      out.push(text(`The project's ${file} lacks ${merged.added.join(', ')}. The next block is that file with them added; ` +
-        'the rest of it is unchanged, so write it over the file.' +
-        (merged.conflicts.length ? ` Kept as the project has them (they differ from the design): ${merged.conflicts.join('; ')}.` : '')));
-      out.push(text(merged.text));
+      const conflicts = merged.conflicts.length ? ` Kept as the project has them (they differ from the design): ${merged.conflicts.join('; ')}.` : '';
+      // A large file is not repeated in every response: the additions are.
+      if (merged.text.length <= DESIGN_SYSTEM_CHARS) {
+        out.push(text(`The project's ${file} lacks ${merged.added.join(', ')}. The next block is that file with them added; ` +
+          `the rest of it is unchanged, so write it over the file.${conflicts}`));
+        out.push(text(merged.text));
+      } else {
+        out.push(text(`The project's ${file} lacks ${merged.added.join(', ')}. Add the next block to it: members go into the ` +
+          `enum each comment names, other declarations at the end of the file.${conflicts}`));
+        out.push(text(merged.patch));
+      }
     }
   }
   out.push(text('The code needs iOS 17 or later (scrollTargetBehavior, contentMargins, containerRelativeFrame, sensoryFeedback, ' +
@@ -363,6 +401,7 @@ export function registerDesignTools(server, bridge, source) {
       out.push(text(`These variables and styles are used in the design:\n${JSON.stringify(vars.defs, null, 2)}`));
     }
     out.push(text({ flutter: FLUTTER_GUIDANCE, swiftui: SWIFTUI_GUIDANCE }[framework] || GUIDANCE));
+    out = withinBudget(out, RESPONSE_CHARS);
     // A node too large to render still gets its code.
     const shot = shotRead && await shotRead;
     if (shot) out.push(image(shot.png));

@@ -73,6 +73,8 @@ export function mergeDesignSystem(existing, generated) {
   let text = existing.endsWith('\n') ? existing : `${existing}\n`;
   const added = [];
   const conflicts = [];
+  // What was added, as code to paste: { enum name or null: lines or blocks }.
+  const patch = [];
   for (const block of blocks(generated)) {
     const name = declared(block);
     if (VALUE_ENUMS.includes(name)) {
@@ -80,6 +82,7 @@ export function mergeDesignSystem(existing, generated) {
       if (!new RegExp(`enum\\s+${name}\\b`).test(text)) {
         text = `${text}\n${block}\n`;
         added.push(...[...ours.keys()].map((k) => `${name}.${k}`));
+        patch.push(block);
         continue;
       }
       const theirs = members(text, name);
@@ -92,11 +95,15 @@ export function mergeDesignSystem(existing, generated) {
           conflicts.push(`${name}.${key} is ${theirs.get(key).value} in the project and ${m.value} in this screen`);
         }
       }
-      if (missing.length) text = addToEnum(text, name, missing);
+      if (missing.length) {
+        text = addToEnum(text, name, missing);
+        patch.push(`// Add to enum ${name}:\n${missing.join('\n')}`);
+      }
     } else if (!has(text, name)) {
       text = `${text}\n${block}\n`;
       added.push(name.replace(/^extension (\w+)\.(\w+)$/, '$1.$2'));
+      patch.push(block);
     }
   }
-  return { text, added, conflicts };
+  return { text, added, conflicts, patch: patch.join('\n\n') };
 }

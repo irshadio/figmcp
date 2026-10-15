@@ -303,3 +303,12 @@ test('a logo\'s text keeps its size at every text size', { skip }, () => {
   assert.match(r.code, /\.custom\("Inter-Regular", size: 13, relativeTo: \.footnote\)/);
   assert.equal(typecheck([r]), '');
 });
+
+test('additions to a design system come as a patch naming their enums', async () => {
+  const { mergeDesignSystem } = await import('../src/codegen/swiftui/design-system.js');
+  const project = 'import SwiftUI\n\nenum DesignTokens {\n  static let brand = Color(hex: 0x111111) // brand\n}\n';
+  const screen = 'import SwiftUI\n\n/// The design variables used, by their Figma names.\nenum DesignTokens {\n  static let brand = Color(hex: 0x111111) // brand\n  static let ink = Color(hex: 0x222222) // ink\n}\n';
+  const m = mergeDesignSystem(project, screen);
+  assert.deepEqual(m.added, ['DesignTokens.ink']);
+  assert.equal(m.patch, '// Add to enum DesignTokens:\n  static let ink = Color(hex: 0x222222) // ink');
+});

@@ -29,6 +29,8 @@ export function normalizeId(id) {
 export class DesignSource {
   constructor(bridge) {
     this.bridge = bridge;
+    // Node id -> why the plugin could not read it.
+    this.unread = new Map();
   }
 
   /**
@@ -37,13 +39,16 @@ export class DesignSource {
    * for the message when none does).
    */
   async live(method, params, timeout) {
-    this.lastError = null;
+    const id = params && (params.id || (params.ids && params.ids[0]));
     try {
-      return await this.bridge.call(method, params, timeout);
+      const result = await this.bridge.call(method, params, timeout);
+      if (id) this.unread.delete(id);
+      return result;
     } catch (e) {
       if (e instanceof PluginUnavailable) return null;
-      if (!READ_FALLBACK.has(method) || !(params.id || (params.ids && params.ids.length)) || !NODE_ERROR.test(e.message)) throw e;
-      this.lastError = e;
+      if (!READ_FALLBACK.has(method) || !id || !NODE_ERROR.test(e.message)) throw e;
+      // Kept by node, as reads of one node run side by side.
+      this.unread.set(id, e);
       return null;
     }
   }
@@ -70,10 +75,11 @@ export class DesignSource {
   snapshot(id, options) {
     const hit = findSnapshotNode(id, options);
     if (!hit || !hit.node) {
-      if (this.lastError) {
+      const error = this.unread.get(id);
+      if (error) {
         throw new NotFound(`Figma could not read node ${id} in the open file, and no saved snapshot contains it. ` +
           'Node ids belong to one file: check the id comes from the file open in Figma (its URL\'s node-id), and that ' +
-          `the layer was not deleted. Figma said: "${this.lastError.message}"`);
+          `the layer was not deleted. Figma said: "${error.message}"`);
       }
       throw new NotFound(`Node ${id} is not available: the Figma plugin is ` +
         'not connected and no saved snapshot contains it.');

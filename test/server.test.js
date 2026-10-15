@@ -183,3 +183,18 @@ test('a long call reports progress when the client asks for it', async (t) => {
   assert.deepEqual(sent.map((n) => [n.method, n.params.progressToken, n.params.progress]),
     [['notifications/progress', 'p1', 1], ['notifications/progress', 'p1', 2]]);
 });
+
+test('a design context response is cut to its budget from its most expendable blocks', async () => {
+  const { withinBudget } = await import('../src/tools/design.js');
+  const block = (t) => ({ type: 'text', text: t });
+  const code = block(`import SwiftUI\n${'x'.repeat(5000)}`);
+  const vars = block(`These variables and styles are used in the design:\n${'{"a": 1}\n'.repeat(2000)}`);
+  const structure = block(`Structure (what each part is):\n${'- 1:2 "Row": card\n'.repeat(400)}`);
+  const out = withinBudget([code, structure, vars, block('IMPORTANT: guidance')], 9000);
+  const total = out.reduce((n, b) => n + b.text.length, 0);
+  assert.ok(total <= 9000, String(total));
+  assert.equal(out[0], code);
+  assert.match(out[2].text, /get_variable_defs/);
+  assert.match(out[1].text, /^Structure \(/);
+  assert.equal(out[3].text, 'IMPORTANT: guidance');
+});
