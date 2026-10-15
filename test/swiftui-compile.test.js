@@ -293,3 +293,13 @@ test('a box whose text already overflows it in the design keeps its height', () 
   assert.match(r.code.slice(at), /\.frame\(height: 15\)/);
   assert.doesNotMatch(r.code.slice(at), /minHeight: 15/);
 });
+
+test('a logo\'s text keeps its size at every text size', { skip }, () => {
+  const logo = frame('Logo', { w: 118, h: 30, mode: 'HORIZONTAL', layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [{ ...text('tripora', { size: 24 }), segments: [{ ...text('tripora', { size: 24 }).segments[0], lineHeight: { unit: 'PIXELS', value: 28 } }] }] });
+  const r = generate(column('Header', [logo, text('Hi Arjun')], { h: 100 }));
+  assert.match(r.code, /\.custom\("Inter-Regular", fixedSize: 24\)/);
+  assert.match(r.code, /\.designLineHeight\(28, font: "Inter-Regular", size: 24, relativeTo: nil\)/);
+  assert.match(r.code, /\.custom\("Inter-Regular", size: 13, relativeTo: \.footnote\)/);
+  assert.equal(typecheck([r]), '');
+});

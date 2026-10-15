@@ -34,15 +34,18 @@ export function postScriptName(fontName) {
 /**
  * The Font of a run: .custom(face, size:, relativeTo:) scales with Dynamic
  * Type from the nearest text style, its face giving weight and italic;
- * .system(size:weight:) keeps its size.
+ * a logo's .custom(face, fixedSize:) and .system(size:weight:) keep their size.
  */
-export function fontOf(seg, value) {
+export function fontOf(seg, value, { fixed = false } = {}) {
   const family = seg.fontName && seg.fontName.family;
   const size = typeof seg.fontSize === 'number' ? seg.fontSize : 17;
   const vars = seg.vars || {};
   const sizeValue = value(size, vars.fontSize);
   if (family && !isSystemFamily(family)) {
-    return call('.custom', [[null, str(postScriptName(seg.fontName))], ['size', sizeValue], ['relativeTo', raw(textStyleFor(size))]]);
+    // A logo keeps its size; other text scales with its text style.
+    return fixed
+      ? call('.custom', [[null, str(postScriptName(seg.fontName))], ['fixedSize', sizeValue]])
+      : call('.custom', [[null, str(postScriptName(seg.fontName))], ['size', sizeValue], ['relativeTo', raw(textStyleFor(size))]]);
   }
   const font = call('.system', [['size', sizeValue], ['weight', raw(`.${WEIGHTS[fontWeight(seg)]}`)]]);
   return /italic|oblique/i.test((seg.fontName && seg.fontName.style) || '') ? mod(font, 'italic') : font;
@@ -193,7 +196,7 @@ export function textView(node, ctx) {
       [null, Math.round(lh * 100) / 100],
       ['font', custom ? str(postScriptName(seg.fontName)) : raw('nil')],
       ['size', seg.fontSize || 17],
-      ['relativeTo', custom ? raw(textStyleFor(seg.fontSize || 17)) : raw('nil')],
+      ['relativeTo', custom && !ctx.fixed ? raw(textStyleFor(seg.fontSize || 17)) : raw('nil')],
     ]);
   }
   for (const e of effectsOf(node, 'DROP_SHADOW')) out = mod(out, 'shadow', shadowArgs(e, ctx.color));

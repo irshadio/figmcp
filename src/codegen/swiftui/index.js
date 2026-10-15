@@ -553,6 +553,11 @@ class SwiftUIWriter {
     return runsOf(flow).filter((r) => !r.items.some((n) => input(n) || swapped(n)));
   }
 
+  /** Whether [node] is part of a logo or wordmark, whose text keeps its size at every text size. */
+  brand(node) {
+    return [...this.ancestors, node].some((n) => /\b(logo|logotype|wordmark|brand)\b/i.test(String(n.name || '')));
+  }
+
   /** Whether a nested type named [name] would shadow a type the code uses. */
   takenType(name) {
     return SWIFT_TYPE_NAMES.has(name) || name === this.structName;
@@ -897,7 +902,8 @@ class SwiftUIWriter {
     return {
       value: (v, name) => this.value(v, name),
       color: (c, o, name) => this.color(c, o, name),
-      font: (seg) => fontOf(seg, (v, name) => this.value(v, name)),
+      font: (seg) => fontOf(seg, (v, name) => this.value(v, name), { fixed: this.brand(node) }),
+      fixed: this.brand(node),
       warn: (message) => this.warn(node, message),
       textStyle: (name, font) => this.textStyle(name, font),
       helper: (name) => this.helpers.add(name),
