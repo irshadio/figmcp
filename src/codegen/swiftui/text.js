@@ -141,6 +141,7 @@ export function textView(node, ctx) {
       else runs.push({ index: 0, text: prefix });
     }
     if (!runs.length) runs.push({ index: 0, text: '' });
+    if (ctx.bind) return applied(view('', [[null, applied(call('Text', [[null, raw(ctx.bind)]]), own[0])]]), shared);
     if (runs.length === 1) return applied(view('', [[null, applied(literal(runs[0].text), own[runs[0].index])]]), shared);
     const joined = runs.map((r) => print(applied(literal(r.text), own[r.index]))).join(' + ');
     return applied(view('', [[null, raw(`(${joined})`)]]), shared);

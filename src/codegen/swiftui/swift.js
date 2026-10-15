@@ -74,13 +74,13 @@ function argList(args) {
 }
 
 /** A call: positional arguments under the label null, labelled ones by name. */
-export function call(name, args = [], { body = null, view = false } = {}) {
-  return { kind: 'call', name, args: argList(args), body, mods: [], view };
+export function call(name, args = [], { body = null, view = false, params = null } = {}) {
+  return { kind: 'call', name, args: argList(args), body, mods: [], view, params };
 }
 
-/** A view: its modifiers go on their own lines. */
-export function view(name, args = [], body = null) {
-  return call(name, args, { body, view: true });
+/** A view: its modifiers go on their own lines. [params] names the closure's parameters. */
+export function view(name, args = [], body = null, params = null) {
+  return call(name, args, { body, view: true, params });
 }
 
 /** [target] with the modifier .name(args) { body } appended. */
@@ -113,10 +113,11 @@ function printArgs(args, indent) {
   return `\n${parts.map((p) => `${pad(indent + 1)}${p}`).join(',\n')}\n${pad(indent)}`;
 }
 
-function printBody(body, indent) {
+function printBody(body, indent, params = null) {
   if (!Array.isArray(body)) return `{ ${print(body, indent)} }`;
   if (!body.length) return '{}';
-  return `{\n${body.map((b) => `${pad(indent + 1)}${print(b, indent + 1)}`).join('\n')}\n${pad(indent)}}`;
+  const open = params ? `{ ${params} in` : '{';
+  return `${open}\n${body.map((b) => `${pad(indent + 1)}${print(b, indent + 1)}`).join('\n')}\n${pad(indent)}}`;
 }
 
 function printCall(e, indent) {
@@ -124,7 +125,7 @@ function printCall(e, indent) {
   let out = e.name === '' && e.args.length === 1 && e.args[0][0] === null
     ? print(e.args[0][1], indent)
     : `${e.name}${e.args.length || !e.body ? `(${printArgs(e.args, indent)})` : ''}`;
-  if (e.body) out += `${e.args.length || e.name ? ' ' : ''}${printBody(e.body, indent)}`;
+  if (e.body) out += `${e.args.length || e.name ? ' ' : ''}${printBody(e.body, indent, e.params)}`;
   // Modifiers line up with a closing brace, else indent one level.
   const at = e.view && out.endsWith('}') ? indent : indent + 1;
   for (const m of e.mods) {

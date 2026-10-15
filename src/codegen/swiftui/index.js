@@ -4,15 +4,17 @@
 // the design's points.
 import { linearTransform, rotationOf } from '../geometry.js';
 import { inFlow, isAutoLayout, isGrid, sizingOf } from '../layout.js';
-import { drawnAsSvg, isTurned, straightLine, visibleChildren } from '../nodes.js';
+import { drawnAsSvg, hasImageFill, isTurned, straightLine, visibleChildren } from '../nodes.js';
 import { sideWeights } from '../paint.js';
 import { isPhoneScreen, minPageHeight, TALL_SCREEN, WRAPPING_PARENTS } from '../screen.js';
+import { systemUi } from '../system-ui.js';
 import { autoLineRatios, fontWeight, segmentsOf } from '../text.js';
 import { visiblePaints } from '../util.js';
 import {
   blendMode, blurs, composite, effectsOf, gradient, HELPERS, isRectangle, sColor, shadowArgs, shapeOf, swiftBlur,
 } from './paint.js';
-import { array, call, mod, print, raw, sIdent, sNum, str, sType, view } from './swift.js';
+import { baseName, fieldsOf, mergeVariants, plural, runsOf } from './repeat.js';
+import { array, call, mod, print, raw, sIdent, sNum, sString, str, sType, view } from './swift.js';
 import { fontOf, isSystemFamily, textView } from './text.js';
 
 const H_ALIGN = { MIN: 'leading', CENTER: '', MAX: 'trailing', SPACE_BETWEEN: 'leading' };
@@ -26,6 +28,31 @@ const INFINITY = raw('.infinity');
 // which keeps each expression small for the Swift type checker.
 const EXTRACT_SIZE = 10;
 const EXTRACT_TYPES = new Set(['FRAME', 'GROUP', 'INSTANCE', 'COMPONENT', 'COMPONENT_SET', 'SECTION']);
+const SWIFTUI_TYPES = new Set([
+  'Button', 'Text', 'Image', 'Label', 'Toggle', 'Map', 'Section', 'List', 'Group', 'Tab', 'Color', 'Font', 'Shape',
+  'Path', 'Grid', 'Menu', 'Link', 'Picker', 'Form', 'Divider', 'Spacer', 'Circle', 'Capsule', 'Rectangle', 'Ellipse',
+  'Gradient', 'Angle', 'Animation', 'Edge', 'Alignment', 'Axis', 'Content', 'View', 'Item', 'Date', 'Data', 'Set',
+  'Array', 'String', 'Int', 'Double', 'Error', 'Result', 'State', 'Binding', 'Environment', 'Stepper', 'Slider',
+  'Gauge', 'Table', 'Layout', 'Material', 'Badge', 'Chart',
+]);
+
+const NAMED_COLORS = { white: 'FFFFFF', black: '000000' };
+
+/** The one colour an SVG paints with, as a colour value through [color], or null. */
+function svgTint(text, color) {
+  const found = new Set();
+  for (const m of text.matchAll(/\b(?:fill|stroke)="([^"]+)"/g)) {
+    const v = m[1].toLowerCase();
+    if (v === 'none' || v.startsWith('url(')) continue;
+    const hex = NAMED_COLORS[v] || (/^#[0-9a-f]{6}$/.test(v) ? v.slice(1).toUpperCase() : null);
+    if (!hex) return null;
+    found.add(hex);
+  }
+  if (found.size !== 1 || /opacity="/.test(text)) return null;
+  const hex = [...found][0];
+  const byte = (i) => parseInt(hex.slice(i, i + 2), 16) / 255;
+  return color({ r: byte(0), g: byte(2), b: byte(4), a: 1 });
+}
 
 function clear() {
   return view('', [[null, raw('Color.clear')]]);
@@ -106,6 +133,18 @@ class SwiftUIWriter {
     this.ratios = null;
     this.screen = null;
     this.scrolls = false;
+    // Layers left out (system UI, bars drawn apart), text and image
+    // bindings of a repeated item, and what repeated items need.
+    this.skip = new Set();
+    this.bindings = new Map();
+    this.ancestors = [];
+    this.inComponent = false;
+    this.components = [];
+    this.models = [];
+    this.states = [];
+    this.lets = [];
+    this.typeNames = new Set();
+    this.memberNames = new Set();
   }
 
   warn(node, message) {
@@ -201,7 +240,7 @@ class SwiftUIWriter {
 
   /** The view for [node] in its parent's [ctx], or null when not drawn. */
   node(node, ctx) {
-    if (!node || node.visible === false || node.isMask) return null;
+    if (!node || node.visible === false || node.isMask || this.skip.has(node.id)) return null;
     const mark = this.warnings.length;
     try {
       return this.place(node, ctx);
@@ -225,21 +264,43 @@ class SwiftUIWriter {
     if (node.error) throw new Error(`the plugin could not read this layer (${node.error})`);
     const fixed = Boolean(node.svg || node.render);
     const size = this.sizeFor(node, ctx, fixed);
-    let core = this.core(node, ctx, size);
+    this.ancestors.push(node);
+    let core;
+    try {
+      core = this.core(node, ctx, size);
+    } finally {
+      this.ancestors.pop();
+    }
     if (this.actions[node.id]) {
       this.tapped = true;
       core = mod(mod(core, 'contentShape', [[null, call('Rectangle')]]), 'onTapGesture', [],
         raw(`action(${print(str(this.actions[node.id]))})`));
     }
-    if (ctx.kind !== 'root' && EXTRACT_TYPES.has(node.type) && countVisible(node) >= EXTRACT_SIZE) core = this.extract(node, core);
+    if (ctx.kind !== 'root' && !this.inComponent && EXTRACT_TYPES.has(node.type) && countVisible(node) >= EXTRACT_SIZE) core = this.extract(node, core);
     return this.wrapPlace(node, ctx, core);
+  }
+
+  /** A member name of the screen struct, unique. */
+  member(label, fallback) {
+    let name = sIdent(label, fallback);
+    for (let i = 2; this.propNames.has(name); i++) name = `${sIdent(label, fallback)}${i}`;
+    this.propNames.add(name);
+    return name;
+  }
+
+  /** A type name, unique in the file and clear of SwiftUI's own types. */
+  typeName(label) {
+    let base = sType(label, 'Item');
+    if (SWIFTUI_TYPES.has(base) || base === this.structName) base = `${base}Item`;
+    let name = base;
+    for (let i = 2; this.typeNames.has(name) || this.typeNames.has(`${name}View`); i++) name = `${base}${i}`;
+    this.typeNames.add(name);
+    return name;
   }
 
   /** A view property holding [v], referenced by name. */
   extract(node, v) {
-    let name = sIdent(node.name, 'section');
-    for (let i = 2; this.propNames.has(name); i++) name = `${sIdent(node.name, 'section')}${i}`;
-    this.propNames.add(name);
+    const name = this.member(node.name, 'section');
     this.props.push({ name, view: v, node });
     return view('', [[null, raw(name)]]);
   }
@@ -255,6 +316,7 @@ class SwiftUIWriter {
     const hugH = hugsHeight(node);
     const content = (axis) => (isAutoLayout(node) && ownSizing(node, axis) === 'HUG') || (axis === 'x' ? hugW : hugH);
     if (ctx.kind === 'root') return { w: W, h: H };
+    if (ctx.kind === 'bar') return { w: 'inf', h: !fixed && (hugH || content('y')) ? null : H };
     if (ctx.kind === 'flex') {
       const out = { w: null, h: null };
       for (const axis of ['x', 'y']) {
@@ -400,7 +462,7 @@ class SwiftUIWriter {
       this.warn(node, 'a text stroke is not drawn');
     }
     if (node.leadingTrim === 'CAP_HEIGHT') this.warn(node, 'the cap height trim is drawn as a centred line box');
-    let v = textView(node, this.textCtx(node)).view;
+    let v = textView(node, { ...this.textCtx(node), bind: this.bindings.get(node.id) || null }).view;
     if (size.w === null && size.h === null) v = mod(v, 'fixedSize');
     else if (size.h === null) v = mod(v, 'fixedSize', [['horizontal', false], ['vertical', true]]);
     const fixedBox = node.textAutoResize === 'NONE' || node.textAutoResize === 'TRUNCATE';
@@ -440,9 +502,60 @@ class SwiftUIWriter {
     return this.frame(inner, { w: size.w ?? node.width, h: size.h ?? node.height }, '.topLeading');
   }
 
+  /**
+   * The SVG to ship for a layer: { text, tile }. An icon on a tile (a frame
+   * with one colour fill around vectors) ships without the tile, which is
+   * drawn in code so its colour can change with state.
+   */
+  svgSource(node) {
+    const own = visiblePaints(node.fills);
+    if (!['FRAME', 'INSTANCE', 'COMPONENT'].includes(node.type) || own.length !== 1 || own[0].type !== 'SOLID' ||
+        visiblePaints(node.strokes).length) return { text: node.svg, tile: false };
+    const m = /^(<svg[^>]*>\s*)(<(?:path|rect)\b[^>]*\bfill="([^"]+)"[^>]*\/>\s*)/.exec(node.svg);
+    const hex = sColor(own[0].color, 1).match(/0x([0-9A-F]{6})/)[1];
+    const drawn = m && (NAMED_COLORS[m[3].toLowerCase()] || m[3].replace(/^#/, '').toUpperCase());
+    if (!m || drawn !== hex) return { text: node.svg, tile: false };
+    return { text: m[1] + node.svg.slice(m[0].length), tile: true };
+  }
+
+  /** The asset name of a layer's SVG. */
+  svgAsset(node) {
+    return this.asset(this.assets.svg(this.svgSource(node).text), 'svg', node.name, 'svg');
+  }
+
+  /** The one solid colour vector layers are painted with (fills and strokes), or null. */
+  tint(nodes) {
+    const found = [];
+    const walk = (n) => {
+      if (!n || n.visible === false) return;
+      const vars = n.vars || {};
+      visiblePaints(n.fills).forEach((p, i) => found.push({ p, v: vars[`fill.${i}`] || null }));
+      if (typeof n.strokeWeight !== 'number' || n.strokeWeight > 0) {
+        visiblePaints(n.strokes).forEach((p, i) => found.push({ p, v: vars[`stroke.${i}`] || vars.strokes || null }));
+      }
+      (n.children || []).forEach(walk);
+    };
+    nodes.forEach(walk);
+    if (!found.length || found.some(({ p }) => p.type !== 'SOLID')) return null;
+    if (new Set(found.map(({ p }) => sColor(p.color, p.opacity ?? 1))).size !== 1) return null;
+    const { p, v } = found.find((f) => f.v) || found[0];
+    return this.color(p.color, p.opacity ?? 1, v);
+  }
+
   svg(node, size) {
-    const name = this.asset(this.assets.svg(node.svg), 'svg', node.name, 'svg');
-    return this.picture(node, size, node.svgBounds, mod(view('Image', [[null, str(name)]]), 'resizable'));
+    const bound = this.bindings.get(node.id);
+    const { tile } = this.svgSource(node);
+    const name = bound ? raw(bound) : str(this.svgAsset(node));
+    // A one-colour icon is tinted in code, so its colour can change with state.
+    const tint = tile ? (this.tint(visibleChildren(node)) || svgTint(this.svgSource(node).text, (c) => this.color(c)))
+      : ['FRAME', 'INSTANCE', 'COMPONENT', 'GROUP'].includes(node.type) ? null : this.tint([node]);
+    let image = mod(view('Image', [[null, name]]), 'resizable');
+    if (tint) image = mod(mod(image, 'renderingMode', [[null, raw('.template')]]), 'foregroundStyle', [[null, tint]]);
+    if (!tile) return this.picture(node, size, node.svgBounds, image);
+    const shape = shapeOf(node, (v, n) => this.value(v, n));
+    const fill = this.fillItems(node)[0];
+    const back = mod(view('', [[null, shape]]), 'fill', [[null, fill.paint]]);
+    return this.effects(node, this.frame(view('ZStack', [], [back, image]), { w: size.w ?? node.width, h: size.h ?? node.height }));
   }
 
   render(node, size) {
@@ -495,8 +608,10 @@ class SwiftUIWriter {
       this.warn(node, 'an image fill has no image data');
       return null;
     }
-    const name = this.asset(source, 'image', node.name, this.assets.imageExt ? this.assets.imageExt(paint.imageHash) : 'png');
-    const image = view('Image', [[null, str(name)]]);
+    const bound = this.bindings.get(node.id);
+    const name = bound ? raw(bound)
+      : str(this.asset(source, 'image', node.name, this.assets.imageExt ? this.assets.imageExt(paint.imageHash) : 'png'));
+    const image = view('Image', [[null, name]]);
     const clip = (v) => (isRectangle(shape) ? mod(v, 'clipped') : mod(v, 'clipShape', [[null, shape]]));
     if (paint.rotation) this.warn(node, 'a rotated image fill is drawn unrotated');
     let layer;
@@ -632,44 +747,109 @@ class SwiftUIWriter {
   }
 
   /**
-   * A phone screen: the root fills the screen instead of keeping the
-   * design's size. The page is as tall as the screen, and on a screen too
-   * short for the layers it keeps the shortest height they fit and scrolls;
-   * the layers Figma keeps fixed when scrolling stay on top. Positions are
-   * the design's, so at the design size the result is the same.
+   * A phone screen as an app screen: the design's status bar and home
+   * indicator are left to the phone, a top bar and a bottom bar (tab bar,
+   * action footer) stay put while the rest scrolls, and layers Figma keeps
+   * fixed when scrolling float over it. On a screen shorter than the
+   * design, the page keeps the shortest height its layers fit.
    */
   screenRoot(node) {
     this.scrolls = ['VERTICAL', 'BOTH'].includes(node.overflowDirection) || node.height > TALL_SCREEN;
-    const all = node.children || [];
-    const fixedCount = isAutoLayout(node) ? 0 : Math.max(0, Math.min(node.numberOfFixedChildren || 0, all.length));
-    const fixed = new Set(all.slice(all.length - fixedCount).map((c) => c.id));
-    const children = visibleChildren(node);
-    const H = isAutoLayout(node) ? round(node.height) : minPageHeight(node, children.filter((c) => !fixed.has(c.id)));
-    const page = (v) => {
-      // The page is as wide as the screen whatever its layers' extent.
-      const wide = mod(v, 'containerRelativeFrame', [[null, raw('.horizontal')], ['alignment', raw('.topLeading')]]);
-      const sized = mod(wide, 'containerRelativeFrame', [[null, raw('.vertical')], ['alignment', raw('.topLeading')]],
-        raw(`length, _ in max(length, ${sNum(H)})`));
-      return mod(view('ScrollView', [], [sized]), 'scrollBounceBehavior', [[null, raw('.basedOnSize')]]);
+    const chrome = systemUi(node);
+    chrome.forEach((c) => this.skip.add(c.id));
+    const statusBottom = Math.max(0, ...chrome.filter((c) => c.kind === 'status bar').map((c) => c.box[1] + c.box[3]));
+    const indicator = chrome.some((c) => c.kind === 'home indicator');
+    const all = (node.children || []).filter((c) => c.visible !== false && !this.skip.has(c.id));
+    const W = node.width;
+    const H = node.height;
+    const rel = (c) => ({ top: c.y - node.y, bottom: c.y - node.y + c.height });
+    const filled = (c) => visiblePaints(c.fills).length > 0;
+    const wide = (c) => c.width >= W * 0.95;
+    const flowRoot = isAutoLayout(node);
+    const kids = flowRoot ? all.filter((c) => inFlow(c, node)) : all;
+    // A bar: a full-width layer at the top under the status bar, or at the bottom.
+    const atTop = (c) => wide(c) && c.height <= 140 && Math.abs(rel(c).top - statusBottom) <= 4 && (!flowRoot || c === kids[0]);
+    // A header on a hero (no fill of its own) pins too, taking the hero's paint once the page scrolls.
+    const topBar = kids.find((c) => atTop(c) && filled(c)) ||
+      kids.find((c) => atTop(c) && /header|app ?bar|nav|top ?bar|toolbar/i.test(c.name) && visibleChildren(c).length);
+    const hero = topBar && !filled(topBar)
+      ? all.find((c) => c !== topBar && wide(c) && rel(c).top <= rel(topBar).top && rel(c).bottom >= rel(topBar).bottom && filled(c))
+      : null;
+    const bottoms = kids.filter((c) => c !== topBar && wide(c) && c.height <= 160 && rel(c).bottom >= H - 2 &&
+      (filled(c) || /tab ?bar|footer|bottom|nav/i.test(c.name)) && (!flowRoot || c === kids[kids.length - 1]));
+    const bottomBar = bottoms.sort((a, b) => rel(b).top - rel(a).top)[0] || null;
+    const fixedCount = flowRoot ? 0 : Math.max(0, Math.min(node.numberOfFixedChildren || 0, (node.children || []).length));
+    const fixed = new Set((node.children || []).slice((node.children || []).length - fixedCount).map((c) => c.id));
+    // Floating controls pinned to the bottom (a map toggle, a button) stay over the content.
+    const floating = flowRoot ? [] : all.filter((c) => c !== bottomBar && c !== topBar && !wide(c) &&
+      ((c.constraints && c.constraints.vertical === 'MAX') || fixed.has(c.id)) && rel(c).top > H / 2);
+    const pinned = all.filter((c) => fixed.has(c.id) && c !== topBar && c !== bottomBar && !floating.includes(c));
+    const top = topBar ? rel(topBar).bottom : statusBottom;
+    // The phone keeps its own room for the home indicator under the bottom bar.
+    const inset = indicator || (bottomBar && rel(bottomBar).bottom >= H - 2 && bottomBar.height > 70) ? 34 : 0;
+    const bottom = bottomBar ? H - rel(bottomBar).top : inset;
+    // Layers drawn apart from the page: skipped there, drawn here.
+    const apart = (c, ctx) => {
+      this.skip.delete(c.id);
+      try {
+        return this.node(c, ctx);
+      } finally {
+        this.skip.add(c.id);
+      }
     };
-    let out;
-    if (isAutoLayout(node)) {
-      out = page(this.box(node, { w: 'inf', h: 'inf' }));
+    const bar = (c, cut) => {
+      let v = apart(c, { kind: 'bar', parent: node });
+      if (v && cut) v = mod(v, 'frame', [['height', round(c.height - cut)], ['alignment', raw('.top')]]);
+      return v;
+    };
+    [topBar, bottomBar, ...floating, ...pinned].forEach((c) => c && this.skip.add(c.id));
+    let page;
+    if (flowRoot) {
+      // The column without the status bar and the bars, as the content.
+      const inner = { ...node, paddingTop: Math.max(0, (node.paddingTop || 0) - statusBottom), paddingBottom: 0 };
+      page = this.box({ ...inner, fills: [], effects: [], strokes: [] }, { w: 'inf', h: null });
     } else {
-      const ctx = { kind: 'stack', parent: node };
-      const moving = children.filter((c) => !fixed.has(c.id)).map((c) => this.node(c, ctx)).filter(Boolean);
-      const pinned = children.filter((c) => fixed.has(c.id)).map((c) => this.node(c, ctx)).filter(Boolean);
-      const stack = mod(view('ZStack', [['alignment', raw('.topLeading')]], moving), 'frame', [
-        ['maxWidth', INFINITY], ['maxHeight', INFINITY], ['alignment', raw('.topLeading')],
-      ]);
-      out = this.box(node, { w: null, h: null }, {
-        content: {
-          view: page(stack), padding: null, align: null,
-          overlay: pinned.length ? view('ZStack', [['alignment', raw('.topLeading')]], pinned) : null,
-        },
-      });
+      // Positions are kept relative to the content area between the bars.
+      const area = { ...node, y: node.y + top, height: Math.max(1, H - top - bottom), fills: [], children: node.children };
+      this.screen = area;
+      const content = all.filter((c) => !this.skip.has(c.id));
+      const ctx = { kind: 'stack', parent: area };
+      const items = content.map((c) => {
+        // A background that runs to the top edge runs on under the status bar.
+        if (rel(c).top <= 0 && wide(c) && !visibleChildren(c).length) {
+          return this.node({ ...c, y: c.y - 200, height: c.height + 200 }, ctx);
+        }
+        return this.node(c, ctx);
+      }).filter(Boolean);
+      const minH = minPageHeight(area, content.map((c) => ({ ...c, y: c.y })));
+      // Layers are laid over a page of the screen's width, so none can widen it.
+      page = mod(mod(clear(), 'frame', [['maxWidth', INFINITY], ['minHeight', round(minH)]]), 'overlay', [['alignment', raw('.topLeading')]],
+        [view('ZStack', [['alignment', raw('.topLeading')]], items)]);
     }
-    return mod(out, 'ignoresSafeArea');
+    let header = topBar ? bar(topBar, 0) : null;
+    if (topBar && !filled(topBar)) {
+      // Like a pinned sliver app bar: clear over the hero, then filled once scrolled.
+      const scrolled = this.member('scrolled', 'scrolled');
+      this.states.push(`  @State private var ${scrolled} = false`);
+      page = mod(page, 'onGeometryChange', [
+        ['for', raw('Bool.self')], ['of', raw('{ $0.frame(in: .scrollView).minY < -4 }')], ['action', raw(`{ ${scrolled} = $0 }`)],
+      ]);
+      const paint = (hero && this.fillItems(hero).find((f) => f.paint)) || this.fillItems(node).find((f) => f.paint);
+      if (paint) {
+        header = mod(header, 'background', [], [mod(mod(view('', [[null, mod(view('Rectangle'), 'fill', [[null, paint.paint]])]]),
+          'opacity', [[null, raw(`${scrolled} ? 1 : 0`)]]), 'ignoresSafeArea')]);
+        header = mod(header, 'animation', [[null, raw('.easeOut(duration: 0.2)')], ['value', raw(scrolled)]]);
+      }
+    }
+    let out = mod(view('ScrollView', [], [page]), 'scrollBounceBehavior', [[null, raw('.basedOnSize')]]);
+    if (header) out = mod(out, 'safeAreaInset', [['edge', raw('.top')], ['spacing', 0]], [header]);
+    if (bottomBar) out = mod(out, 'safeAreaInset', [['edge', raw('.bottom')], ['spacing', 0]], [bar(bottomBar, inset)]);
+    const over = [...floating, ...pinned].map((c) => apart(c, { kind: 'stack', parent: { ...node, height: H - inset } })).filter(Boolean);
+    this.skip = new Set(chrome.map((c) => c.id));
+    if (over.length) out = mod(out, 'overlay', [['alignment', raw('.topLeading')]], [view('ZStack', [['alignment', raw('.topLeading')]], over)]);
+    const fill = this.fillItems(node).find((f) => f.paint);
+    if (fill) out = mod(out, 'background', [[null, fill.paint]]);
+    return out;
   }
 
   /** The children's layout: { view, padding, align, overlay } for the box to frame. */
@@ -709,14 +889,108 @@ class SwiftUIWriter {
     const mainFill = flow.some((c) => sizingOf(c, node, axis) === 'FILL');
     const mainTotal = flow.reduce((t, c) => t + size(c, axis), 0) + (between ? 0 : spacing * (flow.length - 1));
     const crossMax = Math.max(...flow.map((c) => size(c, cross)));
-    const overMain = !hugMain && !mainFill && mainTotal > availMain + 0.5;
-    const overCross = !hugCross && !crossFill.some(Boolean) && crossMax > availCross + 0.5;
+    // A frame of fixed size does not grow with what overflows it.
+    const parent = this.ancestors[this.ancestors.length - 2];
+    const grows = (a) => ownSizing(node, a) !== 'FIXED' || !parent || Boolean(this.screen && parent.id === this.screen.id);
+    const overMain = !hugMain && !mainFill && grows(axis) && mainTotal > availMain + 0.5;
+    const overCross = !hugCross && !crossFill.some(Boolean) && grows(cross) && crossMax > availCross + 0.5;
     if (!overMain && !overCross) return v;
     // On an axis the frame hugs, the box keeps the design's size.
     const inner = { x: round(node.width - left - right), y: round(node.height - top - bottom) };
     const hugged = (a) => (a === axis ? hugMain : hugCross);
     const box = this.frame(clear(), { w: hugged('x') ? inner.x : null, h: hugged('y') ? inner.y : null });
     return mod(box, 'overlay', align && align !== '.center' ? [['alignment', raw(align)]] : [], [v]);
+  }
+
+  /**
+   * A run of layers built the same way as a ForEach over data: a model
+   * struct with what differs between them, a view struct drawn from the
+   * first, and when one item is drawn differently, a selection state.
+   * Null when the items differ in more than values.
+   */
+  repeated(items, ctx, spread) {
+    const fields = fieldsOf(items);
+    const idents = new Set();
+    for (const f of fields) {
+      let id = sIdent(f.name || f.role, f.kind);
+      for (let i = 2; idents.has(id); i++) id = `${sIdent(f.name || f.role, f.kind)}${i}`;
+      idents.add(id);
+      f.ident = id;
+    }
+    const acts = items.map((n) => this.actions[n.id] || '');
+    const varied = new Set(acts).size > 1;
+    const render = (n) => {
+      const index = items.indexOf(n);
+      const saved = { actions: this.actions, inComponent: this.inComponent };
+      for (const f of fields) this.bindings.set(f.nodes[index].id, `item.${f.ident}`);
+      this.actions = {};
+      this.inComponent = true;
+      try {
+        return print(this.node(n, ctx), 2);
+      } finally {
+        Object.assign(this, saved);
+        for (const f of fields) this.bindings.delete(f.nodes[index].id);
+      }
+    };
+    const codes = items.map(render);
+    const kinds = [...new Set(codes)];
+    if (process.env.DEBUG_RUNS && kinds.length > 1) console.error("RUN", items.map((n) => n.name).join(","), kinds.length, kinds.map((k) => k.slice(0, 1500)).join("\n=====\n"));
+    let body;
+    let selected = -1;
+    if (kinds.length === 1) body = codes[0];
+    else if (kinds.length === 2) {
+      const counts = kinds.map((k) => codes.filter((c) => c === k).length);
+      const odd = counts[0] === 1 ? 0 : counts[1] === 1 ? 1 : -1;
+      if (odd < 0) return null;
+      selected = codes.indexOf(kinds[odd]);
+      body = mergeVariants(kinds[odd], kinds[1 - odd]);
+      if (!body) {
+        const indent = (code) => code.split('\n').map((l, i) => (i ? `  ${l}` : l)).join('\n');
+        body = `if isSelected {\n      ${indent(kinds[odd])}\n    } else {\n      ${indent(kinds[1 - odd])}\n    }`;
+      }
+    } else return null;
+    // Values, with the asset name of each image.
+    for (const f of fields) {
+      if (f.kind === 'icon') f.values = f.nodes.map((n) => this.svgAsset(n));
+      if (f.kind === 'image') {
+        f.values = f.nodes.map((n) => {
+          const p = n.fills.find((x) => x && x.visible !== false && x.type === 'IMAGE');
+          const source = this.assets.image(p.imageHash);
+          return source ? this.asset(source, 'image', n.name, this.assets.imageExt ? this.assets.imageExt(p.imageHash) : 'png') : '';
+        });
+      }
+    }
+    const label = baseName(items, this.ancestors);
+    const model = fields.length || varied ? this.typeName(label) : null;
+    const viewName = model ? `${model}View` : `${this.typeName(label)}View`;
+    this.typeNames.add(viewName);
+    const props = [...(model ? [`  let item: ${model}`] : []), ...(selected >= 0 ? ['  var isSelected = false'] : [])];
+    this.components.push([`struct ${viewName}: View {`, ...props, '', '  var body: some View {', `    ${body}`, '  }', '}'].join('\n'));
+    let data = null;
+    if (model) {
+      const members = [...fields.map((f) => `  let ${f.ident}: String`), ...(varied ? ['  let action: String'] : [])];
+      this.models.push([`struct ${model}: Hashable {`, ...members, '}'].join('\n'));
+      data = this.member(plural(sIdent(label, 'item')), 'items');
+      const rows = items.map((n, i) => `    ${model}(${[
+        ...fields.map((f) => `${f.ident}: ${sString(f.values[i])}`), ...(varied ? [`action: ${sString(acts[i])}`] : []),
+      ].join(', ')}),`);
+      this.lets.push([`  private let ${data}: [${model}] = [`, ...rows, '  ]'].join('\n'));
+    }
+    let state = null;
+    if (selected >= 0) {
+      state = this.member(`selected ${label}`, 'selected');
+      this.states.push(`  @State private var ${state} = ${selected}`);
+    }
+    const tap = [state ? `${state} = index` : null, varied ? 'action(item.action)' : acts[0] ? `action(${sString(acts[0])})` : null]
+      .filter(Boolean).join('; ');
+    if (tap.includes('action(')) this.tapped = true;
+    let item = view(viewName, [...(model ? [['item', raw('item')]] : []), ...(state ? [['isSelected', raw(`index == ${state}`)]] : [])]);
+    if (tap) item = mod(mod(item, 'contentShape', [[null, call('Rectangle')]]), 'onTapGesture', [], raw(tap));
+    const indexed = state || spread;
+    const body_ = [...(spread ? [raw('if index > 0 { Spacer(minLength: 0) }')] : []), item];
+    if (!model) return view('ForEach', [[null, raw(`0..<${items.length}`)], ['id', raw('\\.self')]], body_, indexed ? 'index' : '_');
+    if (indexed) return view('ForEach', [[null, raw(`Array(${data}.enumerated())`)], ['id', raw('\\.offset')]], body_, 'index, item');
+    return view('ForEach', [[null, raw(data)], ['id', raw('\\.self')]], body_, 'item');
   }
 
   flex(node, children) {
@@ -734,29 +1008,66 @@ class SwiftUIWriter {
     const ctx = { kind: 'flex', parent: node, axis, hugMain };
     let v;
     if (node.layoutWrap === 'WRAP') {
-      const items = flow.map((c) => this.node(c, { kind: 'wrap', parent: node })).filter(Boolean);
+      const wctx = { kind: 'wrap', parent: node };
+      const runs = this.inComponent ? [] : runsOf(flow);
+      const items = [];
+      for (let i = 0; i < flow.length; i++) {
+        const run = runs.find((r) => r.start === i);
+        const group = run && this.repeated(run.items, wctx, false);
+        if (group) {
+          items.push(group);
+          i += run.items.length - 1;
+        } else items.push(this.node(flow[i], wctx));
+      }
       if (!row) this.warn(node, 'a vertical wrap is drawn as rows');
       if (node.primaryAxisAlignItems && node.primaryAxisAlignItems !== 'MIN') this.warn(node, 'wrapped rows are drawn start aligned');
       this.helpers.add('flow');
       v = view('FlowLayout', [
         ['spacing', spacing > 0 && !between ? this.value(spacing, vars.itemSpacing) : null],
         ['lineSpacing', node.counterAxisSpacing ? this.value(node.counterAxisSpacing, vars.counterAxisSpacing) : null],
-      ], items);
+      ], items.filter(Boolean));
     } else {
       const [top, right, bottom, left] = this.paddingValues(node);
       const availCross = row ? node.height - top - bottom : node.width - left - right;
       const crossAt = { CENTER: '', MAX: row ? 'bottom' : 'trailing' }[node.counterAxisAlignItems] ?? (row ? 'top' : 'leading');
-      let items = flow.map((c) => {
+      const spread = between && !hugMain && flow.length > 1;
+      const one = (c) => {
         const item = this.node(c, ctx);
         const extent = (row ? c.height : c.width) || 0;
         if (!item || hugCross || sizingOf(c, node, cross) === 'FILL' || extent <= availCross + 0.5) return item;
-        // A child larger than the stack across overflows it, as in Figma,
-        // instead of widening the stack.
+        // A frame of fixed size does not grow with what overflows it, unless
+        // the screen stretches it.
+        const parent = this.ancestors[this.ancestors.length - 2];
+        if (ownSizing(node, cross) === 'FIXED' && parent && !(this.screen && parent.id === this.screen.id)) return item;
+        // A row wider than its column scrolls sideways.
+        if (!row && c.layoutMode === 'HORIZONTAL') {
+          const scroller = mod(view('ScrollView', [[null, raw('.horizontal')], ['showsIndicators', false]], [item]), 'frame', [['height', round(c.height)]]);
+          // A scroll view would report its content's width to the layout: it is as wide as the column.
+          return this.screen && node.width >= this.screen.width * 0.95
+            ? mod(scroller, 'containerRelativeFrame', [[null, raw('.horizontal')]])
+            : mod(scroller, 'frame', [['width', round(availCross)]]);
+        }
+        // Another child larger than the stack across overflows it, as in
+        // Figma, instead of widening the stack.
         const box = this.frame(clear(), row ? { w: round(c.width), h: null } : { w: null, h: round(c.height) });
         return mod(box, 'overlay', crossAt ? [['alignment', raw(`.${crossAt}`)]] : [], [item]);
-      }).filter(Boolean);
-      const spread = between && !hugMain && items.length > 1;
-      if (spread) items = items.flatMap((item, i) => (i ? [view('Spacer', [['minLength', 0]]), item] : [item]));
+      };
+      let items = [];
+      const runs = this.inComponent ? [] : runsOf(flow);
+      for (let i = 0; i < flow.length; i++) {
+        const run = runs.find((r) => r.start === i);
+        const group = run && this.repeated(run.items, ctx, spread);
+        if (group) {
+          if (spread && items.length) items.push(view('Spacer', [['minLength', 0]]));
+          items.push(group);
+          i += run.items.length - 1;
+          continue;
+        }
+        const item = one(flow[i]);
+        if (!item) continue;
+        if (spread && items.length) items.push(view('Spacer', [['minLength', 0]]));
+        items.push(item);
+      }
       if (spacing < 0 && node.itemReverseZIndex) this.warn(node, 'the first child is drawn under the next ones, not above');
       const align = (row ? ROW_ALIGN : COLUMN_ALIGN)[node.counterAxisAlignItems];
       v = view(row ? 'HStack' : 'VStack', [
@@ -810,6 +1121,9 @@ export function toSwiftUI(root, assets, options = {}) {
   writer.ratios = autoLineRatios(root);
   const rootNode = { ...root, x: root.x ?? 0, y: root.y ?? 0 };
   const screen = options.screen ?? isPhoneScreen(rootNode);
+  const structName = options.structName || sType(root.name, 'Design');
+  writer.structName = structName;
+  writer.typeNames.add(structName);
   let tree = null;
   if (screen) {
     writer.screen = rootNode;
@@ -818,23 +1132,29 @@ export function toSwiftUI(root, assets, options = {}) {
     } catch (e) {
       writer.warnings.push({ id: root.id, name: root.name, message: `drawn at its design size: ${e.message}` });
       writer.screen = null;
-      writer.props = [];
+      Object.assign(writer, {
+        props: [], skip: new Set(), components: [], models: [], states: [], lets: [], propNames: new Set(['body']),
+      });
     }
   }
   tree = tree || writer.node(rootNode, { kind: 'root' }) || view('EmptyView');
-  const structName = options.structName || sType(root.name, 'Design');
   const lines = [
     'import SwiftUI',
     '',
     ...[...writer.connected.values()].map((m) => `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`),
     ...(writer.connected.size ? [''] : []),
     `struct ${structName}: View {`,
-    ...(writer.tapped ? ['  var action: (String) -> Void = { _ in }', ''] : []),
+    ...(writer.tapped ? ['  var action: (String) -> Void = { _ in }'] : []),
+    ...writer.states,
+    ...(writer.tapped || writer.states.length ? [''] : []),
     '  var body: some View {',
     `    ${print(tree, 2)}`,
     '  }',
     ...writer.props.flatMap((p) => ['', printProperty(p)]),
+    ...writer.lets.flatMap((l) => ['', l]),
     '}',
+    ...writer.components.flatMap((c) => ['', c]),
+    ...writer.models.flatMap((m) => ['', m]),
   ];
   if (options.preview !== false) lines.push('', '#Preview {', `  ${structName}()`, '}');
   if (writer.textStyles.size) {
