@@ -12,8 +12,8 @@ const ALIGN = { CENTER: '.center', RIGHT: '.trailing' };
 // Line height over font size of a font with no measured AUTO line.
 const DEFAULT_RATIO = 1.21;
 const SYSTEM_FAMILY = /^(\.?SF Pro( (Text|Display|Rounded))?|SF Compact.*|\.?SF UI.*|San Francisco|System)$/i;
-// Characters a string literal would read as Markdown.
-const MARKDOWN = /[*_~`[\]\\]/;
+// What a string literal would read as Markdown or a link.
+const MARKDOWN = /[*_~`[\]\\]|\S@\S|:\/\/|www\./;
 
 /** Whether the family is Apple's system font. */
 export function isSystemFamily(family) {

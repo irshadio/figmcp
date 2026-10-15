@@ -106,7 +106,7 @@ function familyFiles(family, files) {
   return chosen.filter((f) => !seen.has(f.stem) && seen.add(f.stem)).map((f) => f.file);
 }
 
-async function fetchGoogleFont(family) {
+export async function fetchGoogleFont(family) {
   const dir = path.join(FONT_CACHE, family.replace(/[^A-Za-z0-9]+/g, '_'));
   if (fs.existsSync(dir) && fs.readdirSync(dir).length) return;
   const weights = [100, 200, 300, 400, 500, 600, 700, 800, 900];

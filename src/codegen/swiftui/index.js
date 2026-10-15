@@ -85,9 +85,11 @@ function padded(v, [top, right, bottom, left]) {
 }
 
 class SwiftUIWriter {
-  constructor(assets, { connect = null } = {}) {
+  constructor(assets, { connect = null, actions = null } = {}) {
     this.assets = assets;
     this.connect = connect;
+    this.actions = actions || {};
+    this.tapped = false;
     this.files = new Map();
     this.names = new Map();
     this.fonts = new Map();
@@ -224,6 +226,11 @@ class SwiftUIWriter {
     const fixed = Boolean(node.svg || node.render);
     const size = this.sizeFor(node, ctx, fixed);
     let core = this.core(node, ctx, size);
+    if (this.actions[node.id]) {
+      this.tapped = true;
+      core = mod(mod(core, 'contentShape', [[null, call('Rectangle')]]), 'onTapGesture', [],
+        raw(`action(${print(str(this.actions[node.id]))})`));
+    }
     if (ctx.kind !== 'root' && EXTRACT_TYPES.has(node.type) && countVisible(node) >= EXTRACT_SIZE) core = this.extract(node, core);
     return this.wrapPlace(node, ctx, core);
   }
@@ -736,7 +743,18 @@ class SwiftUIWriter {
         ['lineSpacing', node.counterAxisSpacing ? this.value(node.counterAxisSpacing, vars.counterAxisSpacing) : null],
       ], items);
     } else {
-      let items = flow.map((c) => this.node(c, ctx)).filter(Boolean);
+      const [top, right, bottom, left] = this.paddingValues(node);
+      const availCross = row ? node.height - top - bottom : node.width - left - right;
+      const crossAt = { CENTER: '', MAX: row ? 'bottom' : 'trailing' }[node.counterAxisAlignItems] ?? (row ? 'top' : 'leading');
+      let items = flow.map((c) => {
+        const item = this.node(c, ctx);
+        const extent = (row ? c.height : c.width) || 0;
+        if (!item || hugCross || sizingOf(c, node, cross) === 'FILL' || extent <= availCross + 0.5) return item;
+        // A child larger than the stack across overflows it, as in Figma,
+        // instead of widening the stack.
+        const box = this.frame(clear(), row ? { w: round(c.width), h: null } : { w: null, h: round(c.height) });
+        return mod(box, 'overlay', crossAt ? [['alignment', raw(`.${crossAt}`)]] : [], [item]);
+      }).filter(Boolean);
       const spread = between && !hugMain && items.length > 1;
       if (spread) items = items.flatMap((item, i) => (i ? [view('Spacer', [['minLength', 0]]), item] : [item]));
       if (spacing < 0 && node.itemReverseZIndex) this.warn(node, 'the first child is drawn under the next ones, not above');
@@ -784,6 +802,8 @@ function printProperty(p) {
  * instance, or null. [screen] draws the root as a phone screen (it fills
  * the screen and tall frames scroll); by default portrait frames of a
  * phone's width are screens. [preview] adds a #Preview (default true).
+ * [actions] maps node ids to names: tapping that layer calls the view's
+ * `action` closure with the name.
  */
 export function toSwiftUI(root, assets, options = {}) {
   const writer = new SwiftUIWriter(assets, options);
@@ -809,6 +829,7 @@ export function toSwiftUI(root, assets, options = {}) {
     ...[...writer.connected.values()].map((m) => `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`),
     ...(writer.connected.size ? [''] : []),
     `struct ${structName}: View {`,
+    ...(writer.tapped ? ['  var action: (String) -> Void = { _ in }', ''] : []),
     '  var body: some View {',
     `    ${print(tree, 2)}`,
     '  }',

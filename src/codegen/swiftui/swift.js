@@ -49,7 +49,10 @@ export function sIdent(name, fallback = 'value') {
 
 /** UpperCamelCase type name. */
 export function sType(name, fallback = 'Design') {
-  const w = words(name);
+  // Leading numbers ('01 Home') are ordering, not part of the name.
+  const all = words(name);
+  const named = all.findIndex((x) => !/^[0-9]+$/.test(x));
+  const w = named > 0 ? all.slice(named) : all;
   let out = w.map((x) => x[0].toUpperCase() + x.slice(1)).join('');
   if (!out) out = fallback;
   if (/^[0-9]/.test(out)) out = `${fallback}${out}`;
