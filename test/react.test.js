@@ -200,7 +200,7 @@ test('phone frames are screens: they fill the viewport, stretch their sections a
   const out = gen(phone);
   assert.equal(out.screen, true);
   assert.equal(out.scrolls, false);
-  assert.match(out.code, /className="relative w-full max-w-\[480px\] mx-auto min-h-\[max\(100dvh,\d+(\.\d+)?px\)\]" data-name="Home"/);
+  assert.match(out.code, /className="relative w-full max-w-\[480px\] mx-auto min-h-\[max\(100dvh,\d+(\.\d+)?px\)\] antialiased" data-name="Home"/);
   assert.match(out.code, /absolute left-4 right-4 top-\[100px\] h-\[200px\]" data-name="Hero"/, 'a centred section stretches');
   assert.match(out.code, /absolute left-\[300px\] w-10 top-80 h-5" data-name="Badge"/);
   assert.match(out.code, /relative shrink-0 w-full max-w-\[340px\] h-10[^"]*" data-name="Row"/, 'a fixed width may shrink to the column');
@@ -223,8 +223,8 @@ test('phone frames are screens: they fill the viewport, stretch their sections a
   assert.equal(rows.warnings.length, 3);
   assert.doesNotMatch(code({ ...phone, width: 1440, height: 1024, children: phone.children.slice(2, 3) }), /overflow-x-auto/, 'only phones scroll rows');
   // screen: false turns the mode off; desktop frames are web pages.
-  assert.match(code({ ...phone, width: 1440, height: 1024 }), /className="relative w-full min-w-\[1440px\] h-\[1024px\]"/);
-  assert.match(code(phone, { screen: false }), /className="relative w-\[390px\] h-\[844px\]"/);
+  assert.match(code({ ...phone, width: 1440, height: 1024 }), /className="relative w-full min-w-\[1440px\] h-\[1024px\] antialiased"/);
+  assert.match(code(phone, { screen: false }), /className="relative w-\[390px\] h-\[844px\] antialiased"/);
 });
 
 test('assets are named after their layers in the asset folder', () => {
@@ -330,7 +330,7 @@ test('corpus findings: rounded text heights, rows over padding, picture roots', 
   assert.match(code(cabin), /max-\[327px\]:max-w-full max-\[327px\]:overflow-x-auto[^"]*" data-name="Row"/);
   // A root shipped as one image is a picture, not a screen.
   const picture = { id: '15:1', name: 'Preview', type: 'FRAME', x: 0, y: 0, width: 390, height: 722, render: { base64: 'x' }, rasterized: 'rotation', children: [] };
-  assert.match(code(picture), /className="relative w-\[390px\] h-\[722px\]"/);
+  assert.match(code(picture), /className="relative w-\[390px\] h-\[722px\] antialiased"/);
 });
 
 test('three or more siblings that differ only in content become data and a .map()', () => {
@@ -368,7 +368,7 @@ test('HTML + Tailwind is the same markup as a static page', () => {
   const data = JSON.parse(fs.readFileSync(new URL('./fixtures/sample-export.json', import.meta.url)));
   const files = { svg: () => '/disk/a.svg', image: () => '/disk/p.png' };
   const out = toHtmlTailwind(data.frames[0].tree, files, { assetDir: 'assets/figma' });
-  assert.match(out.code, /^<!-- SampleScreen -->\n<div class="relative w-\[200px\] h-\[120px\] flex flex-col gap-2[^"]*" data-name="Sample Screen" data-node-id="10:1">/);
+  assert.match(out.code, /^<!-- SampleScreen -->\n<div class="relative w-\[200px\] h-\[120px\] antialiased flex flex-col gap-2[^"]*" data-name="Sample Screen" data-node-id="10:1">/);
   assert.match(out.code, /<p class="[^"]*" data-name="Title" data-node-id="10:2">Hello \{you\}<\/p>/, 'text sits inline, unescaped braces');
   assert.match(out.code, /<img alt="" class="block max-w-none size-full" src="assets\/figma\/arrow.svg">/);
   assert.match(out.code, /<div aria-hidden="true" class="[^"]*"><\/div>/, 'no self-closing divs');
@@ -397,7 +397,7 @@ test('desktop frames are web pages: full-width sections stretch, the rest stays 
   let svg = '';
   const out = toReactTailwind(page, { ...assets, svg: (s) => { svg = s; return '/disk/a.svg'; } });
   assert.equal(out.page, true);
-  assert.match(out.code, /className="relative w-full min-w-\[1440px\] h-\[900px\] overflow-clip" data-name="Landing"/);
+  assert.match(out.code, /className="relative w-full min-w-\[1440px\] h-\[900px\] antialiased overflow-clip" data-name="Landing"/);
   assert.match(out.code, /className="absolute left-0 right-0 top-0 h-\[400px\]" data-name="Hero"/);
   assert.match(out.code, /className="absolute left-0 right-0 top-0 h-\[400px\]" data-name="Backdrop"/, 'a layer spanning a stretched section stretches');
   assert.match(svg, /^<svg preserveAspectRatio="none" width="1440"\/>/, 'and its vector fills the box');
@@ -405,7 +405,7 @@ test('desktop frames are web pages: full-width sections stretch, the rest stays 
   assert.match(out.code, /pl-\[max\(120px,calc\(50%-600px\)\)\] pr-\[max\(120px,calc\(50%-600px\)\)\][^"]*" data-name="Nav"/);
   assert.match(out.code, /left-\[calc\(50%-600px\)\] w-\[300px\][^"]*" data-name="Card"/, 'scale constraints join the column too');
   assert.doesNotMatch(out.code, /Off canvas/, 'a layer outside a clipping page never shows');
-  assert.match(code(page, { page: false }), /className="relative w-\[1440px\] h-\[900px\] overflow-clip"/);
+  assert.match(code(page, { page: false }), /className="relative w-\[1440px\] h-\[900px\] antialiased overflow-clip"/);
 });
 
 test('apps keep their layout fluid; colliding variable names and failed runs are handled', () => {

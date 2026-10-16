@@ -628,7 +628,7 @@ class Writer {
     const empty = (isAutoLayout(node) || isGrid(node)) && !visibleChildren(node).some((c) => inFlow(c, node));
     const pos = opts.inner || (parent ? positionClasses(node, parent, {
       ...opts, fixedSize: Boolean(node.svg || node.render) || empty,
-    }) : this.rootClasses(node));
+    }) : [...this.rootClasses(node), 'antialiased']);
 
     const mapping = node.type === 'INSTANCE' && this.connect ? this.connect(node) : null;
     if (mapping) {
@@ -729,7 +729,6 @@ class Writer {
     this.close(depth, tag);
   }
 
-  /** The root's box: the design's size, or on a phone screen the screen's. */
   /**
    * Where a layer of a web page goes: across the page when it spans the
    * design's width (and the same inside it), else in the centred column,
@@ -778,6 +777,11 @@ class Writer {
     return { indent: `max(0px,calc(50%-${px(room / 2)}))` };
   }
 
+  /**
+   * The root's box: the design's size, or on a phone screen the screen's.
+   * The root also draws text with grayscale smoothing, as Figma does (macOS
+   * browsers otherwise thicken it).
+   */
   rootClasses(node) {
     if (this.page) {
       // The page fills the viewport and is never narrower than the design.
