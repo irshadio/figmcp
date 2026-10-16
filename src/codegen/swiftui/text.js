@@ -19,12 +19,22 @@ export function isSystemFamily(family) {
   return SYSTEM_FAMILY.test(String(family || ''));
 }
 
+/** The key of a face in a face map: family and style without case, spaces or punctuation. */
+export function faceKey(family, style) {
+  const plain = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return `${plain(family)}|${plain(style)}`;
+}
+
 /**
- * The PostScript name of a font face by the usual naming ("Inter" "Semi
- * Bold Italic" -> "Inter-SemiBoldItalic"): iOS finds a custom face by it,
- * while a family name alone may pick any face of the family.
+ * The PostScript name of a font face: iOS finds a custom face by it, while a
+ * family name alone may pick any face of the family. [faces] maps
+ * faceKey()s to the names read from the font files at hand; without an
+ * entry the usual naming is assumed ("Inter" "Semi Bold Italic" ->
+ * "Inter-SemiBoldItalic").
  */
-export function postScriptName(fontName) {
+export function postScriptName(fontName, faces = null) {
+  const known = faces && faces.get(faceKey(fontName.family, fontName.style || 'Regular'));
+  if (known) return known;
   const family = String(fontName.family || '').replace(/[^A-Za-z0-9]+/g, '');
   let style = String(fontName.style || 'Regular').replace(/[^A-Za-z0-9]+/g, '');
   if (/^RegularItalic$/i.test(style)) style = 'Italic';
@@ -36,7 +46,7 @@ export function postScriptName(fontName) {
  * Type from the nearest text style, its face giving weight and italic;
  * a logo's .custom(face, fixedSize:) and .system(size:weight:) keep their size.
  */
-export function fontOf(seg, value, { fixed = false } = {}) {
+export function fontOf(seg, value, { fixed = false, faces = null } = {}) {
   const family = seg.fontName && seg.fontName.family;
   const size = typeof seg.fontSize === 'number' ? seg.fontSize : 17;
   const vars = seg.vars || {};
@@ -44,8 +54,8 @@ export function fontOf(seg, value, { fixed = false } = {}) {
   if (family && !isSystemFamily(family)) {
     // A logo keeps its size; other text scales with its text style.
     return fixed
-      ? call('.custom', [[null, str(postScriptName(seg.fontName))], ['fixedSize', sizeValue]])
-      : call('.custom', [[null, str(postScriptName(seg.fontName))], ['size', sizeValue], ['relativeTo', raw(textStyleFor(size))]]);
+      ? call('.custom', [[null, str(postScriptName(seg.fontName, faces))], ['fixedSize', sizeValue]])
+      : call('.custom', [[null, str(postScriptName(seg.fontName, faces))], ['size', sizeValue], ['relativeTo', raw(textStyleFor(size))]]);
   }
   const font = call('.system', [['size', sizeValue], ['weight', raw(`.${WEIGHTS[fontWeight(seg)]}`)]]);
   return /italic|oblique/i.test((seg.fontName && seg.fontName.style) || '') ? mod(font, 'italic') : font;
@@ -135,7 +145,7 @@ export function textView(node, ctx) {
     !(seg0.textCase === 'SMALL_CAPS' || seg0.textCase === 'SMALL_CAPS_FORCED');
   if (half) {
     if (ctx.helper) ctx.helper('designFont');
-    shared.font = ['designFont', [[null, str(postScriptName(seg0.fontName))], ['size', ctx.value(seg0.fontSize, (seg0.vars || {}).fontSize)],
+    shared.font = ['designFont', [[null, str(postScriptName(seg0.fontName, ctx.faces))], ['size', ctx.value(seg0.fontSize, (seg0.vars || {}).fontSize)],
       ['relativeTo', raw(textStyleFor(seg0.fontSize))]]];
   } else if (shared.font && segs[0].textStyle && segs.every((s) => s.textStyle === segs[0].textStyle) && ctx.textStyle) {
     const ref = ctx.textStyle(segs[0].textStyle, shared.font[1][0][1]);
@@ -206,7 +216,7 @@ export function textView(node, ctx) {
     const custom = family && !isSystemFamily(family);
     out = mod(out, 'designLineHeight', [
       [null, Math.round(lh * 100) / 100],
-      ['font', custom ? str(postScriptName(seg.fontName)) : raw('nil')],
+      ['font', custom ? str(postScriptName(seg.fontName, ctx.faces)) : raw('nil')],
       ['size', seg.fontSize || 17],
       ['relativeTo', custom && !ctx.fixed ? raw(textStyleFor(seg.fontSize || 17)) : raw('nil')],
     ]);

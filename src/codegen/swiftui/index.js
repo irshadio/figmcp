@@ -299,11 +299,12 @@ function withoutSystemUi(c, screen, chrome) {
 }
 
 class SwiftUIWriter {
-  constructor(assets, { connect = null, actions = null, probe = false, variableModes = null, exactLineHeights = true } = {}) {
+  constructor(assets, { connect = null, actions = null, probe = false, variableModes = null, exactLineHeights = true, fontFaces = null } = {}) {
     this.assets = assets;
     this.probe = Boolean(probe);
     this.variableModes = variableModes;
     this.exactLineHeights = exactLineHeights;
+    this.faces = fontFaces;
     // In check mode: an item layer's id -> the first item's id, and
     // "index#first id" -> the layer, for the check to read item boxes back.
     this.probeAlias = new Map();
@@ -552,11 +553,18 @@ class SwiftUIWriter {
     return raw(`AppFonts.${ident}`);
   }
 
-  /** [v] framed to [size] ({ w, h }: a number, 'inf' or null), aligned by [alignment]. */
-  frame(v, size, alignment = null) {
+  /**
+   * [v] framed to [size] ({ w, h }: a number, 'inf' or null), aligned by
+   * [alignment]. A [clips] frame takes the room offered even when its
+   * content is larger, as Figma's clipping frames keep their size.
+   */
+  frame(v, size, alignment = null, clips = false) {
     const args = [];
     const axis = (key, max, s) => {
-      if (s === 'inf') args.push([max, INFINITY]);
+      if (s === 'inf') {
+        if (clips) args.push([`min${key[0].toUpperCase()}${key.slice(1)}`, 0]);
+        args.push([max, INFINITY]);
+      }
       else if (typeof s === 'number') args.push([key, round(s)]);
       else if (s && s.kind === 'raw') args.push([key, s]);
       else if (s && typeof s.min === 'number') args.push([`min${key[0].toUpperCase()}${key.slice(1)}`, round(s.min)]);
@@ -1095,7 +1103,8 @@ class SwiftUIWriter {
     return {
       value: (v, name) => this.value(v, name),
       color: (c, o, name) => this.color(c, o, name),
-      font: (seg) => fontOf(seg, (v, name) => this.value(v, name), { fixed: this.brand(node) }),
+      font: (seg) => fontOf(seg, (v, name) => this.value(v, name), { fixed: this.brand(node), faces: this.faces }),
+      faces: this.faces,
       fixed: this.brand(node),
       warn: (message) => this.warn(node, message),
       textStyle: (name, font) => this.textStyle(name, font),
@@ -1104,15 +1113,31 @@ class SwiftUIWriter {
     };
   }
 
+  /** [v] with [node]'s text stroke: Figma strokes outside the glyphs, or half outside when centred. */
+  textStroke(node, v) {
+    const paints = visiblePaints(node.strokes);
+    if (!paints.length || typeof node.strokeWeight !== 'number' || node.strokeWeight <= 0) return v;
+    const top = paints[paints.length - 1];
+    const align = node.strokeAlign || 'OUTSIDE';
+    if (top.type !== 'SOLID' || align === 'INSIDE') {
+      this.warn(node, `a text stroke ${top.type !== 'SOLID' ? 'that is not a solid colour' : 'inside the glyphs'} is not drawn`);
+      return v;
+    }
+    if (paints.length > 1) this.warn(node, 'only the top text stroke paint is drawn');
+    if (align === 'CENTER') this.warn(node, 'a centred text stroke is drawn outside the glyphs, at half its weight');
+    const vars = node.vars || {};
+    const paint = this.color(top.color, top.opacity ?? 1, vars[`stroke.${node.strokes.indexOf(top)}`] || vars.strokes);
+    this.helpers.add('textStroke');
+    return mod(v, 'textStroke', [[null, paint], ['width', round(align === 'CENTER' ? node.strokeWeight / 2 : node.strokeWeight)]]);
+  }
+
   text(node, size, ctx = {}) {
     const segs = segmentsOf(node);
     segs.forEach((seg) => this.font(seg));
-    if (visiblePaints(node.strokes).length && typeof node.strokeWeight === 'number' && node.strokeWeight > 0) {
-      this.warn(node, 'a text stroke is not drawn');
-    }
     let v = textView(node, { ...this.textCtx(node), bind: this.bindings.get(node.id) || null }).view;
     const input = !this.inComponent && this.inputs.get(node.id);
     if (input) v = this.textInput(node, input, v);
+    else v = this.textStroke(node, v);
     // A control's label stays on one line (a scale factor would let stacks
     // shrink it before its siblings); other text wraps and grows with Dynamic Type.
     const roles = this.ancestors.map((a) => this.roleOf(a));
@@ -1427,7 +1452,7 @@ class SwiftUIWriter {
         // over a box of its size, so a large or far one cannot stretch the
         // layers that fill.
         v = this.layers(this.layerBox(node, size), v.body);
-      } else v = this.frame(v, grows ? { ...size, h: { min: size.h } } : size, content.align);
+      } else v = this.frame(v, grows ? { ...size, h: { min: size.h } } : size, content.align, node.clipsContent);
       if (node.clipsContent) {
         // Figma clips the children, not the frame's own fills and shadows.
         const topLeading = [['alignment', raw('.topLeading')]];
@@ -1512,9 +1537,12 @@ class SwiftUIWriter {
       : null;
     // In a column the last section, or an absolute bar anchored to the bottom.
     const anchored = (c) => !inFlow(c, node) && c.constraints && c.constraints.vertical === 'MAX';
+    // A shade with layers drawn over it (tabs on a gradient) is their backdrop, not a bar above the page.
+    const inside = (k, c) => k.x >= c.x - 1 && k.y >= c.y - 1 && k.x + k.width <= c.x + c.width + 1 && k.y + k.height <= c.y + c.height + 1;
+    const backdrop = (c) => !visibleChildren(c).length && all.slice(all.indexOf(c) + 1).some((k) => inside(k, c));
     const bottoms = (flowRoot ? [...kids, ...all.filter(anchored)] : kids).filter((c) => c !== topBar && wide(c) && c.height <= 160 &&
       rel(c).bottom >= floor - 2 && (filled(c) || /tab ?bar|footer|bottom|nav|input ?bar|composer|toolbar/i.test(c.name)) &&
-      (!flowRoot || c === kids[kids.length - 1] || anchored(c)));
+      (!flowRoot || c === kids[kids.length - 1] || anchored(c)) && !backdrop(c));
     const bottomBar = bottoms.sort((a, b) => rel(b).top - rel(a).top)[0] || null;
     // Figma fixes the topmost layers when scrolling; in a column only absolute ones can be.
     const fixedCount = Math.max(0, Math.min(node.numberOfFixedChildren || 0, (node.children || []).length));
@@ -1669,9 +1697,15 @@ class SwiftUIWriter {
     const common = between.length ? between.reduce((a, b) => (count(b) > count(a) || (count(b) === count(a) && b < a) ? b : a)) : 0;
     const spacing = Math.max(0, between.some((g) => g < common) ? Math.min(...between) : common);
     const items = [];
+    // Later rows draw over earlier ones; where Figma stacks a lower section
+    // over a higher one (a badge over a logo), rows take Figma's order.
+    const tops = bands.map((b) => Math.max(...[...b, ...b.flatMap((c) => floats.get(c.id) || [])].map(order)));
+    const reordered = tops.some((t, i) => i && t < tops[i - 1]);
+    const ranks = [...tops].sort((a, b) => a - b);
     bands.forEach((band, i) => {
       let v = drawBand(band);
       if (!v) return;
+      if (reordered) v = mod(v, 'zIndex', [[null, ranks.indexOf(tops[i])]]);
       let gap = i ? gaps[i] - spacing : gaps[i];
       if (i === split) {
         this.viewport = 'proxy.size.height';
@@ -2286,7 +2320,7 @@ export function toSwiftUI(root, assets, options = {}) {
     }
     shared.push('}');
   }
-  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable']) {
+  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable', 'textStroke']) {
     if (writer.helpers.has(name)) shared.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};

@@ -672,3 +672,40 @@ test('names are singular, Unicode letters are kept and accents dropped', async (
   assert.equal(sIdent('价格'), '价格');
   assert.equal(sIdent('café price'), 'cafePrice');
 });
+
+test('toSwiftUI outlines stroked text and names faces as the font files do', () => {
+  const title = text('RAIL', { x: 40, y: 300, size: 72, color: white, w: 160 });
+  title.segments[0].fontName = { family: 'Lilita One', style: 'Regular' };
+  Object.assign(title, { strokes: [solid(ink)], strokeWeight: 7, strokeAlign: 'OUTSIDE' });
+  const root = frame('Game', { w: 390, h: 844, fills: [solid(brand)], children: [title] });
+  const plain = toSwiftUI(root, assets);
+  assert.match(plain.code, /\.custom\("LilitaOne-Regular"/);
+  assert.match(plain.code, /\.textStroke\(Color\(hex: 0x6E7091\), width: 7\)/);
+  assert.match(plain.shared, /struct TextStroke<S: ShapeStyle>: ViewModifier/);
+  const named = toSwiftUI(root, assets, { fontFaces: new Map([['lilitaone|regular', 'LilitaOne']]) });
+  assert.match(named.code, /\.custom\("LilitaOne", size: 72/);
+  assert.match(named.code, /designLineHeight\(\d+, font: "LilitaOne"/);
+});
+
+test('a clipping frame that fills the width keeps it when a layer overhangs', () => {
+  const gallery = frame('Gallery', {
+    w: 390, h: 300, clipsContent: true, layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'FIXED', fills: [solid(brand)],
+    children: [frame('Count', { x: 316, y: 258, w: 75, h: 28, fills: [solid(ink)], children: [text('1 / 48', { x: 326, y: 263, color: white })] })],
+  });
+  const root = frame('Detail', { w: 390, h: 844, mode: 'VERTICAL', counterAxisAlignItems: 'MIN', children: [gallery, text('Hotel', { x: 16, y: 316, size: 20 })] });
+  const { code } = toSwiftUI(root, assets);
+  assert.match(code, /\.frame\(minWidth: 0, maxWidth: \.infinity, minHeight: 300, alignment: \.topLeading\)\n\s+\.clipped\(\)/);
+});
+
+test('a shade under tabs stays behind them, and rows keep Figma\'s stacking', () => {
+  const shade = { ...frame('Bottom shade', { y: 714, w: 390, h: 130, fills: [solid(ink)] }), type: 'RECTANGLE' };
+  const tabs = [0, 1, 2].map((i) => frame(`Tab ${i}`, { x: 10 + i * 94, y: 740, w: 86, h: 72, fills: [solid(white)], children: [text(`T${i}`, { x: 20 + i * 94, y: 760 })] }));
+  const badge = frame('Badge', { x: 60, y: 250, w: 80, h: 40, fills: [solid(white)], children: [text('Check it!', { x: 66, y: 260 })] });
+  const logo = frame('Logo', { x: 40, y: 280, w: 200, h: 120, fills: [solid(brand)], children: [text('RAIL', { x: 50, y: 300, size: 40 })] });
+  const root = frame('Game', { w: 390, h: 844, fills: [solid(brand)], children: [logo, badge, shade, ...tabs] });
+  const { code } = toSwiftUI(root, assets);
+  assert.doesNotMatch(code, /safeAreaInset\(edge: \.bottom[\s\S]*Bottom shade/);
+  assert.doesNotMatch(code, /\.safeAreaInset\(edge: \.bottom, spacing: 0\) \{\n\s+Rectangle\(\)/);
+  // The badge's row comes first but lies over the logo's.
+  assert.match(code, /Check it![\s\S]*?\.zIndex\(1\)[\s\S]*?RAIL[\s\S]*?\.zIndex\(0\)/);
+});

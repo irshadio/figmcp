@@ -10,6 +10,7 @@ import { countNodes, toReactTailwind } from '../codegen/react.js';
 import { mergeDesignSystem } from '../codegen/swiftui/design-system.js';
 import { toSwiftUI } from '../codegen/swiftui/index.js';
 import { systemUi } from '../codegen/system-ui.js';
+import { projectFontFaces } from '../fonts.js';
 import {
   assetCatalog, designSystemFile, detectFramework, flutterAssetDirs, FRAMEWORKS, isSwiftPackage, usesScreenUtil,
 } from '../project.js';
@@ -360,7 +361,9 @@ export function registerDesignTools(server, bridge, source) {
       } else if (framework === 'swiftui') {
         const catalog = assetsDir ? assetsDir.replace(/\/+$/, '') : assetCatalog();
         const files = { ...fileResolver(node.images), taken: (name, file) => catalogTaken(catalog, name, file) };
-        const result = toSwiftUI(node.tree, files, { connect, screen, variableModes: node.variableModes, exactLineHeights: args.exactLineHeights ?? true });
+        const result = toSwiftUI(node.tree, files, {
+          connect, screen, variableModes: node.variableModes, exactLineHeights: args.exactLineHeights ?? true, fontFaces: projectFontFaces(),
+        });
         out = [text(result.code), ...swiftuiDetails(result, node.tree, catalog, isSwiftPackage())];
       } else {
         const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });

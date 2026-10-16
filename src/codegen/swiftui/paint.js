@@ -263,6 +263,49 @@ extension View {
     modifier(DesignLineHeight(height, font: name, size: size, relativeTo: style))
   }
 }`,
+  textStroke: `/// Figma's text stroke: the glyphs' outline widened by [width] and drawn
+/// behind the text in [style], from copies of the text in rings around it.
+struct TextStroke<S: ShapeStyle>: ViewModifier {
+  let style: S
+  let width: CGFloat
+
+  /// Offsets filling a disc of radius [width], about a point apart.
+  private var offsets: [CGSize] {
+    let rings = max(1, Int((width / 1.5).rounded(.up)))
+    return (1...rings).flatMap { ring -> [CGSize] in
+      let radius = width * CGFloat(ring) / CGFloat(rings)
+      let count = max(8, Int((2 * .pi * radius).rounded(.up)))
+      return (0..<count).map { i in
+        let angle = 2 * .pi * CGFloat(i) / CGFloat(count)
+        return CGSize(width: cos(angle) * radius, height: sin(angle) * radius)
+      }
+    }
+  }
+
+  func body(content: Content) -> some View {
+    content.background {
+      Rectangle()
+        .fill(style)
+        .padding(-width)
+        .mask {
+          ZStack {
+            ForEach(Array(offsets.enumerated()), id: \\.offset) { _, offset in
+              content.offset(offset)
+            }
+          }
+          .padding(width)
+        }
+        .accessibilityHidden(true)
+    }
+  }
+}
+
+extension View {
+  /// An outline [width] points wide around the text, in [style].
+  func textStroke<S: ShapeStyle>(_ style: S, width: CGFloat) -> some View {
+    modifier(TextStroke(style: style, width: width))
+  }
+}`,
   color: `extension Color {
   /// A colour from a 0xRRGGBB value.
   init(hex: UInt32, opacity: Double = 1) {

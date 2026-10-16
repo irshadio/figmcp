@@ -344,11 +344,42 @@ function renderBoundsOf(node, origin) {
   };
 }
 
+// [node] exported with [settings]. Layers clipped out of view (scroll
+// content below a screen's fold) have no render bounds and Figma refuses to
+// export them: a copy of the layer outside the frame is exported instead,
+// and [onBounds] gets its render bounds relative to the layer's box.
+async function exportOf(node, settings, onBounds) {
+  try {
+    return await node.exportAsync(settings);
+  } catch (e) {
+    if (node.absoluteRenderBounds || !('clone' in node) || !node.absoluteBoundingBox) throw e;
+    const copy = node.clone();
+    try {
+      const value = await copy.exportAsync(settings);
+      const box = copy.absoluteBoundingBox;
+      const rb = copy.absoluteRenderBounds;
+      if (onBounds && box && rb) onBounds({ dx: rb.x - box.x, dy: rb.y - box.y, width: rb.width, height: rb.height });
+      return value;
+    } finally {
+      copy.remove();
+    }
+  }
+}
+
+// Render bounds [b] of a copy of [node], placed at the layer's own box.
+function movedBounds(node, origin, b) {
+  const box = node.absoluteBoundingBox;
+  return {
+    x: round(box.x + b.dx - origin.x), y: round(box.y + b.dy - origin.y),
+    width: round(b.width), height: round(b.height),
+  };
+}
+
 // A 2x render of the layer with its shadows and blurs (the render bounds).
-async function renderPng(node) {
-  const bytes = await node.exportAsync({
+async function renderPng(node, onBounds) {
+  const bytes = await exportOf(node, {
     format: 'PNG', constraint: { type: 'SCALE', value: 2 },
-  });
+  }, onBounds);
   return { format: 'png', scale: 2, base64: figma.base64Encode(bytes) };
 }
 
@@ -577,7 +608,9 @@ async function serialize(node, origin, ctx, depth) {
       // draw; started together they share the wait (see settle()).
       const bounds = box ? renderBoundsOf(node, origin) : null;
       if (bounds) out.svgBounds = bounds;
-      track(ctx, node, node.exportAsync({ format: 'SVG_STRING' }), function (svg) {
+      track(ctx, node, exportOf(node, { format: 'SVG_STRING' }, function (b) {
+        if (!out.svgBounds && box) out.svgBounds = movedBounds(node, origin, b);
+      }), function (svg) {
         out.svg = svg;
       }, function () { delete out.svgBounds; });
       if (whole) return out;
@@ -593,7 +626,9 @@ async function serialize(node, origin, ctx, depth) {
       out.rasterized = reason;
       const bounds = box ? renderBoundsOf(node, origin) : null;
       if (bounds) out.renderBounds = bounds;
-      track(ctx, node, renderPng(node), function (render) {
+      track(ctx, node, renderPng(node, function (b) {
+        if (!out.renderBounds && box) out.renderBounds = movedBounds(node, origin, b);
+      }), function (render) {
         out.render = render;
       }, function () {
         delete out.rasterized;
@@ -718,7 +753,7 @@ async function exportNode(params) {
   const format = (params.format || 'PNG').toUpperCase();
   const box = target.absoluteBoundingBox;
   if (format === 'SVG') {
-    const svg = await target.exportAsync({ format: 'SVG_STRING' });
+    const svg = await exportOf(target, { format: 'SVG_STRING' });
     return { format: 'svg', text: svg, width: box && box.width,
       height: box && box.height };
   }
@@ -735,7 +770,7 @@ async function exportNode(params) {
     }
     if (params.absoluteBounds) settings.useAbsoluteBounds = true;
   }
-  const bytes = await target.exportAsync(settings);
+  const bytes = await exportOf(target, settings);
   return {
     format: format.toLowerCase(),
     base64: figma.base64Encode(bytes),

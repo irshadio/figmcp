@@ -419,3 +419,10 @@ test('a keyword names its action as itself, and radio options are buttons', { sk
   assert.match(r.code, /action\(\.\w+\(item\)\)/);
   assert.equal(typecheck([r]), '');
 });
+
+test('stroked text type checks with its outline', { skip }, () => {
+  const title = text('RAIL', { size: 40, w: 120, color: white, strokes: [solid(ink)], strokeWeight: 4, strokeAlign: 'OUTSIDE' });
+  const r = generate(column('Game', [title], { h: 100 }));
+  assert.match(r.code, /\.textStroke\(Color\(hex: 0x6E7091\), width: 4\)/);
+  assert.equal(typecheck([r]), '');
+});

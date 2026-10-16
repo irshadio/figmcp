@@ -183,3 +183,29 @@ test('a frame of many vectors and nothing else is exported as one SVG', async ()
   assert.equal((map.children || []).length, 0);
   assert.equal(find(tree, '1:3').svg, undefined, 'a few vectors stay layers');
 });
+
+test('a vector clipped out of view is exported from a copy', async () => {
+  let removed = 0;
+  const root = makeNode({
+    id: '1:1', type: 'FRAME', box: [0, 0, 100, 400], clipsContent: true,
+    children: [{ id: '1:3', type: 'FRAME', box: [0, 0, 100, 400], children: [{
+      id: '1:2', type: 'VECTOR', box: [10, 300, 20, 20], absoluteRenderBounds: null,
+      exportAsync: async () => { throw new Error('Failed to export node. This node may not have any visible layers.'); },
+      clone() {
+        return {
+          absoluteBoundingBox: { x: 0, y: 0, width: 20, height: 20 },
+          absoluteRenderBounds: { x: -1, y: -1, width: 22, height: 22 },
+          exportAsync: async () => '<svg id="copy"/>',
+          remove() { removed++; },
+        };
+      },
+    }] }],
+  });
+  const { request } = loadPlugin(root);
+  const result = await request('node', { id: '1:1' });
+  const vector = find(result.tree, '1:2');
+  assert.equal(vector.svg, '<svg id="copy"/>');
+  assert.deepEqual(vector.svgBounds, { x: 9, y: 299, width: 22, height: 22 });
+  assert.equal(removed, 1);
+  assert.equal(result.failures, undefined);
+});

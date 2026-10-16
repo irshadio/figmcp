@@ -28,6 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { toSwiftUI } from '../src/codegen/swiftui/index.js';
+import { fontFaceMap } from '../src/fonts.js';
 import { systemUi } from '../src/codegen/system-ui.js';
 import { DATA_DIR, imageExt } from '../src/store.js';
 import { compareBoxes, expectedBoxes, families, loadDesign, pixelDiff } from './compare.js';
@@ -636,6 +637,8 @@ async function check(opts, design, out, sdk) {
   let catalogs = [];
   let generated = null;
   let fontFamilies;
+  let fontFilesList = null;
+  const fontsNotBundled = [];
   if (opts.project) {
     const project = path.resolve(opts.project);
     const file = path.resolve(project, opts.file);
@@ -676,12 +679,17 @@ async function check(opts, design, out, sdk) {
       return saved.get(key);
     };
     const image = (hash) => (design.images[hash] ? Buffer.from(design.images[hash], 'base64') : null);
-    generated = toSwiftUI(tree, {
+    const generate = (fontFaces) => toSwiftUI(tree, {
       svg: (text) => save(`svg:${text}`, 'svg', Buffer.from(text)),
       image: (hash) => (image(hash) ? save(`img:${hash}`, imageExt(image(hash)), image(hash)) : null),
       imageExt: (hash) => (image(hash) ? imageExt(image(hash)) : 'png'),
       render: (r) => save(`r:${r.base64}`, 'png', Buffer.from(r.base64, 'base64')),
-    }, { preview: false, probe: true, variableModes: design.variableModes, exactLineHeights: !opts.fontLineHeights });
+    }, { preview: false, probe: true, variableModes: design.variableModes, exactLineHeights: !opts.fontLineHeights, fontFaces });
+    // The faces are named as the font files bundled with it name them.
+    generated = generate(null);
+    fontFamilies = Object.keys(generated.fonts);
+    fontFilesList = await bundleFonts(fontFamilies, opts.fonts, opts.fetchFonts, fontsNotBundled);
+    generated = generate(fontFaceMap(fontFilesList));
     code = generated.code;
     shared = generated.shared;
     view = generated.structName;
@@ -690,13 +698,11 @@ async function check(opts, design, out, sdk) {
     if (shared) fs.writeFileSync(path.join(out, 'DesignSystem.swift'), shared);
     writeCatalog(path.join(out, 'Assets.xcassets'), generated.assets);
     catalogs = [path.join(out, 'Assets.xcassets')];
-    fontFamilies = Object.keys(generated.fonts);
   }
   // Builds from runs before the lock existed.
   fs.rmSync(path.join(out, 'build'), { recursive: true, force: true });
   if (!view) throw new Error('No `struct X: View` was found in the code; pass --view.');
-  const fontsNotBundled = [];
-  const fontFilesList = await bundleFonts(fontFamilies, opts.fonts, opts.fetchFonts, fontsNotBundled);
+  if (!fontFilesList) fontFilesList = await bundleFonts(fontFamilies, opts.fonts, opts.fetchFonts, fontsNotBundled);
   const build = path.join(out, 'build');
   const built = buildApp(build, { view, code, shared, catalogs, fontFilesList, sdk, dynamicType: opts.dynamicType || 'large' });
   const report = {
