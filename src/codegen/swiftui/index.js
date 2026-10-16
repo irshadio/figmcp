@@ -1510,8 +1510,11 @@ class SwiftUIWriter {
     const hero = topBar && !filled(topBar)
       ? all.find((c) => c !== topBar && wide(c) && rel(c).top <= rel(topBar).top && rel(c).bottom >= rel(topBar).bottom && filled(c))
       : null;
-    const bottoms = kids.filter((c) => c !== topBar && wide(c) && c.height <= 160 && rel(c).bottom >= floor - 2 &&
-      (filled(c) || /tab ?bar|footer|bottom|nav|input ?bar|composer|toolbar/i.test(c.name)) && (!flowRoot || c === kids[kids.length - 1]));
+    // In a column the last section, or an absolute bar anchored to the bottom.
+    const anchored = (c) => !inFlow(c, node) && c.constraints && c.constraints.vertical === 'MAX';
+    const bottoms = (flowRoot ? [...kids, ...all.filter(anchored)] : kids).filter((c) => c !== topBar && wide(c) && c.height <= 160 &&
+      rel(c).bottom >= floor - 2 && (filled(c) || /tab ?bar|footer|bottom|nav|input ?bar|composer|toolbar/i.test(c.name)) &&
+      (!flowRoot || c === kids[kids.length - 1] || anchored(c)));
     const bottomBar = bottoms.sort((a, b) => rel(b).top - rel(a).top)[0] || null;
     // Figma fixes the topmost layers when scrolling; in a column only absolute ones can be.
     const fixedCount = Math.max(0, Math.min(node.numberOfFixedChildren || 0, (node.children || []).length));

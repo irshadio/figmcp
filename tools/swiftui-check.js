@@ -258,6 +258,10 @@ extension View {
     let window = UIWindow(windowScene: scene)
     window.frame = CGRect(origin: .zero, size: size)
     window.overrideUserInterfaceStyle = .light
+    // Laid out on Figma's 2x pixel grid whatever the device's scale, so
+    // positions round as they do in the design's 2x render.
+    window.traitOverrides.displayScale = 2
+    host.traitOverrides.displayScale = 2
     window.windowLevel = .alert + 1
     host.view.frame = window.bounds
     window.rootViewController = host
