@@ -426,3 +426,11 @@ test('stroked text type checks with its outline', { skip }, () => {
   assert.match(r.code, /\.textStroke\(Color\(hex: 0x6E7091\), width: 4\)/);
   assert.equal(typecheck([r]), '');
 });
+
+test('a progress bar type checks with its bar style', { skip }, () => {
+  const track = frame('Bar', { w: 150, h: 6, cornerRadius: 3, fills: [solid(ink)], layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [{ ...frame('Fill', { w: 120, h: 6, cornerRadius: 3, fills: [solid(brand)] }), type: 'RECTANGLE' }] });
+  const r = generate(column('Scores', [track], { h: 40 }));
+  assert.match(r.code, /ProgressView\(value: 0\.8\)/);
+  assert.equal(typecheck([r]), '');
+});

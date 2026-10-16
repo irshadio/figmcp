@@ -268,6 +268,26 @@ extension View {
     modifier(DesignLineHeight(height, font: name, size: size, relativeTo: style))
   }
 }`,
+  designBar: `/// A progress bar drawn as the design draws it: a [track] filled from its
+/// start in [fill] to the progress value, both with corners of [radius].
+struct DesignBarStyle: ProgressViewStyle {
+  var track: Color
+  var fill: Color
+  var radius: CGFloat
+
+  func makeBody(configuration: Configuration) -> some View {
+    let value = min(max(configuration.fractionCompleted ?? 0, 0), 1)
+    RoundedRectangle(cornerRadius: radius)
+      .fill(track)
+      .overlay(alignment: .leading) {
+        GeometryReader { proxy in
+          RoundedRectangle(cornerRadius: radius)
+            .fill(fill)
+            .frame(width: proxy.size.width * value)
+        }
+      }
+  }
+}`,
   textStroke: `/// Figma's text stroke: the glyphs' outline widened by [width] and drawn
 /// behind the text in [style], from copies of the text in rings around it.
 struct TextStroke<S: ShapeStyle>: ViewModifier {

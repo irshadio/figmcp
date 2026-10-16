@@ -234,8 +234,10 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
       flow.forEach((c) => set(c, 'card'));
     } else if (row && parent && isAutoLayout(n) && flow.length >= 2 &&
         // Past its parent's edge (or scrolling in Figma), not only into its padding, with cards for items.
-        (n.width > parent.width + 0.5 || ['HORIZONTAL', 'BOTH'].includes(n.overflowDirection)) && n.width > innerWidth(parent) + 0.5 &&
-        flow.every((c) => c.width >= 60 || hasImage(c))) {
+        ((n.width > parent.width + 0.5 || ['HORIZONTAL', 'BOTH'].includes(n.overflowDirection)) && n.width > innerWidth(parent) + 0.5 &&
+          flow.every((c) => c.width >= 60 || hasImage(c)) ||
+          // A strip of like pictures nearly as wide as the screen runs past a smaller one.
+          flow.length >= 4 && sameShape(flow) && flow.every(hasImage) && n.width >= screenWidth * 0.85)) {
       set(n, 'carousel', { items: flow.map((c) => c.id) }, sameShape(flow) ? 'high' : 'medium',
         `a row of ${flow.length}${sameShape(flow) ? ' equal' : ''} items wider than its column`);
       flow.forEach((c) => set(c, 'card'));
@@ -258,7 +260,16 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
       const last = flow[flow.length - 1];
       const pFlow = isAutoLayout(parent) ? visibleChildren(parent).filter((c) => inFlow(c, parent)) : [];
       const topBar = parent.layoutMode === 'HORIZONTAL' && wide(parent) && parent.height <= 72 && parent.y - ry <= 160;
-      if (small && isIcon(n) && ICON_NAMES.test(n.name)) {
+      const bar = kids.length === 1 && kids[0];
+      const solid = (x) => visiblePaints(x.fills).length === 1 && visiblePaints(x.fills)[0].type === 'SOLID';
+      const plain = (x) => !visiblePaints(x.strokes).length && !(x.effects || []).some((e) => e.visible !== false);
+      if (bar && n.height <= 16 && n.width >= n.height * 4 && ['RECTANGLE', 'FRAME'].includes(bar.type) && !visibleChildren(bar).length &&
+          solid(bar) && plain(bar) && plain(n) && (solid(n) || !visiblePaints(n.fills).length) &&
+          Math.abs(bar.x - n.x) <= 0.5 && Math.abs(bar.y - n.y) <= 0.5 && Math.abs(bar.height - n.height) <= 0.5 &&
+          bar.width > 0 && bar.width < n.width - 0.5) {
+        set(n, 'progress', { fill: bar.id, value: Math.round((bar.width / n.width) * 10000) / 10000 }, 'medium',
+          `a ${Math.round(n.width)}pt track ${Math.round((bar.width / n.width) * 100)}% filled from its start`);
+      } else if (small && isIcon(n) && ICON_NAMES.test(n.name)) {
         set(n, 'iconButton', { label: n.name.split('/').pop().trim() }, 'high', `a ${Math.round(n.width)}pt icon named "${n.name}"`);
       } else if (small && isIcon(n) && topBar && (pFlow[0] === n || (pFlow[pFlow.length - 1] === n && CLOSE.test(n.name)))) {
         // The leading icon of a top bar goes back; a trailing cross closes.
@@ -343,4 +354,5 @@ export const SWIFTUI_PATTERNS = {
   button: 'button: Button with a press-scale style',
   iconButton: 'icon button: Button with an accessibility label',
   textInput: 'text input: TextField bound to state, with its content type and keyboard (SecureField for a password)',
+  progress: 'progress bar: ProgressView(value:) with a bar style drawn as the design draws it, stretching with its row',
 };

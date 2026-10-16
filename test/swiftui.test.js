@@ -709,3 +709,26 @@ test('a shade under tabs stays behind them, and rows keep Figma\'s stacking', ()
   // The badge's row comes first but lies over the logo's.
   assert.match(code, /Check it![\s\S]*?\.zIndex\(1\)[\s\S]*?RAIL[\s\S]*?\.zIndex\(0\)/);
 });
+
+test('a filled track is a ProgressView that shrinks with its row', () => {
+  const track = frame('Bar', { x: 134, y: 18, w: 150, h: 6, cornerRadius: 3, fills: [solid({ r: 0.93, g: 0.93, b: 0.96, a: 1 })],
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [{ ...frame('Fill', { x: 134, y: 18, w: 135, h: 6, cornerRadius: 3, fills: [solid(brand)] }), type: 'RECTANGLE' }] });
+  const row = frame('Cleanliness', { x: 14, y: 12, w: 330, h: 18, mode: 'HORIZONTAL', itemSpacing: 10, layoutSizingHorizontal: 'FILL',
+    layoutSizingVertical: 'HUG', children: [text('Cleanliness', { x: 14, y: 12, w: 110 }), track, text('9.0', { x: 294, y: 12, w: 20 })] });
+  const root = frame('Scores', { w: 390, h: 844, mode: 'VERTICAL', paddingLeft: 30, paddingRight: 30, counterAxisAlignItems: 'MIN', children: [row] });
+  const { code, shared } = toSwiftUI(root, assets);
+  assert.match(code, /ProgressView\(value: 0\.9\)\n\s+\.progressViewStyle\(DesignBarStyle\(track: Color\(hex: 0xEDEDF5\), fill: Color\(hex: 0x3D3BD9\), radius: 3\)\)\n\s+\.frame\(height: 6\)\n\s+\.frame\(maxWidth: 150\)/);
+  assert.match(shared, /struct DesignBarStyle: ProgressViewStyle/);
+});
+
+test('small layers on the right of a screen-wide frame keep to it; tiles spread evenly stay put', () => {
+  const button = (name, x) => icon(name, 38, 38, { x, y: 54 });
+  const tile = (i) => frame(`Tile ${i}`, { x: 10 + i * 94, y: 200, w: 86, h: 72, fills: [solid(white)] });
+  const gallery = frame('Gallery', { w: 390, h: 300, fills: [solid(brand)], children: [button('back', 16), button('share', 290), button('heart', 336), tile(0), tile(1), tile(2), tile(3)] });
+  const root = frame('Detail', { w: 390, h: 844, mode: 'VERTICAL', counterAxisAlignItems: 'MIN', children: [gallery] });
+  const { code } = toSwiftUI(root, assets);
+  assert.match(code, /"heart"\)\n\s+\.padding\(\.trailing, 16\)\n\s+\.frame\(maxWidth: \.infinity, alignment: \.topTrailing\)/);
+  assert.match(code, /"back"[\s\S]*?\.padding\(EdgeInsets\(top: 54, leading: 16/);
+  assert.doesNotMatch(code, /padding\(\.trailing, 18\)/, 'the last tile keeps its leading place');
+});

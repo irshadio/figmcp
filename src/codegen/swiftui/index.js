@@ -351,6 +351,8 @@ class SwiftUIWriter {
     this.containerMods = new Map();
     this.margins = new Map();
     this.stretchCells = new Set();
+    // Rows drawn in a horizontal ScrollView, for the render check.
+    this.scrollRows = new Set();
     this.swaps = new Map();
   }
 
@@ -633,6 +635,28 @@ class SwiftUIWriter {
     }
     if (ctx.kind !== 'root' && !this.inComponent && EXTRACT_TYPES.has(node.type) && countVisible(node) >= EXTRACT_SIZE) core = this.extract(node, core);
     return this.wrapPlace(node, ctx, core);
+  }
+
+  /**
+   * A track filled to [role].value: ProgressView with the design's bar
+   * style. Its width is at most the design's, so a narrower row shrinks it.
+   */
+  progress(node, size, role) {
+    const solid = (n) => {
+      const p = visiblePaints(n.fills)[0];
+      if (!p) return raw('Color.clear');
+      const vars = n.vars || {};
+      return this.color(p.color, p.opacity ?? 1, vars[`fill.${n.fills.indexOf(p)}`] || vars.fills);
+    };
+    const fill = visibleChildren(node)[0];
+    const radius = (n) => (typeof n.cornerRadius === 'number' ? Math.min(n.cornerRadius, n.height / 2) : 0);
+    if (Math.abs(radius(fill) - radius(node)) > 0.5) this.warn(node, 'the bar\'s fill is drawn with the track\'s corner radius');
+    this.helpers.add('designBar');
+    let v = mod(view('ProgressView', [['value', role.value]]), 'progressViewStyle', [[null, call('DesignBarStyle', [
+      ['track', solid(node)], ['fill', solid(fill)], ['radius', round(radius(node))],
+    ])]]);
+    v = mod(v, 'frame', [['height', round(node.height)]]);
+    return mod(v, 'frame', [['maxWidth', size.w === 'inf' ? INFINITY : round(node.width)]]);
   }
 
   /** [v] kept within the layer's min and max width and height, on axes its content or parent sizes. */
@@ -993,6 +1017,15 @@ class SwiftUIWriter {
    * (offset from the start), 'max' (inset from the end), 'center' (offset
    * from the centre) or 'stretch' (inset from both ends).
    */
+  /** Whether [node] is one of three or more like layers spread evenly across a band of [parent] (tabs, tiles). */
+  distributed(node, parent) {
+    const band = visibleChildren(parent).filter((c) => c.y < node.y + node.height && c.y + c.height > node.y &&
+      Math.abs(c.width - node.width) <= node.width * 0.2).sort((a, b) => a.x - b.x);
+    if (band.length < 3) return false;
+    const gaps = band.slice(1).map((c, i) => c.x - band[i].x - band[i].width);
+    return Math.max(...gaps) - Math.min(...gaps) <= 4;
+  }
+
   stackPlacement(node, parent) {
     const x = node.x - parent.x;
     const y = node.y - parent.y;
@@ -1000,10 +1033,16 @@ class SwiftUIWriter {
       ? node.constraints : { horizontal: 'MIN', vertical: 'MIN' };
     // On a phone screen, a section that spans the width or sits centred
     // with equal margins stretches with the screen.
-    const stretchy = parent === this.screen || this.stretchCells.has(parent.id);
+    const screenWide = this.screen && parent.width >= this.screen.width - 1;
+    const stretchy = parent === this.screen || this.stretchCells.has(parent.id) || screenWide;
     if (stretchy && cons.horizontal !== 'MAX' && cons.horizontal !== 'STRETCH' && !hugsWidth(node) &&
         node.width >= parent.width / 2 && Math.abs(x - (parent.width - x - node.width)) <= 2) {
       cons = { ...cons, horizontal: 'STRETCH' };
+    } else if (screenWide && cons.horizontal === 'MIN' && node.width < parent.width / 3 && !this.distributed(node, parent)) {
+      // Left at Figma's default, a small layer keeps to its side of a
+      // screen-wide frame on other screens: actions on the right stay there.
+      if (Math.abs(x + node.width / 2 - parent.width / 2) <= 1) cons = { ...cons, horizontal: 'CENTER' };
+      else if (x >= parent.width / 2) cons = { ...cons, horizontal: 'MAX' };
     }
     const axis = (mode, pos, size, total) => {
       switch (mode) {
@@ -1056,6 +1095,7 @@ class SwiftUIWriter {
     if (drawnAsSvg(node)) return this.svg(node, size);
     if (node.render && this.assets.render) return this.render(node, size);
     const role = this.roles.get(node.id);
+    if (role && role.role === 'progress') return this.progress(node, size, role);
     if (role && role.role === 'segmented' && role.native && role.native.use && !this.inComponent) {
       const flow = visibleChildren(node).filter((c) => inFlow(c, node));
       const picker = this.repeated(flow, { kind: 'flex', parent: node, axis: 'x', hugMain: false }, false);
@@ -1990,6 +2030,7 @@ class SwiftUIWriter {
     if (total <= node.width - left - right + 0.5) return null;
     const parent = this.ancestors[this.ancestors.length - 2];
     const bleed = parent && isAutoLayout(parent) ? Math.min(parent.paddingLeft || 0, parent.paddingRight || 0) : 0;
+    this.scrollRows.add(node.id);
     let out = view('ScrollView', [[null, raw('.horizontal')]], [v]);
     if (bleed) {
       out = mod(out, 'contentMargins', [[null, raw('.horizontal')], [null, round(bleed)], ['for', raw('.scrollContent')]]);
@@ -2041,13 +2082,13 @@ class SwiftUIWriter {
         const [, padR, , padL] = this.paddingValues(node);
         const filling = role.columns * w.width + (role.columns - 1) * (node.itemSpacing || 0) >= node.width - padL - padR - 1;
         const fixedCards = !filling && sizingOf(w, node, 'x') === 'FIXED' && runs[0].items.every((c) => Math.abs(c.width - w.width) < 0.5);
-        const column = call('GridItem', [[null, raw(fixedCards ? `.fixed(${sNum(round(w.width))})` : '.flexible()')], ['spacing', gap]]);
+        const column = call('GridItem', [[null, raw('.flexible()')], ['spacing', gap]]);
         // One column when the text is set to an accessibility size.
         const count = role.columns > 1 && !this.inComponent ? raw(`${this.dynamicTypeSize()}.isAccessibilitySize ? 1 : ${role.columns}`) : role.columns;
         const columns = call('Array', [['repeating', column], ['count', count]]);
         v = view('LazyVGrid', [['columns', columns], ['spacing', lineGap]], items);
-        // A grid of fixed columns centres them in its width: it hugs them, and its frame places it.
-        if (fixedCards) v = mod(v, 'fixedSize', [['horizontal', true], ['vertical', false]]);
+        // Fixed cards keep their width, up to the room a narrower phone leaves them.
+        if (fixedCards) v = mod(v, 'frame', [['maxWidth', round(role.columns * w.width + (role.columns - 1) * (node.itemSpacing || 0))]]);
       } else {
         this.helpers.add('flow');
         v = view('FlowLayout', [['spacing', gap], ['lineSpacing', lineGap]], items.filter(Boolean));
@@ -2074,6 +2115,7 @@ class SwiftUIWriter {
         // only overflowing the padding is drawn overflowing, as in Figma); a
         // carousel snaps to its cards.
         if (!row && c.layoutMode === 'HORIZONTAL' && !scrollsItself(c) && (this.margins.has(c.id) || (!fills && extent > node.width + 0.5))) {
+          this.scrollRows.add(c.id);
           let scroller = view('ScrollView', [[null, raw('.horizontal')]], [item]);
           // Drawn scrolled to its end (its start off the leading edge, its end
           // at the trailing one), as a right-to-left row rests: it opens there.
@@ -2146,6 +2188,7 @@ class SwiftUIWriter {
     if (scrolled) {
       // Figma scrolls this row sideways: its items keep their widths and the
       // row scrolls, its padding inside the scrolled content.
+      this.scrollRows.add(node.id);
       v = mod(view('ScrollView', [[null, raw('.horizontal')]], [padded(v, padding)]), 'scrollIndicators', [[null, raw('.hidden')]]);
       v = mod(v, 'fixedSize', [['horizontal', false], ['vertical', true]]);
       padding = [0, 0, 0, 0];
@@ -2320,7 +2363,7 @@ export function toSwiftUI(root, assets, options = {}) {
     }
     shared.push('}');
   }
-  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable', 'textStroke']) {
+  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable', 'textStroke', 'designBar']) {
     if (writer.helpers.has(name)) shared.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};
@@ -2340,7 +2383,7 @@ export function toSwiftUI(root, assets, options = {}) {
     rasterized: writer.rasterized,
     warnings: writer.warnings,
     structure: structureOf(writer.roles, rootNode),
-    ...(options.probe ? { probeIds: writer.probeIds } : {}),
+    ...(options.probe ? { probeIds: writer.probeIds, scrollRows: [...writer.scrollRows] } : {}),
   };
 }
 

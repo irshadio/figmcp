@@ -559,9 +559,10 @@ async function bundleFonts(familyList, dirs, fetchFonts, missing) {
 /**
  * Layers drawn past the sides of a screen [width] points wide that stay
  * within the design's frame: rows that do not fit. Layers in a row that
- * scrolls, or reaching past the frame in the design, may run off.
+ * scrolls (in Figma or in the code: [scrollRows]), or reaching past the
+ * frame in the design, may run off.
  */
-function overflowing(tree, rects, probeIds, width) {
+function overflowing(tree, rects, probeIds, width, scrollRows) {
   const byId = new Map();
   const parents = new Map();
   const index = (n) => {
@@ -574,7 +575,7 @@ function overflowing(tree, rects, probeIds, width) {
   index(tree);
   const scrolls = (n) => {
     for (let p = n; p; p = parents.get(p.id)) {
-      if (p.overflowDirection === 'HORIZONTAL' || p.overflowDirection === 'BOTH') return true;
+      if (p.overflowDirection === 'HORIZONTAL' || p.overflowDirection === 'BOTH' || scrollRows.has(p.id)) return true;
       if (p !== tree && p.x + p.width > tree.x + tree.width + 0.5) return true;
     }
     return false;
@@ -595,6 +596,28 @@ function overflowing(tree, rects, probeIds, width) {
     if (over > 0.5) out.push({ id, name: n.name, type: n.type, box: [r.x, r.y, r.width, r.height].map((v) => Math.round(v * 10) / 10), over: Math.round(over * 10) / 10 });
   }
   return out.sort((a, b) => b.over - a.over);
+}
+
+/**
+ * Wide layers (60% of the design's width or more, outside rows that scroll)
+ * that do not keep their margins on a screen [width] points wide: a layout
+ * that stays at the design's size instead of following the screen.
+ */
+function unstretched(tree, rects, width) {
+  const out = [];
+  const walk = (n, scrolled) => {
+    if (n.visible === false) return;
+    const scrolls = scrolled || n.overflowDirection === 'HORIZONTAL' || n.overflowDirection === 'BOTH';
+    const r = rects[n.id];
+    if (r && n !== tree && !scrolls && n.type !== 'TEXT' && n.layoutSizingHorizontal !== 'HUG' && n.width >= tree.width * 0.6 && n.x - tree.x >= -0.5 &&
+        n.x + n.width <= tree.x + tree.width + 0.5) {
+      const expected = width - (n.x - tree.x) - (tree.x + tree.width - n.x - n.width);
+      if (Math.abs(r.width - expected) > 2) out.push({ id: n.id, name: n.name, type: n.type, expectedWidth: Math.round(expected * 10) / 10, width: Math.round(r.width * 10) / 10 });
+    }
+    for (const c of n.children || []) walk(c, scrolls);
+  };
+  walk(tree, false);
+  return out;
 }
 
 const USAGE = `Usage: node tools/swiftui-check.js <nodeId|selection> [--snapshot <frame id>]
@@ -784,7 +807,11 @@ async function check(opts, design, out, sdk) {
       Object.assign(report, { device, systemUiLeftOut: chrome.map((c) => `${c.id} "${c.name}" (${c.kind})`) });
       report.files.rendered = rendered;
       const layout = `${rendered}.layout.json`;
-      if (generated && fs.existsSync(layout)) report.overflow = overflowing(tree, JSON.parse(fs.readFileSync(layout, 'utf8')), generated.probeIds, opts.width);
+      if (generated && fs.existsSync(layout)) {
+        const rects = JSON.parse(fs.readFileSync(layout, 'utf8'));
+        report.overflow = overflowing(tree, rects, generated.probeIds, opts.width, new Set(generated.scrollRows));
+        report.notStretched = unstretched(tree, rects, opts.width);
+      }
       fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
       return report;
     }
