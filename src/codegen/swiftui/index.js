@@ -14,6 +14,7 @@ import { visiblePaints } from '../util.js';
 import {
   blendMode, blurs, composite, effectsOf, gradient, HELPERS, isRectangle, sColor, shadowArgs, shapeOf, swiftBlur,
 } from './paint.js';
+import { calendarView, prepareCalendar } from './calendar.js';
 import { indicatorOf, PRESSABLE_STYLE, withIndicator } from './patterns.js';
 import { baseName, fieldsOf, isGenericName, mergeTrees, plural, runsOf } from './repeat.js';
 import {
@@ -570,6 +571,7 @@ class SwiftUIWriter {
       else if (typeof s === 'number') args.push([key, round(s)]);
       else if (s && s.kind === 'raw') args.push([key, s]);
       else if (s && typeof s.min === 'number') args.push([`min${key[0].toUpperCase()}${key.slice(1)}`, round(s.min)]);
+      else if (s && typeof s.max === 'number') args.push([max, round(s.max)]);
     };
     axis('width', 'maxWidth', size.w);
     axis('height', 'maxHeight', size.h);
@@ -966,6 +968,8 @@ class SwiftUIWriter {
         }
         // An item of a control with a label keeps at least its width, and widens for a longer label.
         if (axis === 'x' && typeof out.w === 'number' && !fixed && SELECTABLE.has(this.roleOf(ctx.parent)) && hasText(node)) out.w = { min: W };
+        // Items that fill their row in the design share a narrower screen: at most their width.
+        if (axis === 'x' && ctx.axis === 'x' && node.type !== 'TEXT' && sizingOf(node, ctx.parent, 'x') === 'FIXED' && this.shrinks(ctx.parent)) out.w = { max: W };
       }
       return out;
     }
@@ -1017,6 +1021,36 @@ class SwiftUIWriter {
    * (offset from the start), 'max' (inset from the end), 'center' (offset
    * from the centre) or 'stretch' (inset from both ends).
    */
+  /** The in-flow items of the row [row] and how much of its width they take in the design (0 to 1). */
+  rowFill(row) {
+    const flow = visibleChildren(row).filter((c) => inFlow(c, row));
+    const [, right, , left] = this.paddingValues(row);
+    const inner = row.width - left - right;
+    const used = flow.reduce((t, c) => t + (c.width || 0), 0) + (row.itemSpacing > 0 ? row.itemSpacing * (flow.length - 1) : 0);
+    return { flow, share: inner > 0 ? used / inner : 0 };
+  }
+
+  /**
+   * Whether the fixed items of [row] (a few buttons, a tab bar's tabs) fill
+   * its width as wide as the screen: on a narrower phone they shrink to
+   * share it, never past their design width.
+   */
+  shrinks(row) {
+    if (!this.screen || !row || row.layoutMode !== 'HORIZONTAL' || row.layoutWrap === 'WRAP' || scrollsItself(row)) return false;
+    if (row.width < this.screen.width * 0.85 || row.width > this.screen.width + 0.5 || this.roleOf(row) === 'carousel') return false;
+    const { flow, share } = this.rowFill(row);
+    return (flow.length <= 3 || this.roleOf(row) === 'tabBar') && share >= 0.85 &&
+      flow.some((c) => c.type !== 'TEXT' && sizingOf(c, row, 'x') === 'FIXED');
+  }
+
+  /** Whether [row] holds four or more like fixed items (tiles) filling a screen-wide row: on a narrower phone they scroll. */
+  scrollsWhenNarrow(row) {
+    if (!this.screen || row.layoutMode !== 'HORIZONTAL' || row.layoutWrap === 'WRAP' || scrollsItself(row) || this.shrinks(row)) return false;
+    if (row.width < this.screen.width * 0.85 || row.width > this.screen.width + 0.5 || this.roleOf(row) === 'carousel') return false;
+    const { flow, share } = this.rowFill(row);
+    return flow.length >= 4 && share >= 0.85 && flow.every((c) => sizingOf(c, row, 'x') === 'FIXED' && Math.abs(c.width - flow[0].width) <= 0.5);
+  }
+
   /** Whether [node] is one of three or more like layers spread evenly across a band of [parent] (tabs, tiles). */
   distributed(node, parent) {
     const band = visibleChildren(parent).filter((c) => c.y < node.y + node.height && c.y + c.height > node.y &&
@@ -1034,11 +1068,13 @@ class SwiftUIWriter {
     // On a phone screen, a section that spans the width or sits centred
     // with equal margins stretches with the screen.
     const screenWide = this.screen && parent.width >= this.screen.width - 1;
+    // Most of the screen's width: such a frame follows the screen's width (or keeps its own, where this changes nothing).
+    const wide = this.screen && parent.width >= this.screen.width * 0.8;
     const stretchy = parent === this.screen || this.stretchCells.has(parent.id) || screenWide;
     if (stretchy && cons.horizontal !== 'MAX' && cons.horizontal !== 'STRETCH' && !hugsWidth(node) &&
         node.width >= parent.width / 2 && Math.abs(x - (parent.width - x - node.width)) <= 2) {
       cons = { ...cons, horizontal: 'STRETCH' };
-    } else if (screenWide && cons.horizontal === 'MIN' && node.width < parent.width / 3 && !this.distributed(node, parent)) {
+    } else if (wide && cons.horizontal === 'MIN' && node.width < parent.width / 3 && !this.distributed(node, parent)) {
       // Left at Figma's default, a small layer keeps to its side of a
       // screen-wide frame on other screens: actions on the right stay there.
       if (Math.abs(x + node.width / 2 - parent.width / 2) <= 1) cons = { ...cons, horizontal: 'CENTER' };
@@ -1866,6 +1902,8 @@ class SwiftUIWriter {
       idents.add(id);
       f.ident = id;
     }
+    // Items showing the screen's state (the selected date) are drawn one by one, bound to it.
+    if (fields.some((f) => f.nodes.some((n) => this.bindings.has(n.id)))) return null;
     const role = this.roles.get(parent.id);
     const cell = kind === 'grid';
     const render = (n) => {
@@ -2009,6 +2047,10 @@ class SwiftUIWriter {
       // At accessibility text sizes a long press shows the item enlarged, as in the system tab bar.
       if (SELECTABLE.has(kind)) item = mod(item, 'accessibilityShowsLargeContentViewer');
     }
+    // Items sharing a narrower screen take the room before the Spacers between them.
+    if (parent.layoutMode === 'HORIZONTAL' && items.every((n) => n.type !== 'TEXT' && sizingOf(n, parent, 'x') === 'FIXED') && this.shrinks(parent)) {
+      item = mod(item, 'layoutPriority', [[null, 1]]);
+    }
     // Equal rows would share an identity: they are told apart by their place.
     const unique = !model || new Set(items.map((n, i) => fields.map((f) => f.values[i]).join('\u0000'))).size === items.length;
     const indexed = state || spread || (fires && !model) || !unique || this.probe;
@@ -2106,6 +2148,8 @@ class SwiftUIWriter {
           return view('Spacer', [['minLength', 0]]);
         }
         let item = this.node(c, ctx);
+        // Shrinking items take the room before the Spacers between them.
+        if (item && row && c.type !== 'TEXT' && sizingOf(c, node, 'x') === 'FIXED' && this.shrinks(node)) item = mod(item, 'layoutPriority', [[null, 1]]);
         // Beside a Spacer or a filling item, content with text takes its width first.
         if (item && row && flexibleRow && c.type !== 'TEXT' && sizingOf(c, node, 'x') === 'HUG' && hasText(c)) item = mod(item, 'layoutPriority', [[null, 1]]);
         const extent = (row ? c.height : c.width) || 0;
@@ -2148,7 +2192,17 @@ class SwiftUIWriter {
       };
       let items = [];
       const runs = this.inComponent ? [] : this.runsOf(flow);
+      const calendar = kind === 'calendar' && !this.inComponent ? role : null;
       for (let i = 0; i < flow.length; i++) {
+        if (calendar && flow[i].id === calendar.header) {
+          const ends = flow.findIndex((c) => c.id === calendar.ends);
+          const cal = ends > i ? calendarView(this, node, calendar, ctx) : null;
+          if (cal) {
+            items.push(cal);
+            i = ends;
+            continue;
+          }
+        }
         const run = runs.find((r) => r.start === i);
         const group = run && this.repeated(run.items, ctx, spread);
         if (group) {
@@ -2182,6 +2236,12 @@ class SwiftUIWriter {
       }
       // Children that fill a hugging cross axis take the size of the largest child.
       if (hugCross && crossFill.some(Boolean)) v = mod(v, 'fixedSize', [['horizontal', !row], ['vertical', row]]);
+      // Tiles that fill the row in the design scroll on a phone too narrow for them.
+      if (row && !carousel && !this.inComponent && this.scrollsWhenNarrow(node)) {
+        this.scrollRows.add(node.id);
+        const scroller = mod(view('ScrollView', [[null, raw('.horizontal')]], [v]), 'scrollIndicators', [[null, raw('.hidden')]]);
+        v = view('ViewThatFits', [['in', raw('.horizontal')]], [v, scroller]);
+      }
     }
     for (const [name, args] of this.containerMods.get(node.id) || []) v = mod(v, name, args);
     const scrolled = scrollsItself(node) && !this.margins.has(node.id) && !this.inComponent;
@@ -2296,6 +2356,9 @@ export function toSwiftUI(root, assets, options = {}) {
       }
     };
     index(rootNode);
+    for (const r of roles.values()) {
+      if (r.role === 'calendar' && !prepareCalendar(w, r)) delete r.names;
+    }
     return w;
   };
   let writer = start();

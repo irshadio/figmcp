@@ -2,6 +2,7 @@
 // controls, chips, buttons, fields, carousels and grids. Layer names only
 // break ties. The code generators turn each role into the platform's own
 // pattern, and the response lists them for the agent.
+import { calendarIn } from './calendar.js';
 import { inFlow, isAutoLayout } from './layout.js';
 import { drawnAsSvg, visibleChildren } from './nodes.js';
 import { shapeKey } from './swiftui/repeat.js';
@@ -189,6 +190,12 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
     const tag = TAG.exec(n.name || '');
     if (tag && tag[1].toLowerCase() === 'no-role') suppressed.add(n.id);
     else if (tag) force(n, tag[1], flow);
+    const calendar = !roles.has(n.id) && parent ? calendarIn(n) : null;
+    if (calendar) {
+      const days = calendar.months.reduce((t, m) => t + m.cells.filter((c) => c.day).length, 0);
+      set(n, 'calendar', calendar, 'high', `weekday initials over ${calendar.months.length} month grid${calendar.months.length > 1 ? 's' : ''} ` +
+        `(${days} days) on the real weekdays of ${calendar.months.map((m) => `${m.month}/${m.year}`).join(', ')}`);
+    }
     const selectedName = (i) => (i >= 0 ? `"${texts(flow[i]).length ? texts(flow[i])[0].characters : flow[i].name}" drawn apart` : 'none drawn apart');
     if (iconRow && n.width >= screenWidth * 0.9 && flow.length <= 5 && (atBottom || /tab ?bar|bottom ?nav/i.test(n.name))) {
       const sel = oddItem(flow);
@@ -237,7 +244,8 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
         ((n.width > parent.width + 0.5 || ['HORIZONTAL', 'BOTH'].includes(n.overflowDirection)) && n.width > innerWidth(parent) + 0.5 &&
           flow.every((c) => c.width >= 60 || hasImage(c)) ||
           // A strip of like pictures nearly as wide as the screen runs past a smaller one.
-          flow.length >= 4 && sameShape(flow) && flow.every(hasImage) && n.width >= screenWidth * 0.85)) {
+          flow.length >= 4 && sameShape(flow) && flow.every(hasImage) && n.width >= screenWidth * 0.85 &&
+          parent.layoutMode === 'VERTICAL' && !['HORIZONTAL', 'BOTH'].includes(n.overflowDirection))) {
       set(n, 'carousel', { items: flow.map((c) => c.id) }, sameShape(flow) ? 'high' : 'medium',
         `a row of ${flow.length}${sameShape(flow) ? ' equal' : ''} items wider than its column`);
       flow.forEach((c) => set(c, 'card'));
@@ -354,5 +362,6 @@ export const SWIFTUI_PATTERNS = {
   button: 'button: Button with a press-scale style',
   iconButton: 'icon button: Button with an accessibility label',
   textInput: 'text input: TextField bound to state, with its content type and keyboard (SecureField for a password)',
+  calendar: 'calendar: months computed from Calendar in a LazyVGrid of seven columns, days as Buttons selecting a date in @State, the design\'s per-day data as a lookup',
   progress: 'progress bar: ProgressView(value:) with a bar style drawn as the design draws it, stretching with its row',
 };

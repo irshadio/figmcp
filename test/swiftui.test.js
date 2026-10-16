@@ -732,3 +732,20 @@ test('small layers on the right of a screen-wide frame keep to it; tiles spread 
   assert.match(code, /"back"[\s\S]*?\.padding\(EdgeInsets\(top: 54, leading: 16/);
   assert.doesNotMatch(code, /padding\(\.trailing, 18\)/, 'the last tile keeps its leading place');
 });
+
+test('buttons filling a footer shrink on a narrower phone; tiles filling a row scroll there', () => {
+  const button = (label, x) => ({ ...frame(label, { x, y: 758, w: 165, h: 52, mode: 'HORIZONTAL', paddingLeft: 24, paddingRight: 24, cornerRadius: 12,
+    primaryAxisAlignItems: 'CENTER', fills: [solid(brand)], layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [text(label, { x: x + 60, y: 774, color: white })] }), type: 'INSTANCE', name: 'Button' });
+  const footer = frame('Footer', { y: 746, w: 390, h: 98, mode: 'HORIZONTAL', itemSpacing: 10, paddingLeft: 16, paddingRight: 16,
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', fills: [solid(white)], children: [button('Share', 16), button('Done', 191)] });
+  const tile = (label, x) => frame(label, { x, y: 200, w: 66, h: 70, mode: 'VERTICAL', layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [icon('Icon', 44, 28, { x: x + 11, y: 200 }), text(label, { x: x + 10, y: 232 })] });
+  const tiles = frame('Products', { x: 16, y: 186, w: 358, h: 98, mode: 'HORIZONTAL', primaryAxisAlignItems: 'SPACE_BETWEEN', paddingLeft: 8, paddingRight: 8,
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', children: ['Flights', 'Hotels', 'Stays', 'Trains', 'Buses'].map((l, i) => tile(l, 24 + i * 69)) });
+  const root = frame('Home', { w: 390, h: 844, mode: 'VERTICAL', paddingLeft: 16, paddingRight: 16, counterAxisAlignItems: 'MIN', children: [tiles, footer] });
+  const { code } = toSwiftUI(root, assets);
+  assert.match(code, /\.frame\(maxWidth: 165, minHeight: 52\)|\.frame\(maxWidth: 165\)/);
+  assert.match(code, /\.layoutPriority\(1\)/);
+  assert.match(code, /ViewThatFits\(in: \.horizontal\) \{[\s\S]*?ScrollView\(\.horizontal\) \{/);
+});
