@@ -37,10 +37,12 @@ test('bound variables become var() with the exact value as fallback', () => {
   }]));
   assert.match(out, /gap-\[var\(--padding-16,16px\)\]/);
   assert.match(out, /px-\[var\(--padding-8,8px\)\]/);
-  assert.match(out, /rounded-\[var\(--r\\\/12,12px\)\]/);
-  assert.match(out, /bg-\[var\(--primary\\\/900,#09122d\)\]/);
-  assert.match(out, /text-\[var\(--black\\\/900,#000000\)\]/);
-  assert.match(out, /text-\[length:var\(--body\\\/size,14px\)\]/);
+  // Characters a CSS name would escape become dashes: no backslashes in classes.
+  assert.match(out, /rounded-\[var\(--r-12,12px\)\]/);
+  assert.match(out, /bg-\[var\(--primary-900,#09122d\)\]/);
+  assert.match(out, /text-\[var\(--black-900,#000000\)\]/);
+  assert.match(out, /text-\[length:var\(--body-size,14px\)\]/);
+  assert.doesNotMatch(out, /\\/);
   assert.match(out, /data-text-style="Body\/Medium"/);
 });
 
@@ -52,10 +54,10 @@ test('constraints anchor absolute children like Figma', () => {
     kid('1:4', { horizontal: 'STRETCH', vertical: 'MIN' }),
     kid('1:5', { horizontal: 'SCALE', vertical: 'SCALE' }),
   ]));
-  assert.match(out, /absolute right-\[10px\] w-\[40px\] bottom-\[10px\] h-\[20px\]/);
-  assert.match(out, /left-\[calc\(50%\+50px\)\] w-\[40px\] top-\[calc\(50%\+20px\)\] h-\[20px\]/);
+  assert.match(out, /absolute right-2.5 w-10 bottom-2.5 h-5/);
+  assert.match(out, /left-\[calc\(50%\+50px\)\] w-10 top-\[calc\(50%\+20px\)\] h-5/);
   assert.doesNotMatch(out, /translate/);
-  assert.match(out, /left-\[150px\] right-\[10px\] top-\[70px\] h-\[20px\]/);
+  assert.match(out, /left-\[150px\] right-2.5 top-\[70px\] h-5/);
   assert.match(out, /left-\[75%\] w-\[20%\] top-\[70%\] h-\[20%\]/);
 });
 
@@ -65,7 +67,7 @@ test('min/max sizes, negative spacing and reversed stacking', () => {
     { id: '1:3', name: 'B', type: 'FRAME', x: 12, y: 0, width: 20, height: 20, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED' },
   ], { layoutMode: 'HORIZONTAL', itemSpacing: -8, itemReverseZIndex: true }));
   assert.match(out, /min-w-\[10px\] max-w-\[30px\]/);
-  assert.match(out, /ml-\[-8px\]/);
+  assert.match(out, /-ml-2/);
   assert.doesNotMatch(out, /gap-\[-8px\]/);
   assert.match(out, /z-\[2\]/);
 });
@@ -74,7 +76,7 @@ test('grid layout with fixed and flexible tracks', () => {
   const out = code(frame([
     { id: '1:2', name: 'Cell', type: 'FRAME', x: 0, y: 0, width: 50, height: 50, gridColumnAnchorIndex: 1, gridRowAnchorIndex: 0, layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'FIXED' },
   ], { layoutMode: 'GRID', gridColumnSizes: [{ type: 'FIXED', value: 50 }, { type: 'FLEX', value: 1 }], gridRowCount: 2, gridColumnGap: 8, gridRowGap: 4 }));
-  assert.match(out, /grid grid-cols-\[50px_minmax\(0,1fr\)\] grid-rows-\[repeat\(2,minmax\(0,1fr\)\)\] gap-x-\[8px\] gap-y-\[4px\]/);
+  assert.match(out, /grid grid-cols-\[50px_minmax\(0,1fr\)\] grid-rows-\[repeat\(2,minmax\(0,1fr\)\)\] gap-x-2 gap-y-1/);
   assert.match(out, /col-start-\[2\] row-start-\[1\] justify-self-stretch h-\[50px\]/);
 });
 
@@ -83,7 +85,7 @@ test('rotated leaves turn inside their bounding box; rotated groups use the rend
     { id: '1:2', name: 'Bar', type: 'RECTANGLE', x: 10, y: 10, width: 20, height: 40, rotation: 90, rawWidth: 40, rawHeight: 20, fills: [solid()] },
     { id: '1:3', name: 'Tilted', type: 'GROUP', x: 50, y: 10, width: 30, height: 30, rotation: 15, rawWidth: 25, rawHeight: 25, render: { base64: 'x' }, rasterized: 'rotation', children: [] },
   ]));
-  assert.match(out, /absolute left-\[10px\] w-\[20px\] top-\[10px\] h-\[40px\] flex items-center justify-center">\n\s+<div className="relative flex-none w-\[40px\] h-\[20px\] rotate-\[-90deg\]/);
+  assert.match(out, /absolute left-2.5 w-5 top-2.5 h-10 flex items-center justify-center">\n\s+<div className="relative flex-none w-10 h-5 rotate-\[-90deg\]/);
   assert.match(out, /data-rasterized="rotation"/);
   assert.match(out, /src=\{imgTilted\}/);
 });
@@ -138,7 +140,7 @@ test('text: max lines, truncation, paragraph spacing and links', () => {
     { id: '1:4', name: 'Link', type: 'TEXT', x: 0, y: 90, width: 60, height: 20, characters: 'Terms', textAutoResize: 'WIDTH_AND_HEIGHT', segments: [{ ...seg, characters: 'Terms', hyperlink: { type: 'URL', value: 'https://example.com' } }] },
   ]));
   assert.match(out, /line-clamp-\[2\]/);
-  assert.match(out, /<p className="mb-\[6px\]">One<\/p>\n\s+<p>Two<\/p>/);
+  assert.match(out, /<p className="mb-1.5">One<\/p>\n\s+<p>Two<\/p>/);
   assert.match(out, /<a href="https:\/\/example.com">Terms<\/a>/);
 });
 
@@ -160,7 +162,9 @@ test('mapped components are emitted as the mapped widget with their props', () =
     connect: (n) => (n.componentSetKey === 'k1' ? { componentName: 'AppPrimaryButton', source: 'lib/app_primary_button.dart', label: 'Flutter' } : null),
   });
   assert.match(res.code, /^\/\/ AppPrimaryButton: lib\/app_primary_button.dart \(Flutter\)/);
-  assert.match(res.code, /<AppPrimaryButton className="absolute left-\[0px\] w-\[100px\] top-\[0px\] h-\[40px\]" data-name="Button" data-node-id="1:2" data-component="Button" data-variant="State=Default; Show icon=false" data-interactions="ON_CLICK NODE NAVIGATE Next \(9:9\)" state="Default" showIcon=\{false\} text="Continue" \/>/);
+  // The layout stays on a wrapper; the component gets only its Figma props, its texts are a hint.
+  assert.match(res.code, /<div className="absolute left-0 w-\[100px\] top-0 h-10" data-name="Button" data-node-id="1:2" data-component="Button" data-variant="State=Default; Show icon=false" data-interactions="ON_CLICK NODE NAVIGATE Next \(9:9\)">\n\s+\{\/\* AppPrimaryButton texts in the design: "Continue" \*\/\}\n\s+<AppPrimaryButton state="Default" showIcon=\{false\} \/>\n\s+<\/div>/);
+  assert.doesNotMatch(res.code, /<AppPrimaryButton className/);
   assert.equal(res.connected.length, 1);
   const off = code(frame([button]));
   assert.doesNotMatch(off, /AppPrimaryButton/);
@@ -176,8 +180,8 @@ test('runs share their common styles on the paragraph', () => {
     lineHeight: { unit: 'PIXELS', value: 22 }, fills: [solid(color)] });
   const out = code(frame([{ id: '1:2', name: 'T', type: 'TEXT', x: 0, y: 0, width: 128, height: 22, characters: 'Ton x1',
     textAutoResize: 'WIDTH_AND_HEIGHT', segments: [run('Ton ', black), run('x1', { r: 1, g: 0, b: 0, a: 1 })] }]));
-  assert.match(out, /<p className="[^"]*font-\['Inter:Semi_Bold',sans-serif\] text-\[14px\] leading-\[22px\]/);
-  assert.match(out, /<span className="text-\[#000000\]">\{"Ton "\}<\/span><span className="text-\[#ff0000\]">x1<\/span>/);
+  assert.match(out, /<p className="[^"]*font-\['Inter',sans-serif\] font-semibold text-\[14px\] leading-\[22px\]/);
+  assert.match(out, /<span className="text-black">\{"Ton "\}<\/span><span className="text-\[#ff0000\]">x1<\/span>/);
 });
 
 test('an SVG larger than its layer keeps its own size and offset', () => {

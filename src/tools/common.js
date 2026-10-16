@@ -72,20 +72,3 @@ export function fileResolver(images) {
     render: (render) => path.join(ASSETS, saveAsset(Buffer.from(render.base64, 'base64'), 'png')),
   };
 }
-
-/** Saves embedded design data as assets and returns their URLs. */
-export function resolver(bridge, images) {
-  const bytes = (hash) => (images[hash] ? Buffer.from(images[hash], 'base64') : null);
-  return {
-    svg: (svg) => bridge.assetUrl(saveAsset(svg, 'svg')),
-    image: (hash) => {
-      const b = bytes(hash);
-      return b ? bridge.assetUrl(saveAsset(b, imageExt(b))) : null;
-    },
-    imageSize: (hash) => {
-      const b = bytes(hash);
-      return b ? imageSize(b) : null;
-    },
-    render: (render) => bridge.assetUrl(saveAsset(Buffer.from(render.base64, 'base64'), 'png')),
-  };
-}

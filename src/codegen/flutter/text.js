@@ -1,5 +1,5 @@
 // Text nodes as Text and Text.rich widgets.
-import { boxLineHeight, paragraphs, segmentsOf, SOFT_BREAK, topPaint } from '../text.js';
+import { boxLineHeight, paragraphs, segmentsOf, SOFT_BREAK, styleWeight, topPaint } from '../text.js';
 import { call, list, print, raw, str } from './dart.js';
 
 /** The gradient of a run's top fill, or null. */
@@ -14,18 +14,11 @@ const DECORATION = { UNDERLINE: 'TextDecoration.underline', STRIKETHROUGH: 'Text
 const DECORATION_STYLE = {
   WAVY: 'TextDecorationStyle.wavy', DOTTED: 'TextDecorationStyle.dotted', DASHED: 'TextDecorationStyle.dashed',
 };
-const STYLE_WEIGHTS = [
-  [/thin|hairline/i, 100], [/extra ?light|ultra ?light/i, 200], [/light/i, 300], [/medium/i, 500],
-  [/semi ?bold|demi ?bold/i, 600], [/extra ?bold|ultra ?bold/i, 800], [/bold/i, 700],
-  [/black|heavy/i, 900],
-];
 
 /** Font weight 100..900 of a text run. */
 export function fontWeight(seg) {
   if (typeof seg.fontWeight === 'number') return Math.min(900, Math.max(100, Math.round(seg.fontWeight / 100) * 100));
-  const style = (seg.fontName && seg.fontName.style) || '';
-  const hit = STYLE_WEIGHTS.find(([re]) => re.test(style));
-  return hit ? hit[1] : 400;
+  return styleWeight(seg.fontName && seg.fontName.style);
 }
 
 function titleCase(text) {

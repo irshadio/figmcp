@@ -102,6 +102,27 @@ test('text keeps its styling when newer segment fields are not supported', async
   assert.equal(tree.segmentsError, undefined);
 });
 
+test('OpenType features of a run are exported; a Figma without them keeps the other fields', async () => {
+  const runs = [
+    { characters: '40,00', start: 0, end: 5, fontSize: 16, openTypeFeatures: {}, textDecoration: 'NONE' },
+    { characters: '00', start: 5, end: 7, fontSize: 16, openTypeFeatures: { SUPS: true }, textDecoration: 'UNDERLINE' },
+  ];
+  const text = (getStyledTextSegments) => makeNode({
+    id: '1:1', type: 'TEXT', box: [0, 0, 60, 20], characters: '40,0000', textAutoResize: 'WIDTH_AND_HEIGHT', getStyledTextSegments,
+  });
+  const { tree } = await loadPlugin(text(() => runs)).request('node', { id: '1:1' });
+  assert.equal('openTypeFeatures' in tree.segments[0], false, 'no features, no field');
+  assert.deepEqual(tree.segments[1].openTypeFeatures, { SUPS: true });
+
+  const older = await loadPlugin(text((fields) => {
+    if (fields.includes('openTypeFeatures')) throw new Error('Invalid field openTypeFeatures');
+    return runs.map(({ openTypeFeatures, ...rest }) => ({ ...rest, textDecorationStyle: fields.includes('textDecorationStyle') ? 'WAVY' : undefined }));
+  })).request('node', { id: '1:1' });
+  assert.equal(older.tree.segments[1].textDecoration, 'UNDERLINE');
+  assert.equal(older.tree.segments[1].textDecorationStyle, 'WAVY', 'the decoration fields are still read');
+  assert.equal(older.tree.segmentsError, undefined);
+});
+
 test('a read stops at maxNodes and says it was truncated', async () => {
   const kids = Array.from({ length: 5 }, (_, i) => ({ id: `2:${i}`, type: 'FRAME', box: [0, 0, 5, 5],
     children: [{ id: `3:${i}`, type: 'FRAME', box: [0, 0, 1, 1] }] }));
@@ -147,4 +168,15 @@ test('run reports syntax errors, thrown errors with logs, and Dev Mode', async (
   assert.equal(figma.undoSteps, 1);
   const dev = loadPlugin(makeNode({ id: '1:1', type: 'FRAME' }), { editorType: 'dev' });
   await assert.rejects(dev.request('run', { code: 'return 1' }), /Design mode/);
+});
+
+test('a paint bound to a variable carries the variable\'s value for the layer, not its stored colour', async () => {
+  const alias = { type: 'VARIABLE_ALIAS', id: 'V:1' };
+  const stale = { type: 'SOLID', visible: true, color: { r: 0, g: 0, b: 0 }, opacity: 1, blendMode: 'NORMAL', boundVariables: { color: alias } };
+  const root = makeNode({ id: '1:1', type: 'FRAME', box: [0, 0, 100, 100], fills: [stale], strokes: [] });
+  const variables = { 'V:1': { name: 'bg/page', resolveForConsumer: (node) => ({ resolvedType: 'COLOR', value: { r: 0.96, g: 0.965, b: 0.97, a: 1 }, node }) } };
+  const { tree } = await loadPlugin(root, { variables }).request('node', { id: '1:1' });
+  assert.equal(tree.vars['fill.0'], 'bg/page');
+  assert.deepEqual(tree.fills[0].color, { r: 0.96, g: 0.965, b: 0.97 });
+  assert.equal(tree.fills[0].opacity, 1);
 });

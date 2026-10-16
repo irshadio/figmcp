@@ -18,7 +18,7 @@ export async function loadDesign(opts) {
   if (opts.export) {
     const data = JSON.parse(fs.readFileSync(opts.export, 'utf8'));
     const frame = data.frames[0];
-    return { tree: frame.tree, images: data.images || {}, render: Buffer.from(frame.previewPng2x, 'base64') };
+    return { tree: frame.tree, images: data.images || {}, render: frame.previewPng2x ? Buffer.from(frame.previewPng2x, 'base64') : null };
   }
   if (opts.snapshot) {
     const hit = findSnapshotNode(opts.snapshot.replace(/-/g, ':'), { preview: true });
@@ -54,8 +54,11 @@ export function families(n, out = new Set()) {
 /** Every node the code draws, with its box relative to the root. */
 export function expectedBoxes(tree, { skip = () => false } = {}) {
   const out = [];
+  // A layer wholly outside a clipping root never shows.
+  const outside = (n) => tree.clipsContent && n !== tree && (n.x + n.width <= tree.x || n.x >= tree.x + tree.width ||
+    n.y + n.height <= tree.y || n.y >= tree.y + tree.height);
   const walk = (n, depth) => {
-    if (!n || n.visible === false || n.isMask || skip(n)) return;
+    if (!n || n.visible === false || n.isMask || skip(n) || (depth === 1 && outside(n))) return;
     out.push({ id: n.id, name: n.name, type: n.type, x: n.x - tree.x, y: n.y - tree.y, width: n.width, height: n.height, depth,
       text: n.type === 'TEXT', families: [...families(n)] });
     if (n.svg || n.render) return;
@@ -120,14 +123,18 @@ export function compareBoxes(boxes, rects, bundled, tree = null) {
     const missingFonts = box.families.filter((f) => !bundled.has(f));
     missingFonts.forEach((f) => unbundled.add(f));
     const tol = box.text ? TEXT_TOLERANCE : BOX_TOLERANCE;
-    const d = ['x', 'y', 'width', 'height'].map((k) => Math.round((got[k] - box[k]) * 100) / 100);
+    // A scroller is compared by its box or by its scroll width, whichever the design has.
+    const width = typeof got.scrollWidth === 'number' && Math.abs(got.scrollWidth - box.width) < Math.abs(got.width - box.width)
+      ? got.scrollWidth : got.width;
+    const d = ['x', 'y', 'width', 'height'].map((k) => Math.round(((k === 'width' ? width : got[k]) - box[k]) * 100) / 100);
+    if (got.grows && d[2] > 0) d[2] = 0;
     if (d.some((v) => Math.abs(v) > tol)) {
       const rounding = sensitive.get(box.id) && Math.abs(d[0]) <= ROUNDING && Math.abs(d[2]) <= ROUNDING &&
         Math.abs(d[1]) <= tol && Math.abs(d[3]) <= tol;
       (missingFonts.length ? fontMismatches : rounding ? roundingMismatches : mismatches).push({
         id: box.id, name: box.name, type: box.type,
         expected: [box.x, box.y, box.width, box.height].map((v) => Math.round(v * 100) / 100),
-        actual: [got.x, got.y, got.width, got.height].map((v) => Math.round(v * 100) / 100),
+        actual: [got.x, got.y, width, got.height].map((v) => Math.round(v * 100) / 100),
         delta: d, ...(missingFonts.length ? { cause: `text in ${missingFonts.join(', ')}, which is not bundled` } : {}),
       });
     }
