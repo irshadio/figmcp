@@ -169,3 +169,14 @@ test('run reports syntax errors, thrown errors with logs, and Dev Mode', async (
   const dev = loadPlugin(makeNode({ id: '1:1', type: 'FRAME' }), { editorType: 'dev' });
   await assert.rejects(dev.request('run', { code: 'return 1' }), /Design mode/);
 });
+
+test('a paint bound to a variable carries the variable\'s value for the layer, not its stored colour', async () => {
+  const alias = { type: 'VARIABLE_ALIAS', id: 'V:1' };
+  const stale = { type: 'SOLID', visible: true, color: { r: 0, g: 0, b: 0 }, opacity: 1, blendMode: 'NORMAL', boundVariables: { color: alias } };
+  const root = makeNode({ id: '1:1', type: 'FRAME', box: [0, 0, 100, 100], fills: [stale], strokes: [] });
+  const variables = { 'V:1': { name: 'bg/page', resolveForConsumer: (node) => ({ resolvedType: 'COLOR', value: { r: 0.96, g: 0.965, b: 0.97, a: 1 }, node }) } };
+  const { tree } = await loadPlugin(root, { variables }).request('node', { id: '1:1' });
+  assert.equal(tree.vars['fill.0'], 'bg/page');
+  assert.deepEqual(tree.fills[0].color, { r: 0.96, g: 0.965, b: 0.97 });
+  assert.equal(tree.fills[0].opacity, 1);
+});

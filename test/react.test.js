@@ -435,3 +435,33 @@ test('apps keep their layout fluid; colliding variable names and failed runs are
   assert.match(failed, /\{brokenItems\.map\(/);
   assert.match(failed, /data-error="the plugin could not read this layer \(boom\)"/);
 });
+
+test('corpus findings, second round: font axes, empty texts, baseline rows, hugging columns', () => {
+  const axes = code(frame([text('Get paid', {}, { fontName: { family: 'Bricolage Grotesque', style: 'Bold', variationSettings: { opsz: 14, wdth: 100, wght: 700 } } })]));
+  assert.match(axes, /\[font-variation-settings:'opsz'_14\]/, 'Figma\'s optical size, not the browser\'s pick');
+  assert.doesNotMatch(code(frame([text('Hi', {}, { fontName: { family: 'Inter', style: 'Bold', variationSettings: { wght: 700 } } })])), /font-variation/);
+
+  assert.match(code(frame([text('', { height: 16 })])), /h-4[^"]*" data-name="T"/, 'an empty text keeps its line');
+  assert.match(code(frame([text('A long title that wraps', { textAutoResize: 'HEIGHT', height: 60 }, { lineHeight: { unit: 'PIXELS', value: 30 } })])),
+    /min-h-\[60px\]/, 'wrapped text keeps the height Figma gives it');
+
+  const priceRow = frame([text('AED 3,899', { id: '20:2', y: 0, height: 28 }), { ...box('20:3', { name: 'Save', y: 8, height: 20 }) }],
+    { layoutMode: 'HORIZONTAL', counterAxisAlignItems: 'BASELINE', height: 28 });
+  const baseline = code(priceRow);
+  assert.match(baseline, /className="[^"]*flex justify-start items-start[^"]*" data-name="Root"/);
+  assert.match(baseline, /mt-2[^"]*" data-name="Save"/, 'each child sits where Figma has it');
+
+  const phone = (column) => ({ id: '21:1', name: 'Screen', type: 'FRAME', x: 0, y: 0, width: 390, height: 844, children: [{
+    ...box('21:2', { name: 'Week', layoutMode: 'HORIZONTAL', width: 134, height: 42, x: 100, y: 100, layoutSizingHorizontal: 'HUG' }),
+    children: [{ ...box('21:3', { name: 'Day', layoutMode: 'VERTICAL', width: 22, height: 42, x: 100, y: 100, ...column }), children: [box('21:4', { name: 'Dot', x: 100, y: 100, width: 22, height: 22, layoutSizingHorizontal: 'FIXED' })] }],
+  }] });
+  assert.match(code(phone({ layoutSizingHorizontal: 'HUG' })), /relative shrink-0 w-\[22px\] h-\[22px\]" data-name="Dot"/, 'no w-full in a column that hugs its children');
+  assert.match(code(phone({ layoutSizingHorizontal: 'FIXED' })), /w-full max-w-\[22px\][^"]*" data-name="Dot"/);
+  assert.match(code(phone({ layoutSizingHorizontal: 'FIXED', strokeWeight: 1, strokes: [solid()], strokesIncludedInLayout: true })),
+    /w-\[22px\][^"]*" data-name="Dot"/, 'a border in the layout leaves less room');
+
+  const stale = gen(frame([box('22:1', { fills: [solid()], vars: { 'fill.0': 'bg/page' } }),
+    box('22:2', { fills: [solid({ r: 0.96, g: 0.96, b: 0.96, a: 1 })], vars: { 'fill.0': 'bg/page' } }),
+    box('22:3', { fills: [solid({ r: 0.96, g: 0.96, b: 0.96, a: 1 })], vars: { 'fill.0': 'bg/page' } })]));
+  assert.match(stale.css, /--bg-page: #f5f5f5; \/\* bg\/page; also used as #000000 \*\//, 'the value most of the frame uses');
+});

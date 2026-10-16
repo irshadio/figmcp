@@ -3,7 +3,7 @@
 // CSS grids and everything else is placed by its constraints.
 import { linearTransform, rotationOf } from './geometry.js';
 import {
-  containerClasses, inFlow, isAutoLayout, isGrid, positionClasses, radiusClasses, sizingOf,
+  containerClasses, inFlow, isAutoLayout, isGrid, positionClasses, radiusClasses, sizingOf, strokeSpace,
 } from './layout.js';
 import { drawnAsSvg, hasImageFill, isTurned, straightLine, visibleChildren } from './nodes.js';
 import {
@@ -339,7 +339,10 @@ class Writer {
     const regular = segs.filter((seg) => !scriptOf(seg));
     const perRun = (regular.length ? regular : segs).map((seg) => fontClasses(seg, node, this.ratios));
     const shared = perRun[0].filter((c) => perRun.every((classes) => classes.includes(c)));
-    const block = [...textBlockClasses(node), ...this.boxClasses(node, {}, false).classes, roundedHeight(node, paras)];
+    // An empty text keeps the line Figma gives it; an empty CSS box has none.
+    const blank = !paras.some((p) => p.pieces.some((x) => x.text));
+    const block = [...textBlockClasses(node), ...this.boxClasses(node, {}, false).classes,
+      blank ? `h-[${px(node.height)}]` : roundedHeight(node, paras)];
     const valign = verticalAlign(node);
     const spacing = node.paragraphSpacing || 0;
     const characters = paras.map((p) => p.pieces.map((x) => (x.br ? '\u2028' : x.text)).join('')).join('\n');
@@ -566,9 +569,11 @@ class Writer {
     }
     if (!inFlow(node, parent) || node.svg || node.render || hasImageFill(node) || node.type === 'TEXT' && node.textAutoResize === 'WIDTH_AND_HEIGHT') return out;
     if (parent.layoutMode === 'VERTICAL') {
-      // A fixed width narrower than the column may shrink with the screen.
-      const room = parent.width - (parent.paddingLeft || 0) - (parent.paddingRight || 0);
-      out.narrow = sizingOf(node, parent, 'x') === 'FIXED' && node.width <= room + 0.01;
+      // A fixed width narrower than the column may shrink with the screen,
+      // when the column's own width does not come from its children.
+      const [borderLeft, borderRight] = strokeSpace(parent);
+      const room = parent.width - (parent.paddingLeft || 0) - (parent.paddingRight || 0) - borderLeft - borderRight;
+      out.narrow = !hugsOwnWidth(parent) && sizingOf(node, parent, 'x') === 'FIXED' && node.width <= room + 0.01;
     } else if (parent.layoutMode === 'HORIZONTAL' && (parent.itemSpacing || 0) >= 0 && !scroller) {
       // Fixed-width columns of text in a row that fits may shrink when the
       // screen is narrower than the design; with room they keep their width.
@@ -816,13 +821,19 @@ function scrollsSideways(node, parent, screen) {
 }
 
 /**
- * Figma rounds a hugging text box's height up to a whole pixel, as it does
- * its width: with fractional line heights (scaled frames) the box is taller
- * than its lines. A min-height keeps that box.
+ * A min-height that keeps a text box as Figma has it. Figma rounds a
+ * hugging text box's height up to a whole pixel, as it does its width: with
+ * fractional line heights (scaled frames) the box is taller than its lines.
  */
 function roundedHeight(node, paras) {
   if (node.textAutoResize !== 'WIDTH_AND_HEIGHT' && node.textAutoResize !== 'HEIGHT') return null;
   const segs = segmentsOf(node);
+  // Wrapping text Figma breaks onto two or more lines keeps that height: a
+  // font build a hair narrower would otherwise fit it on fewer and move
+  // everything below. It still grows when the browser wraps it further.
+  const line = Math.max(...segs.map((s) => (s.lineHeight && s.lineHeight.unit === 'PIXELS' ? s.lineHeight.value
+    : (s.fontSize || 14) * (s.lineHeight && s.lineHeight.unit === 'PERCENT' ? s.lineHeight.value / 100 : 1.25))));
+  if (node.textAutoResize === 'HEIGHT' && node.height >= line * 1.75) return `min-h-[${px(node.height)}]`;
   const lh = segs[0].lineHeight;
   if (!lh || lh.unit !== 'PIXELS' || !lh.value || !segs.every((s) => s.lineHeight && s.lineHeight.unit === 'PIXELS' && s.lineHeight.value === lh.value)) return null;
   const spacing = (node.paragraphSpacing || 0) * Math.max(0, paras.length - 1);
@@ -868,6 +879,13 @@ function columnPadding(classes, node, width) {
   const side = (v) => `[max(${px(v)},calc(50%-${px(half - v)}))]`;
   const kept = classes.filter((c) => !/^(px|pl|pr)-/.test(c));
   return [...kept, `pl-${side(node.paddingLeft || 0)}`, `pr-${side(node.paddingRight || 0)}`];
+}
+
+/** Whether an auto-layout frame takes its width from its children. */
+function hugsOwnWidth(node) {
+  if (node.layoutSizingHorizontal) return node.layoutSizingHorizontal === 'HUG';
+  const mode = node.layoutMode === 'HORIZONTAL' ? node.primaryAxisSizingMode : node.counterAxisSizingMode;
+  return mode === 'AUTO';
 }
 
 function hasText(node) {

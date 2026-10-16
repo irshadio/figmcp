@@ -125,6 +125,8 @@ export function positionClasses(node, parent, opts = {}) {
       }
     }
     if (opts.indent) out.push(`ml-[${opts.indent}]`);
+    const lift = baselineOffset(node, parent);
+    if (lift) out.push(`mt-[${px(lift)}]`);
     if (parent.itemReverseZIndex && typeof opts.index === 'number') {
       out.push(`z-[${(opts.count || 0) - opts.index}]`);
     }
@@ -196,7 +198,19 @@ function sign(v) {
   return v < 0 ? n : `+${n}`;
 }
 
-function strokeSpace(node) {
+/**
+ * How far below the top of a baseline-aligned row Figma puts [node]: its
+ * offset from the padding edge, or 0.
+ */
+export function baselineOffset(node, parent) {
+  if (!parent || parent.layoutMode !== 'HORIZONTAL' || parent.counterAxisAlignItems !== 'BASELINE' || !inFlow(node, parent)) return 0;
+  const top = parent.y + (parent.paddingTop || 0) + strokeSpace(parent)[2];
+  const offset = Math.round((node.y - top) * 100) / 100;
+  return offset > 0.01 ? offset : 0;
+}
+
+/** Room a border takes in a layout (left, right, top, bottom), when Figma counts strokes in it. */
+export function strokeSpace(node) {
   if (!node.strokesIncludedInLayout) return [0, 0, 0, 0];
   const visible = Array.isArray(node.strokes) && node.strokes.some((p) => p && p.visible !== false);
   if (!visible) return [0, 0, 0, 0];
@@ -281,7 +295,9 @@ export function containerClasses(node) {
     out.push(`gap-[${tw(spacing)}]`);
   }
   out.push(loneChildJustify(node, row) || JUSTIFY[node.primaryAxisAlignItems] || 'justify-start');
-  out.push(ITEMS[node.counterAxisAlignItems] || 'items-start');
+  // A row aligned on text baselines places its children where Figma has
+  // them (baselineOffset), as browsers round font metrics differently.
+  out.push(row && node.counterAxisAlignItems === 'BASELINE' ? 'items-start' : ITEMS[node.counterAxisAlignItems] || 'items-start');
   return [...out, ...padding(node)];
 }
 

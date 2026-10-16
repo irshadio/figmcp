@@ -33,7 +33,7 @@ export function makeNode(desc, parent = null, ids = { n: 1 }) {
 }
 
 /** Loads the plugin with [root] as the document; returns { request, posted }. */
-export function loadPlugin(root, { images = {}, editorType = 'figma' } = {}) {
+export function loadPlugin(root, { images = {}, editorType = 'figma', variables = {} } = {}) {
   const byId = new Map();
   const index = (n) => {
     byId.set(n.id, n);
@@ -77,7 +77,7 @@ export function loadPlugin(root, { images = {}, editorType = 'figma' } = {}) {
     getStyleByIdAsync: async () => null,
     getImageByHash: (hash) => (images[hash] ? { getBytesAsync: images[hash] } : null),
     base64Encode: (bytes) => Buffer.from(bytes).toString('base64'),
-    variables: { getVariableByIdAsync: async () => null },
+    variables: { getVariableByIdAsync: async (id) => variables[id] || null },
   };
   const context = vm.createContext({
     figma, __html__: '', console, setTimeout, clearTimeout, Promise, Date, JSON, Math, Map, Set, Array, Symbol,

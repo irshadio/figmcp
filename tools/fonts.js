@@ -88,11 +88,57 @@ export async function fetchGoogleFont(family) {
   }
 }
 
+let axesCache = null;
+
+/** Google Fonts' axes of [family] ([{ tag, min, max }]), or null. */
+async function googleAxes(family) {
+  if (!axesCache) {
+    const file = path.join(FONT_CACHE, 'google-axes.json');
+    try {
+      axesCache = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      const res = await fetch('https://fonts.google.com/metadata/fonts', { signal: AbortSignal.timeout(30000) });
+      if (!res.ok) return null;
+      const text = await res.text();
+      const list = JSON.parse(text.slice(text.indexOf('{'))).familyMetadataList || [];
+      axesCache = Object.fromEntries(list.filter((f) => f.axes && f.axes.length).map((f) => [f.family, f.axes]));
+      fs.mkdirSync(FONT_CACHE, { recursive: true });
+      fs.writeFileSync(file, JSON.stringify(axesCache));
+    }
+  }
+  return axesCache[family] || null;
+}
+
+/** Downloads the variable font of [family] (all its axes) from Google Fonts. */
+export async function fetchVariableFont(family) {
+  const dir = path.join(FONT_CACHE, `${family.replace(/[^A-Za-z0-9]+/g, '_')}_variable`);
+  if (fs.existsSync(dir) && fs.readdirSync(dir).length) return;
+  const axes = await googleAxes(family);
+  if (!axes) return;
+  const sorted = [...axes].sort((a, b) => (a.tag < b.tag ? -1 : 1));
+  const query = `family=${encodeURIComponent(family)}:${sorted.map((a) => a.tag).join(',')}@${sorted.map((a) => `${a.min}..${a.max}`).join(',')}`;
+  const res = await fetch(`https://fonts.googleapis.com/css2?${query}`, { signal: AbortSignal.timeout(20000) });
+  if (!res.ok) return;
+  const url = /url\(([^)]+\.ttf)\)/.exec(await res.text());
+  if (!url) return;
+  fs.mkdirSync(dir, { recursive: true });
+  const bytes = Buffer.from(await (await fetch(url[1], { signal: AbortSignal.timeout(30000) })).arrayBuffer());
+  fs.writeFileSync(path.join(dir, `${family.replace(/\s+/g, '')}-Variable.ttf`), bytes);
+}
+
+/** The variable font files of [family] among [files]. */
+function variableFiles(family, files) {
+  const key = norm(family);
+  return files.filter((f) => f.stem.startsWith(key) && /variable|vf|wght/.test(f.stem.slice(key.length))).map((f) => f.file);
+}
+
 /**
  * { family: [files] } for the [used] families, from [dirs], the system font
  * folders and the download cache; [fetch] downloads missing Google Fonts.
+ * Families in [variable] (their design sets axes such as optical size) use
+ * a variable font, which honours those axes.
  */
-export async function resolveFonts(used, dirs, { fetch: download = false, exts } = {}) {
+export async function resolveFonts(used, dirs, { fetch: download = false, exts, variable = new Set() } = {}) {
   const all = () => fontFiles([...dirs, ...SYSTEM_FONTS, FONT_CACHE], exts);
   let files = all();
   if (download) {
@@ -108,9 +154,23 @@ export async function resolveFonts(used, dirs, { fetch: download = false, exts }
     }
     if (fetched) files = all();
   }
+  if (download) {
+    let fetched = false;
+    for (const family of used) {
+      if (!variable.has(family) || variableFiles(family, files).length) continue;
+      try {
+        await fetchVariableFont(family);
+        fetched = true;
+      } catch (e) {
+        process.stderr.write(`could not download the variable ${family}: ${e.message}\n`);
+      }
+    }
+    if (fetched) files = all();
+  }
   const out = {};
   for (const family of used) {
-    const hit = familyFiles(family, files);
+    const vf = variable.has(family) ? variableFiles(family, files) : [];
+    const hit = vf.length ? vf : familyFiles(family, files);
     if (hit.length) out[family] = hit;
   }
   return out;

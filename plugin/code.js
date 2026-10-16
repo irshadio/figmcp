@@ -147,6 +147,30 @@ async function variableName(ctx, alias) {
   return name;
 }
 
+// A paint bound to a colour variable is drawn in the variable's value for
+// the layer's mode; the colour stored on the paint can be out of date.
+async function resolvedColor(ctx, alias, consumer) {
+  if (!alias || alias.type !== 'VARIABLE_ALIAS') return null;
+  try {
+    const variable = await figma.variables.getVariableByIdAsync(alias.id);
+    const resolved = variable && variable.resolveForConsumer ? variable.resolveForConsumer(consumer) : null;
+    const v = resolved && resolved.resolvedType === 'COLOR' ? resolved.value : null;
+    return v && typeof v.r === 'number' ? { r: v.r, g: v.g, b: v.b } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Writes the resolved colour of each bound paint in [exported] (the cleaned copy of [list]). */
+async function resolvePaints(ctx, list, exported, consumer) {
+  if (!Array.isArray(list) || !Array.isArray(exported)) return;
+  for (let i = 0; i < list.length && i < exported.length; i++) {
+    const b = list[i] && list[i].boundVariables;
+    const color = b ? await resolvedColor(ctx, b.color, consumer) : null;
+    if (color && exported[i]) exported[i].color = color;
+  }
+}
+
 async function styleName(ctx, id) {
   if (!id || typeof id !== 'string') return null;
   if (ctx.styles.has(id)) return ctx.styles.get(id);
@@ -330,7 +354,10 @@ async function textDetails(ctx, node, out) {
     for (const raw of segments) {
       const seg = clean(raw);
       const vars = await boundNames(ctx, raw, raw.boundVariables);
-      if (Object.keys(vars).length) seg.vars = vars;
+      if (Object.keys(vars).length) {
+        seg.vars = vars;
+        await resolvePaints(ctx, raw.fills, seg.fills, node);
+      }
       const style = await styleName(ctx, raw.textStyleId);
       if (style) seg.textStyle = style;
       delete seg.boundVariables;
@@ -490,6 +517,12 @@ async function serialize(node, origin, ctx, depth) {
     const vars = await timed(ctx, 'variables', function () {
       return boundNames(ctx, node, 'boundVariables' in node ? node.boundVariables : null);
     });
+    if (Object.keys(vars).length) {
+      try {
+        if ('fills' in node) await resolvePaints(ctx, node.fills, out.fills, node);
+        if ('strokes' in node) await resolvePaints(ctx, node.strokes, out.strokes, node);
+      } catch (e) { /* the stored colours stay */ }
+    }
     if (Object.keys(vars).length) out.vars = vars;
     const styles = {};
     for (const pair of [['fillStyleId', 'fill'], ['strokeStyleId', 'stroke'],

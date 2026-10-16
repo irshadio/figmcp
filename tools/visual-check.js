@@ -79,6 +79,23 @@ export function findChrome(explicit) {
   return [explicit, ...CHROMES].find((c) => c && fs.existsSync(c)) || null;
 }
 
+/** Families whose runs set variation axes other than the weight (optical size, width). */
+function axisFamilies(tree) {
+  const out = new Set();
+  const walk = (n) => {
+    if (!n || n.visible === false) return;
+    for (const seg of Array.isArray(n.segments) ? n.segments : []) {
+      const axes = seg.fontName && seg.fontName.variationSettings;
+      if (axes && Object.entries(axes).some(([tag, v]) => tag !== 'wght' && !(tag === 'wdth' && v === 100) && !(tag === 'slnt' && v === 0))) {
+        out.add(seg.fontName.family);
+      }
+    }
+    (n.children || []).forEach(walk);
+  };
+  walk(tree);
+  return out;
+}
+
 /** @font-face rules for the resolved { family: [files] }, by weight and style. */
 export function fontFaceCss(fonts) {
   const rules = [];
@@ -256,7 +273,7 @@ export async function reactCheck({
   fs.writeFileSync(codeFile, code);
   if (css) fs.writeFileSync(path.join(out, 'design.css'), css);
   const used = [...families(tree)];
-  const fonts = await resolveFonts(used, fontDirs, { fetch: fetchFonts, exts: FONT_EXTS });
+  const fonts = await resolveFonts(used, fontDirs, { fetch: fetchFonts, exts: FONT_EXTS, variable: axisFamilies(tree) });
   const [width, height] = viewport || [tree.width, tree.height];
   const htmlFile = path.join(out, 'index.html');
   fs.writeFileSync(htmlFile, page({

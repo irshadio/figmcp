@@ -117,7 +117,11 @@ export function usedVariables(code) {
     const cls = /([a-z-]+)-\[(?:length:|color:)?$|\[([a-z-]+):[^[]*$/.exec(before);
     const prefix = cls ? (cls[1] || cls[2]) : '';
     const ident = m[1];
-    if (found.has(ident)) continue;
+    if (found.has(ident)) {
+      const seen = found.get(ident).counts;
+      seen.set(value, (seen.get(value) || 0) + 1);
+      continue;
+    }
     const kind = /^(#|rgba?\(|hsla?\()/.test(value) ? 'color'
       : /^rounded/.test(prefix) ? 'radius'
         : prefix === 'text' ? 'text'
@@ -125,9 +129,14 @@ export function usedVariables(code) {
             : prefix === 'tracking' ? 'tracking'
               : prefix === 'font-weight' ? 'weight'
                 : /px$/.test(value) ? 'spacing' : 'number';
-    found.set(ident, { ident, name: unescapeIdent(ident), value, kind });
+    found.set(ident, { ident, name: unescapeIdent(ident), value, kind, counts: new Map([[value, 1]]) });
   }
-  return [...found.values()];
+  // A variable seen with several values (a stale colour, another mode) is
+  // declared with the one most of the frame uses.
+  return [...found.values()].map(({ counts, ...v }) => {
+    const ranked = [...counts].sort((a, b) => b[1] - a[1]);
+    return { ...v, value: ranked[0][0], others: ranked.slice(1).map(([value]) => value) };
+  });
 }
 
 const THEME_NAMESPACE = {
@@ -144,7 +153,9 @@ const THEME_NAMESPACE = {
 export function tokensCss(code, names = new Map()) {
   const vars = usedVariables(code).map((v) => ({ ...v, name: names.get(v.ident) || v.name }));
   if (!vars.length) return '';
-  const root = vars.map((v) => `  --${v.ident}: ${v.value};${v.name !== v.ident ? ` /* ${v.name} */` : ''}`);
+  const note = (v) => [v.name !== v.ident ? v.name : null, v.others.length ? `also used as ${v.others.join(', ')}` : null]
+    .filter(Boolean).join('; ');
+  const root = vars.map((v) => `  --${v.ident}: ${v.value};${note(v) ? ` /* ${note(v)} */` : ''}`);
   const keys = new Set();
   const theme = [];
   for (const v of vars) {
