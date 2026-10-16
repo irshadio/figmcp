@@ -640,6 +640,38 @@ class SwiftUIWriter {
   }
 
   /**
+   * A switch: Toggle bound to a state (the screen's, or the item view's in
+   * a row of items), drawn by the design's switch style.
+   */
+  toggle(node, role) {
+    const paint = (n) => {
+      const p = visiblePaints(n.fills)[0];
+      if (!p || p.type !== 'SOLID') return null;
+      const vars = n.vars || {};
+      return this.color(p.color, p.opacity ?? 1, vars[`fill.${n.fills.indexOf(p)}`] || vars.fills);
+    };
+    const knob = visibleChildren(node)[0];
+    const track = paint(node) || raw('Color.accentColor');
+    const name = `${sIdent(role.label, 'switch')}On`;
+    let state;
+    if (this.inComponent) {
+      state = 'isOn';
+      // Item views keep a memberwise init the screen can call.
+      if (!this.metrics.has(state)) this.metrics.set(state, `  @State var isOn = ${role.on}`);
+    } else {
+      state = this.member(name, 'isOn');
+      this.states.push(`  @State private var ${state} = ${role.on}`);
+    }
+    this.helpers.add('designSwitch');
+    const inset = round((node.height - knob.height) / 2);
+    const style = call('DesignSwitchStyle', [
+      ['on', role.on ? track : raw('Color.accentColor')], ['off', role.on ? raw('Color(.systemFill)') : track], ['knob', paint(knob) || raw('Color.white')],
+      ['width', round(node.width)], ['height', round(node.height)], ['inset', inset],
+    ]);
+    return mod(mod(view('Toggle', [[null, call('String', [['localized', str(role.label)]])], ['isOn', raw(`$${state}`)]]), 'toggleStyle', [[null, style]]), 'labelsHidden');
+  }
+
+  /**
    * A track filled to [role].value: ProgressView with the design's bar
    * style. Its width is at most the design's, so a narrower row shrinks it.
    */
@@ -715,6 +747,8 @@ class SwiftUIWriter {
     for (const [axis, key, design] of [['w', 'Width', node.width], ['h', 'Height', node.height]]) {
       const s = size[axis] ?? design;
       if (s === 'inf') args.push([`ideal${key}`, round(design)], [`max${key}`, INFINITY]);
+      else if (s && typeof s.min === 'number') args.push([`min${key}`, round(s.min)], [`ideal${key}`, round(design)]);
+      else if (s && typeof s.max === 'number') args.push([`ideal${key}`, round(design)], [`max${key}`, round(s.max)]);
       else args.push([key.toLowerCase(), typeof s === 'number' ? round(s) : s]);
     }
     const fixed = args.filter(([k]) => k === 'width' || k === 'height');
@@ -1039,7 +1073,8 @@ class SwiftUIWriter {
     if (!this.screen || !row || row.layoutMode !== 'HORIZONTAL' || row.layoutWrap === 'WRAP' || scrollsItself(row)) return false;
     if (row.width < this.screen.width * 0.85 || row.width > this.screen.width + 0.5 || this.roleOf(row) === 'carousel') return false;
     const { flow, share } = this.rowFill(row);
-    return (flow.length <= 3 || this.roleOf(row) === 'tabBar') && share >= 0.85 &&
+    // Items running past the row scroll there instead.
+    return (flow.length <= 3 || this.roleOf(row) === 'tabBar') && share >= 0.85 && share <= 1.01 &&
       flow.some((c) => c.type !== 'TEXT' && sizingOf(c, row, 'x') === 'FIXED');
   }
 
@@ -1048,7 +1083,7 @@ class SwiftUIWriter {
     if (!this.screen || row.layoutMode !== 'HORIZONTAL' || row.layoutWrap === 'WRAP' || scrollsItself(row) || this.shrinks(row)) return false;
     if (row.width < this.screen.width * 0.85 || row.width > this.screen.width + 0.5 || this.roleOf(row) === 'carousel') return false;
     const { flow, share } = this.rowFill(row);
-    return flow.length >= 4 && share >= 0.85 && flow.every((c) => sizingOf(c, row, 'x') === 'FIXED' && Math.abs(c.width - flow[0].width) <= 0.5);
+    return flow.length >= 4 && share >= 0.85 && share <= 1.01 && flow.every((c) => sizingOf(c, row, 'x') === 'FIXED' && Math.abs(c.width - flow[0].width) <= 0.5);
   }
 
   /** Whether [node] is one of three or more like layers spread evenly across a band of [parent] (tabs, tiles). */
@@ -1132,6 +1167,7 @@ class SwiftUIWriter {
     if (node.render && this.assets.render) return this.render(node, size);
     const role = this.roles.get(node.id);
     if (role && role.role === 'progress') return this.progress(node, size, role);
+    if (role && role.role === 'switch') return this.toggle(node, role);
     if (role && role.role === 'segmented' && role.native && role.native.use && !this.inComponent) {
       const flow = visibleChildren(node).filter((c) => inFlow(c, node));
       const picker = this.repeated(flow, { kind: 'flex', parent: node, axis: 'x', hugMain: false }, false);
@@ -2441,7 +2477,7 @@ export function toSwiftUI(root, assets, options = {}) {
     }
     shared.push('}');
   }
-  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable', 'textStroke', 'designBar', 'shimmer', 'stretchy']) {
+  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable', 'textStroke', 'designBar', 'shimmer', 'stretchy', 'designSwitch']) {
     if (writer.helpers.has(name)) shared.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};

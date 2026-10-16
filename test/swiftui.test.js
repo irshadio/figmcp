@@ -765,3 +765,27 @@ test('a screen of data shows placeholders while loading; a full-bleed photo stre
   assert.match(code, /\.stretchesOnPull\(\)/);
   assert.match(shared, /func stretchesOnPull\(\) -> some View/);
 });
+
+test('a rounded track with a round knob is a Toggle in the design\'s switch style', () => {
+  const knob = { ...frame('Ellipse', { x: 333, y: 144.5, w: 22, h: 22, fills: [solid(white)] }), type: 'ELLIPSE' };
+  const track = frame('Switch', { x: 312, y: 141.5, w: 46, h: 28, mode: 'HORIZONTAL', paddingLeft: 3, paddingRight: 3, cornerRadius: 999,
+    fills: [solid(brand)], layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', children: [knob] });
+  const head = frame('Head', { x: 32, y: 135, w: 326, h: 41, mode: 'HORIZONTAL', layoutSizingHorizontal: 'FILL', children: [text('Dubai', { x: 32, y: 135, size: 16 }), track] });
+  const root = frame('Alerts', { w: 390, h: 844, mode: 'VERTICAL', paddingLeft: 32, paddingRight: 32, counterAxisAlignItems: 'MIN', children: [head] });
+  const { code, shared } = toSwiftUI(root, assets);
+  assert.match(code, /@State private var dubaiOn = true/);
+  assert.match(code, /Toggle\(String\(localized: "Dubai"\), isOn: \$dubaiOn\)/);
+  assert.match(code, /DesignSwitchStyle\(\s*on: Color\(hex: 0x3D3BD9\),\s*off: Color\(\.systemFill\),\s*knob: Color\(hex: 0xFFFFFF\),\s*width: 46,\s*height: 28,\s*inset: 3/);
+  assert.match(code, /\.labelsHidden\(\)/);
+  assert.match(shared, /struct DesignSwitchStyle: ToggleStyle/);
+});
+
+test('a shrinking item drawn as layers keeps its width as a bound', () => {
+  const card = (label, x) => frame(label, { x, y: 760, w: 170, h: 52, fills: [solid(brand)], layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [text(label, { x: x + 20, y: 776, color: white }), { ...frame('Dot', { x: x + 150, y: 770, w: 8, h: 8, fills: [solid(white)] }), type: 'ELLIPSE' }] });
+  const footer = frame('Footer', { y: 746, w: 390, h: 80, mode: 'HORIZONTAL', itemSpacing: 18, paddingLeft: 16, paddingRight: 16,
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', children: [card('Share', 16), card('Done', 204)] });
+  const root = frame('Done', { w: 390, h: 844, mode: 'VERTICAL', counterAxisAlignItems: 'MIN', children: [footer] });
+  const { code } = toSwiftUI(root, assets);
+  assert.match(code, /\.frame\((idealWidth: 170, )?maxWidth: 170[,)]/);
+});

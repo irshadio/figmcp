@@ -268,10 +268,21 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
       const last = flow[flow.length - 1];
       const pFlow = isAutoLayout(parent) ? visibleChildren(parent).filter((c) => inFlow(c, parent)) : [];
       const topBar = parent.layoutMode === 'HORIZONTAL' && wide(parent) && parent.height <= 72 && parent.y - ry <= 160;
+      const knob = kids.length === 1 && kids[0];
+      const round = (x) => x.type === 'ELLIPSE' || (typeof x.cornerRadius === 'number' && x.cornerRadius >= x.height / 2 - 1);
+      const switchLike = knob && n.height >= 18 && n.height <= 36 && n.width / n.height >= 1.4 && n.width / n.height <= 2.4 &&
+        (round(n) || /switch|toggle/i.test(n.name)) && round(knob) && Math.abs(knob.width - knob.height) <= 0.5 &&
+        knob.height >= n.height * 0.55 && knob.height <= n.height && !visibleChildren(knob).length &&
+        Math.abs(knob.y + knob.height / 2 - (n.y + n.height / 2)) <= 1.5 && filled(knob) && (filled(n) || stroked(n));
       const bar = kids.length === 1 && kids[0];
       const solid = (x) => visiblePaints(x.fills).length === 1 && visiblePaints(x.fills)[0].type === 'SOLID';
       const plain = (x) => !visiblePaints(x.strokes).length && !(x.effects || []).some((e) => e.visible !== false);
-      if (bar && n.height <= 16 && n.width >= n.height * 4 && ['RECTANGLE', 'FRAME'].includes(bar.type) && !visibleChildren(bar).length &&
+      if (switchLike) {
+        const on = knob.x + knob.width / 2 > n.x + n.width / 2;
+        const label = texts(parent).find((t) => !texts(n).includes(t));
+        set(n, 'switch', { on, knob: knob.id, label: label ? label.characters : n.name }, /switch|toggle/i.test(n.name) ? 'high' : 'medium',
+          `a ${Math.round(n.width)}x${Math.round(n.height)} rounded track with a round knob at its ${on ? 'trailing' : 'leading'} end`);
+      } else if (bar && n.height <= 16 && n.width >= n.height * 4 && ['RECTANGLE', 'FRAME'].includes(bar.type) && !visibleChildren(bar).length &&
           solid(bar) && plain(bar) && plain(n) && (solid(n) || !visiblePaints(n.fills).length) &&
           Math.abs(bar.x - n.x) <= 0.5 && Math.abs(bar.y - n.y) <= 0.5 && Math.abs(bar.height - n.height) <= 0.5 &&
           bar.width > 0 && bar.width < n.width - 0.5) {
@@ -363,5 +374,6 @@ export const SWIFTUI_PATTERNS = {
   iconButton: 'icon button: Button with an accessibility label',
   textInput: 'text input: TextField bound to state, with its content type and keyboard (SecureField for a password)',
   calendar: 'calendar: months computed from Calendar in a LazyVGrid of seven columns, days as Buttons selecting a date in @State, the design\'s per-day data as a lookup',
+  switch: 'switch: Toggle bound to state, with a toggle style drawn as the design draws it (knob sliding with an animation)',
   progress: 'progress bar: ProgressView(value:) with a bar style drawn as the design draws it, stretching with its row',
 };

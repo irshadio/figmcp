@@ -268,6 +268,46 @@ extension View {
     modifier(DesignLineHeight(height, font: name, size: size, relativeTo: style))
   }
 }`,
+  designSwitch: `/// A switch drawn as the design draws it: a rounded track, [on] or [off],
+/// with a round [knob] that slides to the trailing end when on.
+struct DesignSwitchStyle: ToggleStyle {
+  var on: Color
+  var off: Color
+  var knob: Color
+  var width: CGFloat
+  var height: CGFloat
+  var inset: CGFloat
+
+  func makeBody(configuration: Configuration) -> some View {
+    Track(isOn: configuration.$isOn, style: self)
+      .accessibilityRepresentation {
+        Toggle(isOn: configuration.$isOn) { configuration.label }
+      }
+  }
+
+  private struct Track: View {
+    @Binding var isOn: Bool
+    let style: DesignSwitchStyle
+    @Environment(\\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+      Capsule()
+        .fill(isOn ? style.on : style.off)
+        .frame(width: style.width, height: style.height)
+        .overlay(alignment: isOn ? .trailing : .leading) {
+          Circle()
+            .fill(style.knob)
+            .padding(style.inset)
+            .frame(width: style.height, height: style.height)
+        }
+        .contentShape(Capsule())
+        .onTapGesture {
+          withAnimation(reduceMotion ? nil : .snappy) { isOn.toggle() }
+        }
+        .sensoryFeedback(.selection, trigger: isOn)
+    }
+  }
+}`,
   stretchy: `extension View {
   /// Pulled down past the top of its scroll view, the view grows from its
   /// bottom edge to fill the room instead of leaving a gap above it.
