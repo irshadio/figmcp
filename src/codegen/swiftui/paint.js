@@ -156,6 +156,35 @@ export function composite(bottom, top) {
 
 // Helpers added to the code when it uses them.
 export const HELPERS = {
+  designFont: `/// A custom face at a size that scales with Dynamic Type like its text
+/// style, without .custom(_:size:relativeTo:) rounding it to whole points
+/// (a 14.5 pt design size would be drawn at 15).
+struct DesignFont: ViewModifier {
+  private let name: String
+  @ScaledMetric private var size: CGFloat
+
+  init(_ name: String, size: CGFloat, relativeTo style: Font.TextStyle) {
+    self.name = name
+    _size = ScaledMetric(wrappedValue: size, relativeTo: style)
+  }
+
+  func body(content: Content) -> some View {
+    content.font(.custom(name, fixedSize: size))
+  }
+}
+
+extension View {
+  /// The face [name] at [size], scaled with [style] (see DesignFont).
+  func designFont(_ name: String, size: CGFloat, relativeTo style: Font.TextStyle) -> some View {
+    modifier(DesignFont(name, size: size, relativeTo: style))
+  }
+}`,
+  dynamicColor: `extension Color {
+  /// A colour with its own value in dark mode, as a design variable's modes give it.
+  init(light: Color, dark: Color) {
+    self.init(uiColor: UIColor { $0.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light) })
+  }
+}`,
   layerStack: `/// A frame's layers over each other, as Figma lays them out: each is offered
 /// the stack's own size and placed from its top leading corner, and none of
 /// them sizes the stack (a ZStack would grow to the union of its layers).

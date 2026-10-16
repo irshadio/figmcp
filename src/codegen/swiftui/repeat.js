@@ -118,7 +118,7 @@ export function baseName(items, ancestors, label = null) {
 // Words whose plural is themselves, or that end in s as singulars.
 const UNCOUNTED = new Set(['news', 'series', 'species', 'status', 'bus', 'canvas', 'plus', 'gas', 'campus', 'bonus', 'virus',
   'focus', 'corpus', 'atlas', 'alias', 'analysis', 'basis', 'axis', 'crisis', 'thesis', 'chassis', 'lens', 'data', 'info',
-  'settings', 'details', 'analytics', 'statistics', 'physics', 'maths', 'economics', 'sms', 'gps', 'ios', 'faqs']);
+  'analytics', 'statistics', 'physics', 'maths', 'economics', 'sms', 'gps', 'ios', 'faqs']);
 // Plurals in -ies whose singular ends in -ie.
 const IE_WORDS = new Set(['movies', 'cookies', 'selfies', 'calories', 'zombies', 'rookies', 'goalies', 'hoodies', 'smoothies',
   'pies', 'ties', 'lies', 'freebies', 'brownies', 'newbies', 'genies', 'aunties', 'veggies', 'techies', 'sweeties', 'boogies']);
@@ -140,6 +140,9 @@ export function singular(word) {
 
 /** The plural of an identifier ('chip' -> 'chips', 'search' -> 'searches'). */
 export function plural(ident) {
+  // A word that is its own plural ("news", "series") lists its items.
+  const last = /[A-Z]?[a-z]+$/.exec(ident);
+  if (last && /s$/.test(ident) && singular(last[0]) === last[0]) return `${ident}Items`;
   if (/(ch|sh|s|x)$/.test(ident)) return `${ident}es`;
   if (/[^aeiou]y$/.test(ident)) return `${ident.slice(0, -1)}ies`;
   return `${ident}s`;

@@ -18,12 +18,12 @@ export async function loadDesign(opts) {
   if (opts.export) {
     const data = JSON.parse(fs.readFileSync(opts.export, 'utf8'));
     const frame = data.frames[0];
-    return { tree: frame.tree, images: data.images || {}, render: Buffer.from(frame.previewPng2x, 'base64') };
+    return { tree: frame.tree, images: data.images || {}, variableModes: data.variableModes, render: Buffer.from(frame.previewPng2x, 'base64') };
   }
   if (opts.snapshot) {
     const hit = findSnapshotNode(opts.snapshot.replace(/-/g, ':'), { preview: true });
     if (!hit || hit.node !== hit.frame.tree) throw new Error(`No saved snapshot has the frame ${opts.snapshot} with a preview`);
-    return { tree: hit.frame.tree, images: hit.data.images || {}, render: Buffer.from(hit.frame.previewPng2x, 'base64') };
+    return { tree: hit.frame.tree, images: hit.data.images || {}, variableModes: hit.data.variableModes, render: Buffer.from(hit.frame.previewPng2x, 'base64') };
   }
   const bridge = new Bridge({ port: Number(process.env.FIGMA_LOCAL_MCP_PORT || 3947) });
   await bridge.start();
@@ -37,7 +37,7 @@ export async function loadDesign(opts) {
     id = id.replace(/-/g, ':');
     const node = await bridge.call('node', { id, svg: true, images: true }, 180000);
     const shot = await bridge.call('export', { id, format: 'PNG', scale: 2, absoluteBounds: true }, 180000);
-    return { tree: node.tree, images: node.images || {}, render: Buffer.from(shot.base64, 'base64') };
+    return { tree: node.tree, images: node.images || {}, variableModes: node.variableModes, render: Buffer.from(shot.base64, 'base64') };
   } finally {
     bridge.close();
   }

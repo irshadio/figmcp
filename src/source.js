@@ -104,6 +104,7 @@ export class DesignSource {
       result.images = { ...savedImages(missing), ...(result.images || {}) };
     }
     const extra = result ? {
+      ...(result.variableModes ? { variableModes: result.variableModes } : {}),
       ...(result.truncated ? { truncated: true } : {}),
       ...(result.failures && result.failures.length ? { failures: result.failures } : {}),
     } : {};
@@ -118,6 +119,7 @@ export class DesignSource {
         page: result.page ? result.page.name : null,
         frames: [{ id: result.tree.id, name: result.tree.name, previewPng2x: null, tree: result.tree }],
         images: images ? {} : result.images || {},
+        ...(result.variableModes ? { variableModes: result.variableModes } : {}),
       };
       setImmediate(() => {
         try {
@@ -130,6 +132,7 @@ export class DesignSource {
     return {
       tree: rebase(hit.node),
       images: { ...savedImages(imageHashes(hit.node)), ...(hit.data.images || {}) },
+      ...(hit.data.variableModes ? { variableModes: hit.data.variableModes } : {}),
       source: 'snapshot',
       exportedAt: hit.exportedAt,
       snapshot: hit.snapshot,

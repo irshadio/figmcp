@@ -226,8 +226,8 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.match(code, /\.accessibilityLabel\("Bell"\)/);
   // The route's ends swap as state.
   assert.match(code, /struct RouteEnd: Hashable \{\n    let title: String\n  \}/);
-  assert.match(code, /@State private var from = RouteEnd\(title: "Kochi"\)/);
-  assert.match(code, /@State private var to = RouteEnd\(title: "Dubai"\)/);
+  assert.match(code, /@State private var from = RouteEnd\(title: String\(localized: "Kochi"\)\)/);
+  assert.match(code, /@State private var to = RouteEnd\(title: String\(localized: "Dubai"\)\)/);
   assert.match(code, /Text\(from\.title\)/);
   assert.match(code, /withAnimation\(reduceMotion \? nil : \.snappy\) \{ \(from, to\) = \(to, from\) \}/);
   assert.doesNotMatch(code, /case swap\n/);
@@ -666,7 +666,7 @@ test('names are singular, Unicode letters are kept and accents dropped', async (
   const { singular } = await import('../src/codegen/swiftui/repeat.js');
   const { sIdent } = await import('../src/codegen/swiftui/swift.js');
   const cases = { Status: 'Status', News: 'News', Movies: 'Movie', Series: 'Series', Bus: 'Bus', Categories: 'Category', Searches: 'Search',
-    Addresses: 'Address', Courses: 'Course', Cities: 'City', Chips: 'Chip', Settings: 'Settings' };
+    Addresses: 'Address', Courses: 'Course', Cities: 'City', Chips: 'Chip', Settings: 'Setting' };
   for (const [plural, one] of Object.entries(cases)) assert.equal(singular(plural), one, plural);
   assert.equal(sIdent('Größe'), 'große');
   assert.equal(sIdent('价格'), '价格');

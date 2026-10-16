@@ -40,6 +40,9 @@ const RESERVED_MEMBERS = ['body', 'action', 'dismiss', 'openURL', 'dynamicTypeSi
   'isSelected', 'namespace'];
 // Names of the Dynamic Type metrics scaledMetric declares.
 const METRIC_NAME = /^iconSize[\d_]+$/;
+// Swift words that sIdent suffixes ("continue" -> "continueValue"); a section gets "Section" instead.
+const RESERVED_IDENTS = new Set(['continueValue', 'defaultValue', 'returnValue', 'breakValue', 'caseValue', 'switchValue',
+  'repeatValue', 'whileValue', 'doValue', 'ifValue', 'elseValue', 'forValue', 'inValue', 'isValue', 'asValue', 'tryValue']);
 // Roles whose layer is a Button calling the screen's action, and roles whose
 // items select on tap.
 // Item runs, by the word their name ends in.
@@ -293,9 +296,11 @@ function withoutSystemUi(c, screen, chrome) {
 }
 
 class SwiftUIWriter {
-  constructor(assets, { connect = null, actions = null, probe = false } = {}) {
+  constructor(assets, { connect = null, actions = null, probe = false, variableModes = null, exactLineHeights = true } = {}) {
     this.assets = assets;
     this.probe = Boolean(probe);
+    this.variableModes = variableModes;
+    this.exactLineHeights = exactLineHeights;
     // In check mode: an item layer's id -> the first item's id, and
     // "index#first id" -> the layer, for the check to read item boxes back.
     this.probeAlias = new Map();
@@ -440,7 +445,7 @@ class SwiftUIWriter {
     this.models.push([`struct ${model}: Hashable {`, ...values.map((f) => `  let ${f.ident}: String`), '}'].join('\n'));
     const names = ends.map((end, i) => {
       const name = this.member(end.name, i ? 'to' : 'from');
-      const init = values.map((f) => `${f.ident}: ${sString(f.values[i])}`).join(', ');
+      const init = values.map((f) => `${f.ident}: ${dataValue(f, f.values[i])}`).join(', ');
       this.states.push(`  @State private var ${name} = ${model}(${init})`);
       for (const f of values) this.bindings.set(f.nodes[i].id, `${name}.${f.ident}`);
       return name;
@@ -474,6 +479,21 @@ class SwiftUIWriter {
     return null;
   }
 
+  /**
+   * The colour variable [name] as Color(light:dark:) when its collection has
+   * a dark mode with another value, else null.
+   */
+  modeColor(name) {
+    const modes = this.variableModes && this.variableModes[name];
+    if (!modes) return null;
+    const names = Object.keys(modes);
+    const dark = names.find((m) => /dark/i.test(m));
+    const light = names.find((m) => /light/i.test(m)) || names.find((m) => m !== dark);
+    if (!dark || !light || sColor(modes[dark]) === sColor(modes[light])) return null;
+    this.helpers.add('dynamicColor');
+    return `Color(light: ${sColor(modes[light])}, dark: ${sColor(modes[dark])})`;
+  }
+
   /** A number, or its design token when a variable is bound. */
   value(v, varName) {
     const n = round(v);
@@ -485,7 +505,7 @@ class SwiftUIWriter {
     this.helpers.add('color');
     const literal = raw(sColor(color, opacity));
     if (!varName) return literal;
-    const t = this.token(varName, 'Color', sColor(color, 1));
+    const t = this.token(varName, 'Color', this.modeColor(varName) || sColor(color, 1));
     if (!t) return literal;
     const a = Math.round((color.a ?? 1) * opacity * 1000) / 1000;
     return a < 0.999 ? raw(`${t.code}.opacity(${sNum(a)})`) : t;
@@ -667,6 +687,28 @@ class SwiftUIWriter {
     return mod(box, 'overlay', [['alignment', raw('.topLeading')]], [view('LayerStack', [], items)]);
   }
 
+  /**
+   * The short heading text just above [node]: a text sibling before it, or
+   * before one of its first few ancestors ("SERVICE DETAILS" above a list).
+   */
+  headingAbove(node) {
+    let child = node;
+    for (let depth = 0; child && depth < 4; depth++) {
+      const parent = this.parents.get(child.id);
+      if (!parent) break;
+      const kids = visibleChildren(parent);
+      for (let i = kids.indexOf(child) - 1; i >= 0; i--) {
+        const t = findText(kids[i]);
+        const text = t && String(t.characters || '').trim();
+        if (text && /^[^\d\n]{3,30}$/.test(text) && text.split(/\s+/).length <= 4) return text;
+        if (t) break;
+      }
+      if (parent === this.screenNode) break;
+      child = parent;
+    }
+    return null;
+  }
+
   /** Whether [node] is part of a logo or wordmark, whose text keeps its size at every text size. */
   brand(node) {
     return [...this.ancestors, node].some((n) => /\b(logo|logotype|wordmark|brand)\b/i.test(String(n.name || '')));
@@ -703,12 +745,12 @@ class SwiftUIWriter {
     this.states.push(`  @State private var ${state} = ""`);
     const focus = this.focusCase(input, base);
     const content = input.content || {};
-    const font = (text.mods || []).find((m) => m.name === 'font');
+    const font = (text.mods || []).find((m) => m.name === 'font' || m.name === 'designFont');
     const color = (text.mods || []).find((m) => m.name === 'foregroundStyle');
     // The design's text is the placeholder, in its colour; typed text keeps the primary colour.
     const prompt = color ? mod(view('Text', [[null, str(input.label)]]), 'foregroundStyle', color.args) : null;
     let v = view(content.secure ? 'SecureField' : 'TextField', [[null, str(input.label)], ['text', raw(`$${state}`)], ['prompt', prompt]]);
-    if (font) v = mod(v, 'font', font.args);
+    if (font) v = mod(v, font.name, font.args);
     if (content.textContentType) v = mod(v, 'textContentType', [[null, raw(content.textContentType)]]);
     if (content.keyboardType) v = mod(v, 'keyboardType', [[null, raw(content.keyboardType)]]);
     v = mod(v, 'focused', [[null, raw('$focusedField')], ['equals', raw(`.${focus.name}`)]]);
@@ -818,9 +860,23 @@ class SwiftUIWriter {
 
   /** A view property holding [v], referenced by name. */
   extract(node, v) {
-    const label = this.label(node, 'section');
+    const own = this.label(node, 'section');
+    // A name already given (to a section inside this one, or to data) gives
+    // way to the next text of the section before a number is added.
+    const free = (l) => !this.propNames.has(sIdent(l, 'section')) && !RESERVED_IDENTS.has(sIdent(l, 'section'));
+    const texts = [];
+    const walk = (n) => {
+      if (!n || n.visible === false || texts.length >= 6) return;
+      if (isText(n)) {
+        // Only a short label reads as a name ("Raised by"), not a sentence or a value.
+        const t = String(n.characters || '').trim();
+        if (/^[A-Za-z][A-Za-z&\s-]{3,20}$/.test(t) && t.split(/\s+/).length <= 2) texts.push(t);
+      } else (n.children || []).forEach(walk);
+    };
+    if (isGenericName(node.name)) walk(node);
+    const label = [own, ...texts].find(free) || own;
     // A section shares its name with its items' data: it is that section.
-    const taken = this.propNames.has(sIdent(label, 'section')) && !/section$/i.test(label);
+    const taken = !free(label) && !/section$/i.test(label);
     const name = this.member(taken ? `${label} section` : label, 'section');
     this.props.push({ name, view: v, node });
     return view('', [[null, raw(name)]]);
@@ -1021,6 +1077,7 @@ class SwiftUIWriter {
       warn: (message) => this.warn(node, message),
       textStyle: (name, font) => this.textStyle(name, font),
       helper: (name) => this.helpers.add(name),
+      exactLineHeights: this.exactLineHeights,
     };
   }
 
@@ -1030,7 +1087,6 @@ class SwiftUIWriter {
     if (visiblePaints(node.strokes).length && typeof node.strokeWeight === 'number' && node.strokeWeight > 0) {
       this.warn(node, 'a text stroke is not drawn');
     }
-    if (node.leadingTrim === 'CAP_HEIGHT') this.warn(node, 'the cap height trim is drawn as a centred line box');
     let v = textView(node, { ...this.textCtx(node), bind: this.bindings.get(node.id) || null }).view;
     const input = !this.inComponent && this.inputs.get(node.id);
     if (input) v = this.textInput(node, input, v);
@@ -1053,6 +1109,13 @@ class SwiftUIWriter {
       v = mod(v, 'fixedSize', [['horizontal', false], ['vertical', true]]);
       // In a row, text takes its width before the other items.
       if (size.w === null && parent && parent.layoutMode === 'HORIZONTAL') v = mod(v, 'layoutPriority', [[null, 1]]);
+    }
+    if (node.leadingTrim === 'CAP_HEIGHT') {
+      // Figma trims the box to the cap height: it ends at the last baseline
+      // and starts at the capitals' top, the box's height above it.
+      const x = { LEFT: 'leading', CENTER: 'center', RIGHT: 'trailing' }[node.textAlignHorizontal] || 'leading';
+      v = this.frame(v, { w: size.w, h: round(node.height) }, `.${x}LastTextBaseline`);
+      return this.effects(node, v);
     }
     const fixedBox = node.textAutoResize === 'NONE' || node.textAutoResize === 'TRUNCATE';
     const align = alignmentOf(TEXT_X[node.textAlignHorizontal] ?? 'leading', fixedBox ? TEXT_Y[node.textAlignVertical] ?? 'top' : '');
@@ -1746,14 +1809,17 @@ class SwiftUIWriter {
         });
       }
     }
-    const label = baseName(items, this.ancestors, this.label(parent, 'item', { text: false }));
+    // Named after a named layer below the screen, else the heading above the
+    // run, else what the items hold, and only last after the screen.
+    const label = baseName(items, this.ancestors.filter((a) => a !== this.screenNode),
+      this.headingAbove(parent) || contentName(fields) || this.label(parent, 'item', { text: false }));
     const model = fields.length ? this.typeName(label) : null;
     const title = fields.find((f) => f.kind === 'text');
     if (kind === 'segmented' && role.native && role.native.use && model && title && selected >= 0) {
       // Drawn like the system control: the system control.
       this.models.push([`struct ${model}: Hashable {`, ...fields.map((f) => `  let ${f.ident}: String`), '}'].join('\n'));
       const data = this.member(plural(sIdent(label, 'item')), 'items');
-      const rows = items.map((n, i) => `    ${model}(${fields.map((f) => `${f.ident}: ${sString(f.values[i])}`).join(', ')}),`);
+      const rows = items.map((n, i) => `    ${model}(${fields.map((f) => `${f.ident}: ${dataValue(f, f.values[i])}`).join(', ')}),`);
       this.lets.push([`  private let ${data}: [${model}] = [`, ...rows, '  ]'].join('\n'));
       const state = this.member(`selected ${label}`, 'selected');
       this.states.push(`  @State private var ${state} = ${selected}`);
@@ -1783,7 +1849,7 @@ class SwiftUIWriter {
     if (model) {
       this.models.push([`struct ${model}: Hashable {`, ...fields.map((f) => `  let ${f.ident}: String`), '}'].join('\n'));
       data = this.member(plural(sIdent(label, 'item')), 'items');
-      const rows = items.map((n, i) => `    ${model}(${fields.map((f) => `${f.ident}: ${sString(f.values[i])}`).join(', ')}),`);
+      const rows = items.map((n, i) => `    ${model}(${fields.map((f) => `${f.ident}: ${dataValue(f, f.values[i])}`).join(', ')}),`);
       this.lets.push([`  private let ${data}: [${model}] = [`, ...rows, '  ]'].join('\n'));
     }
     let state = null;
@@ -1987,6 +2053,23 @@ class SwiftUIWriter {
   }
 }
 
+/**
+ * A value of the data: text people read is a localized string (Xcode puts
+ * it in the String Catalog), asset names and figures are plain literals.
+ */
+function dataValue(field, value) {
+  return field.kind === 'text' && /\p{L}/u.test(String(value)) ? `String(localized: ${sString(value)})` : sString(value);
+}
+
+/** A name for items by what they hold: single digits are digits, numbers numbers; else null. */
+function contentName(fields) {
+  const values = fields.filter((f) => f.kind === 'text').flatMap((f) => f.values);
+  if (!values.length) return null;
+  if (values.every((v) => /^\d$/.test(String(v).trim()))) return 'Digit';
+  if (values.every((v) => /^[\d.,]+$/.test(String(v).trim()))) return 'Number';
+  return null;
+}
+
 function printProperty(p) {
   return [`  private var ${p.name}: some View {`, `    ${print(p.view, 2)}`, '  }'].join('\n');
 }
@@ -2029,6 +2112,7 @@ export function toSwiftUI(root, assets, options = {}) {
     for (const r of roles.values()) if (r.role === 'textInput') w.inputs.set(r.placeholder, r);
     w.parents = new Map();
     w.byId = new Map();
+    w.screenNode = rootNode;
     const index = (n) => {
       w.byId.set(n.id, n);
       for (const c of n.children || []) {
@@ -2098,7 +2182,7 @@ export function toSwiftUI(root, assets, options = {}) {
     }
     shared.push('}');
   }
-  for (const name of ['color', 'designLineHeight', 'layerStack', 'flow', 'pressable']) {
+  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable']) {
     if (writer.helpers.has(name)) shared.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};

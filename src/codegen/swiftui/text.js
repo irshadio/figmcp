@@ -55,10 +55,12 @@ export function fontOf(seg, value, { fixed = false } = {}) {
  * The line height of a run in points, or null for Figma's default: the
  * face's own, which iOS lays out the same.
  */
-function lineHeightOf(seg, node) {
+function lineHeightOf(seg, node, exact = false) {
   const lh = seg.lineHeight;
   const size = seg.fontSize;
-  if (typeof size !== 'number' || !lh || lh.unit === 'AUTO') return null;
+  // With exact line heights, Figma's default line box (the face's own,
+  // rounded to whole points) is set too, as its box shows it.
+  if (typeof size !== 'number' || !lh || lh.unit === 'AUTO') return exact && node.leadingTrim !== 'CAP_HEIGHT' ? boxLineHeight(node) : null;
   if (lh.unit === 'PIXELS') return lh.value;
   // Figma rounds percent line heights to whole pixels; its box tells.
   return boxLineHeight(node) || (size * lh.value) / 100;
@@ -125,7 +127,17 @@ export function textView(node, ctx) {
   const keys = Object.keys(styles[0]).filter((k) => styles.every((s) => k in s && same(s[k], styles[0][k])));
   const shared = Object.fromEntries(keys.map((k) => [k, styles[0][k]]));
   // One Figma text style for the whole text: its font is a named font.
-  if (shared.font && segs[0].textStyle && segs.every((s) => s.textStyle === segs[0].textStyle) && ctx.textStyle) {
+  // A half-point size scaled by .custom(_:size:relativeTo:) is rounded to
+  // whole points; the whole text's face goes through designFont instead.
+  const seg0 = segs[0];
+  const half = shared.font && !ctx.fixed && seg0.fontName && !isSystemFamily(seg0.fontName.family) &&
+    typeof seg0.fontSize === 'number' && !Number.isInteger(seg0.fontSize) && segs.every((s) => s.fontSize === seg0.fontSize) &&
+    !(seg0.textCase === 'SMALL_CAPS' || seg0.textCase === 'SMALL_CAPS_FORCED');
+  if (half) {
+    if (ctx.helper) ctx.helper('designFont');
+    shared.font = ['designFont', [[null, str(postScriptName(seg0.fontName))], ['size', ctx.value(seg0.fontSize, (seg0.vars || {}).fontSize)],
+      ['relativeTo', raw(textStyleFor(seg0.fontSize))]]];
+  } else if (shared.font && segs[0].textStyle && segs.every((s) => s.textStyle === segs[0].textStyle) && ctx.textStyle) {
     const ref = ctx.textStyle(segs[0].textStyle, shared.font[1][0][1]);
     if (ref) shared.font = ['font', [[null, ref]]];
   }
@@ -160,7 +172,7 @@ export function textView(node, ctx) {
   };
 
   const seg = segs[0];
-  const lh = lineHeightOf(seg, node);
+  const lh = lineHeightOf(seg, node, ctx.exactLineHeights);
   let out;
   // Text drawn from data is one value, whatever paragraphs the first item has.
   if (!ctx.bind && (listed || (spacing && paras.length > 1))) {

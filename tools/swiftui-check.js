@@ -5,7 +5,7 @@
 //
 // Usage: node tools/swiftui-check.js <nodeId|selection> [--snapshot <frame id>]
 //          [--export <design export.json>] [--fonts <dir>]... [--fetch-fonts]
-//          [--out <dir>] [--device <udid or name>]
+//          [--out <dir>] [--device <udid or name>] [--font-line-heights]
 //          [--code <View.swift> [--assets <assets.json>]]
 //          [--project <dir> --file <View.swift> [--view <Struct>]]
 // Reads live through the running MCP server (the plugin must be connected),
@@ -58,6 +58,7 @@ function args(argv) {
     else if (a === '--file') out.file = argv[++i];
     else if (a === '--view') out.view = argv[++i];
     else if (a === '--device') out.device = argv[++i];
+    else if (a === '--font-line-heights') out.fontLineHeights = true;
     else if (a === '--help' || a === '-h') out.help = true;
     else if (a.startsWith('--')) throw new Error(`Unknown option ${a}.\n${USAGE}`);
     else out.target = a;
@@ -571,7 +572,7 @@ async function check(opts, design, out, sdk) {
       image: (hash) => (image(hash) ? save(`img:${hash}`, imageExt(image(hash)), image(hash)) : null),
       imageExt: (hash) => (image(hash) ? imageExt(image(hash)) : 'png'),
       render: (r) => save(`r:${r.base64}`, 'png', Buffer.from(r.base64, 'base64')),
-    }, { preview: false, probe: true });
+    }, { preview: false, probe: true, variableModes: design.variableModes, exactLineHeights: !opts.fontLineHeights });
     code = generated.code;
     shared = generated.shared;
     view = generated.structName;

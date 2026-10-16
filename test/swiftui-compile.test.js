@@ -212,7 +212,10 @@ test('text names its face by PostScript name and sets explicit line heights on t
   assert.match(r.code, /\.custom\("Onest-SemiBold", size: 32, relativeTo: \.largeTitle\)/);
   assert.doesNotMatch(r.code, /\.weight\(/);
   assert.match(r.code, /\.designLineHeight\(34, font: "Onest-SemiBold", size: 32, relativeTo: \.largeTitle\)/);
-  assert.equal((r.code.match(/designLineHeight/g) || []).length, 1);
+  // Figma's default line box (rounded to whole points) is set too, unless asked not to.
+  assert.equal((r.code.match(/designLineHeight/g) || []).length, 2);
+  const lean = generate(column('Card', [tight, auto], { h: 120 }), { exactLineHeights: false });
+  assert.equal((lean.code.match(/designLineHeight/g) || []).length, 1);
   assert.match(r.shared, /struct DesignLineHeight: ViewModifier/);
   assert.equal(typecheck([r]), '');
 });
@@ -311,4 +314,43 @@ test('additions to a design system come as a patch naming their enums', async ()
   const m = mergeDesignSystem(project, screen);
   assert.deepEqual(m.added, ['DesignTokens.ink']);
   assert.equal(m.patch, '// Add to enum DesignTokens:\n  static let ink = Color(hex: 0x222222) // ink');
+});
+
+test('data text is localized; digits and asset names stay literals; names come from content and headings', { skip }, () => {
+  const digit = (d, x) => frame('Frame 1', { x, w: 26, h: 26, mode: 'HORIZONTAL', fills: [solid(brand)], layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED', children: [text(d, { x: x + 9 })] });
+  const row = frame('Frame 2', { w: 200, h: 26, mode: 'HORIZONTAL', itemSpacing: 4, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    children: ['1', '5', '7', '2'].map((d, i) => digit(d, i * 30)) });
+  const section = (t, y) => frame('Frame 3', { y, w: 340, h: 50, mode: 'HORIZONTAL', fills: [solid(white)], layoutSizingHorizontal: 'FILL',
+    layoutSizingVertical: 'FIXED', children: [text(t, { y })] });
+  const list = frame('Frame 4', { w: 340, h: 120, mode: 'VERTICAL', itemSpacing: 8, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG',
+    children: [section('Property & Repairs', 0), section('Safety & Security', 60)] });
+  const r = generate(column('Frame 5', [row, text('Service details', { w: 120 }), list], { h: 400 }));
+  assert.match(r.code, /struct Digit: Hashable/);
+  assert.match(r.code, /Digit\(title: "1"\)/);
+  assert.match(r.code, /struct ServiceDetail: Hashable/);
+  assert.match(r.code, /ServiceDetail\(title: String\(localized: "Property & Repairs"\)\)/);
+  assert.equal(typecheck([r]), '');
+});
+
+test('a colour variable with a dark mode becomes a light and dark colour', { skip }, () => {
+  const card = frame('Card', { w: 200, h: 60, fills: [solid(white)], vars: { 'fill.0': 'bg/surface' }, children: [text('Hi')] });
+  const r = generate(column('Home', [card], { h: 100 }), {
+    variableModes: { 'bg/surface': { Light: { r: 1, g: 1, b: 1, a: 1 }, Dark: { r: 0.1, g: 0.1, b: 0.12, a: 1 } } },
+  });
+  assert.match(r.shared, /static let bgSurface = Color\(light: Color\(hex: 0xFFFFFF\), dark: Color\(hex: 0x1A1A1F\)\) \/\/ bg\/surface/);
+  assert.match(r.shared, /init\(light: Color, dark: Color\)/);
+  assert.match(r.code, /DesignTokens\.bgSurface/);
+  assert.equal(typecheck([r]), '');
+});
+
+test('a half-point size keeps its size under Dynamic Type', { skip }, () => {
+  const t = text('Designing calm, human-centred products.', { size: 14.5, w: 300 });
+  t.segments = [{ ...t.segments[0], fontName: { family: 'Manrope', style: 'Regular' }, lineHeight: { unit: 'PIXELS', value: 22 }, letterSpacing: { unit: 'PIXELS', value: 0.2 } }];
+  const whole = text('Posts');
+  const r = generate(column('Profile', [{ ...t, textAutoResize: 'HEIGHT' }, whole], { h: 100 }));
+  assert.match(r.code, /\.designFont\("Manrope-Regular", size: 14\.5, relativeTo: \.subheadline\)/);
+  assert.match(r.code, /\.font\(\.custom\("Inter-Regular", size: 13, relativeTo: \.footnote\)\)/);
+  assert.match(r.shared, /struct DesignFont: ViewModifier/);
+  assert.equal(typecheck([r]), '');
 });

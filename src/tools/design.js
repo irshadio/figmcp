@@ -309,6 +309,10 @@ export function registerDesignTools(server, bridge, source) {
       screenUtil: z.boolean().optional().describe(
         'Flutter: write lengths with flutter_screenutil (.w, .h, .r, .sp) so the layout scales from the design size ' +
         '(default: when the project\'s pubspec.yaml depends on flutter_screenutil).'),
+      exactLineHeights: z.boolean().optional().describe(
+        'SwiftUI: set Figma\'s default line heights too, which Figma rounds to whole points, so text matches the design to ' +
+        'the pixel (default: true). false leaves default-height text at the face\'s own line height (within half a point per ' +
+        'line) and the code shorter.'),
       excludeScreenshot: z.boolean().optional().describe('Leave the screenshot out of the response.'),
       forceCode: z.boolean().optional().describe('Always return code, even for very large nodes.'),
       disableCodeConnect: z.boolean().optional().describe('Draw mapped components from their layers instead of naming the code component.'),
@@ -356,7 +360,7 @@ export function registerDesignTools(server, bridge, source) {
       } else if (framework === 'swiftui') {
         const catalog = assetsDir ? assetsDir.replace(/\/+$/, '') : assetCatalog();
         const files = { ...fileResolver(node.images), taken: (name, file) => catalogTaken(catalog, name, file) };
-        const result = toSwiftUI(node.tree, files, { connect, screen });
+        const result = toSwiftUI(node.tree, files, { connect, screen, variableModes: node.variableModes, exactLineHeights: args.exactLineHeights ?? true });
         out = [text(result.code), ...swiftuiDetails(result, node.tree, catalog, isSwiftPackage())];
       } else {
         const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });
