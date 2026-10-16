@@ -135,7 +135,8 @@ export function usedVariables(code) {
   // declared with the one most of the frame uses.
   return [...found.values()].map(({ counts, ...v }) => {
     const ranked = [...counts].sort((a, b) => b[1] - a[1]);
-    return { ...v, value: ranked[0][0], others: ranked.slice(1).map(([value]) => value) };
+    const uses = ranked.reduce((n, [, c]) => n + c, 0);
+    return { ...v, value: ranked[0][0], uses, others: ranked.slice(1).map(([value]) => value) };
   });
 }
 
@@ -151,10 +152,19 @@ const THEME_NAMESPACE = {
  * (--color-brand-600 gives bg-brand-600). Empty when none is used.
  */
 export function tokensCss(code, names = new Map()) {
-  const vars = usedVariables(code).map((v) => ({ ...v, name: names.get(v.ident) || v.name }));
-  if (!vars.length) return '';
-  const note = (v) => [v.name !== v.ident ? v.name : null, v.others.length ? `also used as ${v.others.join(', ')}` : null]
-    .filter(Boolean).join('; ');
+  const found = usedVariables(code).map((v) => ({ ...v, name: names.get(v.ident) || v.name }));
+  if (!found.length) return '';
+  // Variables sharing a Figma name sit together, the most used first, which
+  // also names the Tailwind utility.
+  const first = new Map();
+  found.forEach((v, i) => first.has(v.name) || first.set(v.name, i));
+  const vars = [...found].sort((a, b) => first.get(a.name) - first.get(b.name) || b.uses - a.uses);
+  const shared = (v) => vars.find((o) => o.name === v.name) !== v;
+  const note = (v) => [
+    v.name !== v.ident || shared(v) ? v.name : null,
+    shared(v) ? 'another value (another collection or mode)' : null,
+    v.others.length ? `also used as ${v.others.join(', ')}` : null,
+  ].filter(Boolean).join('; ');
   const root = vars.map((v) => `  --${v.ident}: ${v.value};${note(v) ? ` /* ${note(v)} */` : ''}`);
   const keys = new Set();
   const theme = [];

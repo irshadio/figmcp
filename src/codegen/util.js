@@ -69,11 +69,18 @@ export function varIdent(name) {
 // Figma names would share one ('ink/500' and 'ink-500').
 let idents = null;
 
-/** Sets the CSS names to use (Figma name -> identifier) until reset with null. */
+/**
+ * Sets the CSS names to use until reset with null: Figma name ->
+ * identifier, or name + NUL + value -> identifier for one of its values.
+ */
 export function useVarIdents(map) {
   idents = map;
 }
 
 export function withVar(name, fallback) {
-  return name ? `var(--${(idents && idents.get(name)) || varIdent(name)},${fallback})` : fallback;
+  if (!name) return fallback;
+  // A name used with several values (two variables of one name in different
+  // collections) has a CSS name per value.
+  const ident = (idents && (idents.get(`${name}\u0000${fallback}`) || idents.get(name))) || varIdent(name);
+  return `var(--${ident},${fallback})`;
 }

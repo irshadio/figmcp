@@ -125,15 +125,16 @@ export function scriptOf(seg) {
 
 /**
  * The variation axes Figma set on a run's font other than its weight, which
- * font-weight carries: a browser would pick optical size and the rest by
- * itself and draw other letterforms. A width of 100 and no slant are left
- * out, being every font's default.
+ * font-weight carries. A width of 100 and no slant are left out, being every
+ * font's default, and so is optical size: Figma reports the named
+ * instance's value (14 at any size) and draws it at the font size, as
+ * browsers do by default.
  */
 function variationClasses(seg) {
   const axes = seg.fontName && seg.fontName.variationSettings;
   if (!axes || typeof axes !== 'object') return [];
   const list = Object.entries(axes).filter(([tag, v]) => /^[A-Za-z0-9]{4}$/.test(tag) && typeof v === 'number' &&
-    tag !== 'wght' && tag !== 'ital' && !(tag === 'wdth' && v === 100) && !(tag === 'slnt' && v === 0));
+    tag !== 'wght' && tag !== 'ital' && tag !== 'opsz' && !(tag === 'wdth' && v === 100) && !(tag === 'slnt' && v === 0));
   if (!list.length) return [];
   return [`[font-variation-settings:${list.map(([tag, v]) => `'${tag}'_${num(v)}`).join(',')}]`];
 }

@@ -118,8 +118,9 @@ function reactDetails(result, tree, { html = false } = {}) {
   if (fonts.length) {
     const axes = result.fontAxes || {};
     out.push(text('Fonts used (load each family with these weights, e.g. with next/font, a Google Fonts ' +
-      '<link> or @font-face; the classes name the family itself. Families with axes set the design\'s ' +
-      'variation with font-variation-settings: load their variable font with those axes):\n' +
+      '<link> or @font-face; the classes name the family itself. Families with axes need their variable font ' +
+      'with those axes: font-variation-settings sets the values, and opsz auto follows the font size as in Figma, ' +
+      'the browser default):\n' +
       fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}${axes[family] ? `; axes ${axes[family].join(', ')}` : ''}`).join('\n')));
   }
   if (result.textStyles.length) {

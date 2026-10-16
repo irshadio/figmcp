@@ -438,7 +438,9 @@ test('apps keep their layout fluid; colliding variable names and failed runs are
 
 test('corpus findings, second round: font axes, empty texts, baseline rows, hugging columns', () => {
   const axes = code(frame([text('Get paid', {}, { fontName: { family: 'Bricolage Grotesque', style: 'Bold', variationSettings: { opsz: 14, wdth: 100, wght: 700 } } })]));
-  assert.match(axes, /\[font-variation-settings:'opsz'_14\]/, 'Figma\'s optical size, not the browser\'s pick');
+  assert.doesNotMatch(axes, /font-variation/, 'optical size follows the font size, as Figma draws it');
+  assert.match(code(frame([text('Narrow', {}, { fontName: { family: 'Roboto Flex', style: 'Bold', variationSettings: { opsz: 14, wdth: 80, wght: 700 } } })])),
+    /\[font-variation-settings:'wdth'_80\]/);
   assert.doesNotMatch(code(frame([text('Hi', {}, { fontName: { family: 'Inter', style: 'Bold', variationSettings: { wght: 700 } } })])), /font-variation/);
 
   assert.match(code(frame([text('', { height: 16 })])), /h-4[^"]*" data-name="T"/, 'an empty text keeps its line');
@@ -456,7 +458,7 @@ test('corpus findings, second round: font axes, empty texts, baseline rows, hugg
   assert.match(wrapRow, /items-baseline/, 'a wrapping row keeps baseline alignment');
   assert.doesNotMatch(wrapRow, /mt-|data-align/);
   assert.deepEqual(gen(frame([text('Get paid', {}, { fontName: { family: 'Bricolage Grotesque', style: 'Bold', variationSettings: { opsz: 14, wdth: 100, wght: 700 } } })])).fontAxes,
-    { 'Bricolage Grotesque': ['opsz 14'] });
+    { 'Bricolage Grotesque': ['opsz auto'] });
 
   const phone = (column) => ({ id: '21:1', name: 'Screen', type: 'FRAME', x: 0, y: 0, width: 390, height: 844, children: [{
     ...box('21:2', { name: 'Week', layoutMode: 'HORIZONTAL', width: 134, height: 42, x: 100, y: 100, layoutSizingHorizontal: 'HUG' }),
@@ -470,5 +472,7 @@ test('corpus findings, second round: font axes, empty texts, baseline rows, hugg
   const stale = gen(frame([box('22:1', { fills: [solid()], vars: { 'fill.0': 'bg/page' } }),
     box('22:2', { fills: [solid({ r: 0.96, g: 0.96, b: 0.96, a: 1 })], vars: { 'fill.0': 'bg/page' } }),
     box('22:3', { fills: [solid({ r: 0.96, g: 0.96, b: 0.96, a: 1 })], vars: { 'fill.0': 'bg/page' } })]));
-  assert.match(stale.css, /--bg-page: #f5f5f5; \/\* bg\/page; also used as #000000 \*\//, 'the value most of the frame uses');
+  assert.match(stale.css, /--bg-page: #f5f5f5; \/\* bg\/page \*\/\n  --bg-page-2: #000000; \/\* bg\/page; another value/, 'each value has a CSS name');
+  assert.match(stale.css, /--color-bg-page: var\(--bg-page\);/, 'the utility takes the value most of the frame uses');
+  assert.match(stale.code, /bg-\[var\(--bg-page-2,#000000\)\][^"]*" data-name="22:1"|var\(--bg-page-2,#000000\)/);
 });

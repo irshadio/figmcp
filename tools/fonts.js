@@ -109,27 +109,57 @@ async function googleAxes(family) {
   return axesCache[family] || null;
 }
 
-/** Downloads the variable font of [family] (all its axes) from Google Fonts. */
+/** Whether the font file [bytes] has variation axes (an fvar table). */
+export function hasAxes(bytes) {
+  if (bytes.length < 12) return false;
+  const tables = bytes.readUInt16BE(4);
+  for (let i = 0; i < tables && 12 + i * 16 + 4 <= bytes.length; i++) {
+    if (bytes.toString('latin1', 12 + i * 16, 12 + i * 16 + 4) === 'fvar') return true;
+  }
+  return false;
+}
+
+/** hasAxes for a font file, reading only its table directory. */
+function fileHasAxes(file) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const head = Buffer.alloc(12 + 64 * 16);
+    return hasAxes(head.subarray(0, fs.readSync(fd, head, 0, head.length, 0)));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
+ * Downloads the variable font of [family] (all its axes) from the Google
+ * Fonts repository. The CSS API sends one static instance per axis value to
+ * clients it does not know, which would draw every weight and width alike.
+ */
 export async function fetchVariableFont(family) {
   const dir = path.join(FONT_CACHE, `${family.replace(/[^A-Za-z0-9]+/g, '_')}_variable`);
-  if (fs.existsSync(dir) && fs.readdirSync(dir).length) return;
+  const file = path.join(dir, `${family.replace(/\s+/g, '')}-Variable.ttf`);
+  if (fs.existsSync(file) && fileHasAxes(file)) return;
   const axes = await googleAxes(family);
   if (!axes) return;
-  const sorted = [...axes].sort((a, b) => (a.tag < b.tag ? -1 : 1));
-  const query = `family=${encodeURIComponent(family)}:${sorted.map((a) => a.tag).join(',')}@${sorted.map((a) => `${a.min}..${a.max}`).join(',')}`;
-  const res = await fetch(`https://fonts.googleapis.com/css2?${query}`, { signal: AbortSignal.timeout(20000) });
-  if (!res.ok) return;
-  const url = /url\(([^)]+\.ttf)\)/.exec(await res.text());
-  if (!url) return;
-  fs.mkdirSync(dir, { recursive: true });
-  const bytes = Buffer.from(await (await fetch(url[1], { signal: AbortSignal.timeout(30000) })).arrayBuffer());
-  fs.writeFileSync(path.join(dir, `${family.replace(/\s+/g, '')}-Variable.ttf`), bytes);
+  const tags = axes.map((a) => a.tag).sort((a, b) => (a < b ? -1 : 1)).join(',');
+  const name = `${family.replace(/\s+/g, '')}%5B${tags}%5D.ttf`;
+  const folder = family.toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const licence of ['ofl', 'apache', 'ufl']) {
+    const res = await fetch(`https://raw.githubusercontent.com/google/fonts/main/${licence}/${folder}/${name}`, { signal: AbortSignal.timeout(60000) });
+    if (!res.ok) continue;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (!hasAxes(bytes)) return;
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, bytes);
+    return;
+  }
 }
 
 /** The variable font files of [family] among [files]. */
 function variableFiles(family, files) {
   const key = norm(family);
-  return files.filter((f) => f.stem.startsWith(key) && /variable|vf|wght/.test(f.stem.slice(key.length))).map((f) => f.file);
+  return files.filter((f) => f.stem.startsWith(key) && /variable|vf|wght/.test(f.stem.slice(key.length)))
+    .map((f) => f.file).filter(fileHasAxes);
 }
 
 /**

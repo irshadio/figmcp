@@ -18,7 +18,7 @@ import {
 } from './semantics.js';
 import { collapseRuns } from './runs.js';
 import { applyTextStyles } from './text-styles.js';
-import { mergeEdges, snapClass, tokensCss } from './tailwind.js';
+import { mergeEdges, snapClass, tokensCss, usedVariables } from './tailwind.js';
 import {
   autoLineRatios, cssWeight, fontClasses, jsxText, paragraphs, scriptOf, segmentsOf, textBlockClasses,
   verticalAlign,
@@ -338,11 +338,13 @@ class Writer {
     const key = `${cssWeight(seg)}${italic ? ' italic' : ''}`;
     if (!this.fonts.has(family)) this.fonts.set(family, new Set());
     this.fonts.get(family).add(key);
-    // Axes the classes set besides the weight: they need the variable font.
+    // Axes besides the weight need the variable font: the values the classes
+    // set, and an optical size following the font size (a static file is
+    // one optical size).
     for (const [tag, v] of Object.entries(seg.fontName.variationSettings || {})) {
       if (tag === 'wght' || tag === 'ital' || (tag === 'wdth' && v === 100) || (tag === 'slnt' && v === 0) || typeof v !== 'number') continue;
       if (!this.axes.has(family)) this.axes.set(family, new Set());
-      this.axes.get(family).add(`${tag} ${num(v)}`);
+      this.axes.get(family).add(tag === 'opsz' ? 'opsz auto' : `${tag} ${num(v)}`);
     }
   }
 
@@ -865,6 +867,26 @@ function roundedHeight(node, paras, flow = true) {
   return extra > 0.01 && extra < 1 ? `min-h-[${px(node.height)}]` : null;
 }
 
+/**
+ * CSS names for the further values of variables used with several:
+ * name + NUL + value -> identifier.
+ */
+function splitVariables(used, variables) {
+  const out = new Map();
+  const taken = new Set(variables.byIdent.keys());
+  for (const v of used) {
+    const name = variables.byIdent.get(v.ident);
+    if (!name || !v.others.length) continue;
+    for (const value of v.others) {
+      let ident = `${v.ident}-2`;
+      for (let i = 3; taken.has(ident); i++) ident = `${v.ident}-${i}`;
+      taken.add(ident);
+      out.set(`${name}\u0000${value}`, ident);
+    }
+  }
+  return out;
+}
+
 /** The design variables bound in [tree]: CSS identifier -> Figma name. */
 function variableNames(tree) {
   const names = new Set();
@@ -951,18 +973,30 @@ export function toReactTailwind(root, assets, {
   // A root shipped as one image is a picture, not a screen to lay out.
   const asScreen = screen ?? (isPhoneScreen(tree) && !tree.render && !drawnAsSvg(tree));
   const asPage = !asScreen && (page ?? (isWebPage(tree) && !tree.render && !drawnAsSvg(tree)));
-  const writer = new Writer(assets, { connect, ratios: autoLineRatios(tree), screen: asScreen ? tree : null, assetDir });
-  writer.page = asPage ? tree : null;
-  writer.app = asPage && isAppShell(tree);
-  if (asPage) writer.sections.add(tree);
-  writer.pinned = asScreen || asPage ? pinnedChildren(tree) : new Set();
-  writer.runs = repeats;
   const variables = variableNames(tree);
-  useVarIdents(variables.toIdent);
-  try {
-    writer.node(tree, null, 2);
-  } finally {
-    useVarIdents(null);
+  const write = (idents) => {
+    const w = new Writer(assets, { connect, ratios: autoLineRatios(tree), screen: asScreen ? tree : null, assetDir });
+    w.page = asPage ? tree : null;
+    w.app = asPage && isAppShell(tree);
+    if (asPage) w.sections.add(tree);
+    w.pinned = asScreen || asPage ? pinnedChildren(tree) : new Set();
+    w.runs = repeats;
+    useVarIdents(idents);
+    try {
+      w.node(tree, null, 2);
+    } finally {
+      useVarIdents(null);
+    }
+    return w;
+  };
+  let writer = write(variables.toIdent);
+  // One name with several values in the frame (variables of one name in two
+  // collections, or modes): each further value gets a CSS name of its own,
+  // so declaring one cannot recolour the others.
+  const split = splitVariables(usedVariables(writer.lines.join('\n')), variables);
+  if (split.size) {
+    writer = write(new Map([...variables.toIdent, ...split]));
+    for (const [key, ident] of split) variables.byIdent.set(ident, key.split('\u0000')[0]);
   }
   const header = [...writer.connected.values()].map((m) =>
     `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`);
