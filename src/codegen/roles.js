@@ -28,6 +28,15 @@ const CONTENT_TYPES = [
 const CLOSE = /close|dismiss|cross|^x$/i;
 const SWAP = /swap|exchange|reverse|switch/i;
 
+/** Whether [n] holds a radio button: a small round outline (16 to 28 pt) near its start, a few layers deep. */
+function hasRadio(n, depth = 0) {
+  return visibleChildren(n).some((c) => {
+    const round = (c.type === 'ELLIPSE' || radius(c) >= Math.min(c.width, c.height) / 2 - 0.5) && c.width >= 16 && c.width <= 28 &&
+      Math.abs(c.width - c.height) < 1 && (stroked(c) || visibleChildren(c).some((k) => k.type === 'ELLIPSE'));
+    return round || (depth < 2 && !(c.type === 'TEXT') && hasRadio(c, depth + 1));
+  });
+}
+
 /** Whether [n] or a layer in it is filled with an image. */
 function hasImage(n) {
   return n.visible !== false && ((Array.isArray(n.fills) && n.fills.some((p) => p && p.visible !== false && p.type === 'IMAGE')) ||
@@ -266,6 +275,8 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
           radius(n) > 0 && kids.every((c) => c.type === 'TEXT' || isIcon(c))) {
         set(n, 'button', { primary: filled(n), label: ts[0].characters }, 'high',
           `a ${filled(n) ? 'filled' : 'outlined'} rounded frame ${Math.round(n.height)}pt high with one label`);
+      } else if (isAutoLayout(n) && (filled(n) || stroked(n)) && ts.length >= 1 && n.height >= 40 && hasRadio(n)) {
+        set(n, 'option', { label: ts[0].characters }, 'medium', `a box with a radio circle and "${ts[0].characters}"`);
       } else if (row && isAutoLayout(n) && flow.length >= 2 && ts.length >= 1 && last && isIcon(last) && DISCLOSURE.test(last.name)) {
         set(n, 'listRow', {}, 'medium', `a row ending in "${last.name}"`);
       } else if (isAutoLayout(n) && hasIcon(n) && ts.length >= 2 && ts.length <= 3 && n.height <= 80 && kids.some(isIcon)) {
@@ -326,6 +337,7 @@ export const SWIFTUI_PATTERNS = {
   grid: 'grid: LazyVGrid with flexible columns',
   sectionHeader: 'section header: title with the header trait and a link Button',
   listRow: 'disclosure row: a Button with a press-scale style',
+  option: 'radio option: a Button telling the owner the choice (selection state is the owner\'s)',
   swapFields: 'swap pair: two fields whose values are state, exchanged with an animation by the swap button',
   field: 'form field: a Button that opens its picker (destination, date, travellers)',
   button: 'button: Button with a press-scale style',

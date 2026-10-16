@@ -17,7 +17,7 @@ import {
 import { indicatorOf, PRESSABLE_STYLE, withIndicator } from './patterns.js';
 import { baseName, fieldsOf, isGenericName, mergeTrees, plural, runsOf } from './repeat.js';
 import {
-  array, call, mod, print, raw, sIdent, sNum, sString, str, sType, SWIFT_TYPE_NAMES, trailing, view,
+  array, call, KEYWORDS, mod, print, raw, sIdent, sNum, sString, str, sType, SWIFT_TYPE_NAMES, trailing, view,
 } from './swift.js';
 import { fontOf, isSystemFamily, textView } from './text.js';
 
@@ -52,9 +52,9 @@ const RESERVED_IDENTS = new Set(['continueValue', 'defaultValue', 'returnValue',
 const CONTAINER_ROLES = { carousel: 'carousel', grid: 'grid', chips: 'chips', tabs: 'picker', segmented: 'picker', tabBar: 'tab bar' };
 // Roles whose text is a label.
 const CONTROLS = new Set(['tabBar', 'tabs', 'segmented', 'chips', 'button', 'iconButton']);
-const TAPPABLE = new Set(['button', 'iconButton', 'field', 'link', 'listRow']);
+const TAPPABLE = new Set(['button', 'iconButton', 'field', 'link', 'listRow', 'option']);
 const SELECTABLE = new Set(['tabBar', 'tabs', 'segmented', 'chips']);
-const TAPPABLE_ITEMS = new Set(['card', 'field', 'button', 'listRow', 'iconButton', 'tab']);
+const TAPPABLE_ITEMS = new Set(['card', 'field', 'button', 'listRow', 'iconButton', 'tab', 'option']);
 const HELPER_CODE = { ...HELPERS, pressable: PRESSABLE_STYLE };
 
 /** The one colour an SVG paints with, as a colour value through [color], or null. */
@@ -360,7 +360,10 @@ class SwiftUIWriter {
 
   /** A case of the screen's action enum, unique by name, with its payload type. */
   actionCase(label, payload = null) {
-    const base = sIdent(label, 'tap');
+    // A keyword reads as itself: `case \`continue\`` and action(.continue).
+    const plain = sIdent(label, 'tap');
+    const keyword = /^(\w+)Value$/.exec(plain);
+    const base = keyword && KEYWORDS.has(keyword[1]) ? keyword[1] : plain;
     let name = base;
     for (let i = 2; this.cases.has(name) && this.cases.get(name) !== payload; i++) name = `${base}${i}`;
     this.cases.set(name, payload);
@@ -384,7 +387,7 @@ class SwiftUIWriter {
   /** The action case a tappable layer fires, from its role and label. */
   actionName(node, role) {
     switch (role.role) {
-      case 'button': case 'iconButton': return role.label;
+      case 'button': case 'iconButton': case 'option': return role.label;
       case 'link': return `${node.characters} ${role.section || ''}`;
       default: return this.label(node);
     }
@@ -2307,7 +2310,7 @@ export function toSwiftUI(root, assets, options = {}) {
 /** The screen's action enum: what tapping its controls asks the owner to do. */
 function actionEnum(cases) {
   const lines = ['/// What the screen asks its owner to do.', 'enum Action: Hashable {'];
-  for (const [name, payload] of cases) lines.push(`  case ${name}${payload ? `(${payload})` : ''}`);
+  for (const [name, payload] of cases) lines.push(`  case ${KEYWORDS.has(name) ? `\`${name}\`` : name}${payload ? `(${payload})` : ''}`);
   lines.push('}');
   return lines.join('\n');
 }

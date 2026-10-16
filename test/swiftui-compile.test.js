@@ -406,3 +406,16 @@ test('a scrim and the sheet over it cover the whole screen', { skip }, () => {
   assert.match(r.code.slice(modal), /\.ignoresSafeArea\(\)/);
   assert.equal(typecheck([r]), '');
 });
+
+test('a keyword names its action as itself, and radio options are buttons', { skip }, () => {
+  const radio = (y, label) => frame(label, { y, w: 340, h: 60, mode: 'HORIZONTAL', itemSpacing: 10, strokes: [solid(ink)], strokeWeight: 1, cornerRadius: 12,
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', children: [
+      { id: id(), name: 'Radio', type: 'ELLIPSE', x: 12, y: y + 20, width: 20, height: 20, strokes: [solid(ink)], strokeWeight: 2, fills: [] },
+      text(label, { y: y + 20 })] });
+  const r = generate(column('Fares', [radio(0, 'Saver'), radio(70, 'Flexi plus'), button('Continue')], { h: 300 }));
+  assert.match(r.code, /case `continue`/);
+  assert.match(r.code, /action\(\.continue\)/);
+  // Options of one shape are data; each tells the owner which was chosen.
+  assert.match(r.code, /action\(\.\w+\(item\)\)/);
+  assert.equal(typecheck([r]), '');
+});

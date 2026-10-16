@@ -11,6 +11,9 @@ const RESERVED = new Set([
 ]);
 const WIDTH = 100;
 
+/** Swift keywords: a member may take one written in backticks, and a reference after a dot needs none. */
+export const KEYWORDS = new Set([...RESERVED].filter((w) => !['body', 'view', 'content', 'Self', 'Any', 'some', 'any'].includes(w)));
+
 /**
  * Type names a generated type must not take: Swift, Foundation and SwiftUI
  * types the code uses or a project commonly does, and the generator's own
