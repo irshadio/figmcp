@@ -23,7 +23,7 @@ import {
   autoLineRatios, cssWeight, fontClasses, jsxText, paragraphs, scriptOf, segmentsOf, textBlockClasses,
   verticalAlign,
 } from './text.js';
-import { camel, num, pascal, px, tw, varIdent, withVar } from './util.js';
+import { camel, num, pascal, px, tw, useVarIdents, varIdent, withVar } from './util.js';
 
 const CSS_BLENDS = new Set(['NORMAL', 'PASS_THROUGH', 'MULTIPLY', 'SCREEN', 'OVERLAY', 'DARKEN', 'LIGHTEN',
   'COLOR_DODGE', 'COLOR_BURN', 'HARD_LIGHT', 'SOFT_LIGHT', 'DIFFERENCE', 'EXCLUSION', 'HUE', 'SATURATION',
@@ -164,6 +164,7 @@ class Writer {
     this.ratios = ratios;
     this.screen = screen;
     this.page = null;
+    this.app = false;
     this.sections = new Set();
     this.columns = new Set();
     this.assetDir = assetDir ? assetDir.replace(/^\/+|\/+$/g, '') : null;
@@ -507,6 +508,7 @@ class Writer {
     const lines = this.lines.length;
     const consts = this.consts.size;
     const files = this.files.size;
+    const arrays = this.arrays.length;
     const open = this.stack.length;
     try {
       this.draw(node, parent, depth, opts);
@@ -518,6 +520,10 @@ class Writer {
       for (const [source, { id }] of [...this.consts].slice(consts)) {
         this.consts.delete(source);
         this.names.delete(id);
+      }
+      for (const data of this.arrays.splice(arrays)) {
+        // The data of runs inside the failed layer goes with it.
+        this.names.delete(/^const (\w+) =/.exec(data[0])[1]);
       }
       for (const file of [...this.files.keys()].slice(files)) {
         this.files.delete(file);
@@ -720,7 +726,8 @@ class Writer {
         Math.abs(c.x + c.width - node.x) <= 1 && c.y < node.y + node.height && c.y + c.height > node.y);
       return after ? { stretch: true } : { pin: 'MAX' };
     }
-    return { center: true };
+    // An app's layout is fluid: its layers keep their Figma constraints.
+    return this.app ? {} : { center: true };
   }
 
   /** A full-width layer's own children follow the page rules too. */
@@ -758,6 +765,18 @@ class Writer {
       : minPageHeight(node, visibleChildren(node).filter((c) => !this.pinned.has(c.id)));
     return ['relative', 'w-full', `max-w-[${px(PHONE_MAX)}]`, 'mx-auto', `min-h-[max(100dvh,${px(H)})]`];
   }
+}
+
+/**
+ * Whether a page is an app's shell rather than a site: a rail (a sidebar)
+ * at least half the page's height on its left or right edge.
+ */
+function isAppShell(page) {
+  return visibleChildren(page).some((c) => {
+    const x = c.x - page.x;
+    const right = page.width - x - c.width;
+    return (x <= 1 || right <= 1) && !spansPage(c, page) && c.height >= page.height / 2 && c.width < page.width / 2;
+  });
 }
 
 /** A straight line with a solid dashed stroke and plain ends: straightLine plus its dashes. */
@@ -816,9 +835,9 @@ function roundedHeight(node, paras) {
 
 /** The design variables bound in [tree]: CSS identifier -> Figma name. */
 function variableNames(tree) {
-  const out = new Map();
+  const names = new Set();
   const add = (vars) => vars && typeof vars === 'object' &&
-    Object.values(vars).forEach((name) => typeof name === 'string' && out.set(varIdent(name), name));
+    Object.values(vars).forEach((name) => typeof name === 'string' && names.add(name));
   const walk = (n) => {
     if (!n || typeof n !== 'object' || n.visible === false) return;
     add(n.vars);
@@ -826,7 +845,17 @@ function variableNames(tree) {
     if (Array.isArray(n.children)) n.children.forEach(walk);
   };
   walk(tree);
-  return out;
+  // Names that would share a CSS name get numbered ones, in a stable order.
+  const byIdent = new Map();
+  const toIdent = new Map();
+  for (const name of [...names].sort()) {
+    const base = varIdent(name);
+    let ident = base;
+    for (let i = 2; byIdent.has(ident); i++) ident = `${base}-${i}`;
+    byIdent.set(ident, name);
+    toIdent.set(name, ident);
+  }
+  return { byIdent, toIdent };
 }
 
 /**
@@ -885,10 +914,17 @@ export function toReactTailwind(root, assets, {
   const asPage = !asScreen && (page ?? (isWebPage(tree) && !tree.render && !drawnAsSvg(tree)));
   const writer = new Writer(assets, { connect, ratios: autoLineRatios(tree), screen: asScreen ? tree : null, assetDir });
   writer.page = asPage ? tree : null;
+  writer.app = asPage && isAppShell(tree);
   if (asPage) writer.sections.add(tree);
   writer.pinned = asScreen || asPage ? pinnedChildren(tree) : new Set();
   writer.runs = repeats;
-  writer.node(tree, null, 2);
+  const variables = variableNames(tree);
+  useVarIdents(variables.toIdent);
+  try {
+    writer.node(tree, null, 2);
+  } finally {
+    useVarIdents(null);
+  }
   const header = [...writer.connected.values()].map((m) =>
     `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`);
   const consts = [...writer.consts.values()].map(({ id, url }) => `const ${id} = ${JSON.stringify(url)};`);
@@ -915,7 +951,7 @@ export function toReactTailwind(root, assets, {
   }
   return {
     code,
-    css: tokensCss(code, variableNames(tree)),
+    css: tokensCss(code, variables.byIdent),
     componentName,
     assets: map,
     files: Object.fromEntries(writer.files),

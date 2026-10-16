@@ -407,3 +407,31 @@ test('desktop frames are web pages: full-width sections stretch, the rest stays 
   assert.doesNotMatch(out.code, /Off canvas/, 'a layer outside a clipping page never shows');
   assert.match(code(page, { page: false }), /className="relative w-\[1440px\] h-\[900px\] overflow-clip"/);
 });
+
+test('apps keep their layout fluid; colliding variable names and failed runs are handled', () => {
+  const shell = {
+    id: '19:1', name: 'Dashboard', type: 'FRAME', x: 0, y: 0, width: 1440, height: 900, children: [
+      { ...box('19:2', { name: 'Top bar', x: 0, y: 0, width: 1440, height: 64 }), children: [text('Acme', { id: '19:3', x: 24, y: 20 })] },
+      box('19:4', { name: 'Sidebar', x: 0, y: 64, width: 240, height: 836 }),
+      { ...box('19:5', { name: 'Main', x: 240, y: 64, width: 1200, height: 836 }), children: [box('19:6', { name: 'Card', x: 272, y: 96, width: 360, height: 200 })] },
+    ],
+  };
+  const app = code(shell);
+  assert.match(app, /className="absolute left-6 top-5[^"]*" data-name="T"/, 'an app bar keeps its title on the left');
+  assert.match(app, /className="absolute left-0 w-60 top-16[^"]*" data-name="Sidebar"/);
+  assert.match(app, /className="absolute left-60 right-0 top-16[^"]*" data-name="Main"/, 'the main area fills the rest');
+
+  const out = gen(frame([box('19:7', { fills: [solid()], vars: { 'fill.0': 'ink/500' } }), box('19:8', { fills: [solid()], vars: { 'fill.0': 'ink-500' } })]));
+  assert.match(out.code, /var\(--ink-500,#000000\)/);
+  assert.match(out.code, /var\(--ink-500-2,#000000\)/);
+  assert.match(out.css, /--ink-500: #000000;/);
+  assert.match(out.css, /--ink-500-2: #000000; \/\* ink\/500 \*\//);
+
+  const tab = (id) => ({ ...box(id, { name: 'Tab' }), children: [text('Go', { id: `${id}t` })] });
+  const broken = { ...box('19:9', { name: 'Broken', layoutMode: 'HORIZONTAL' }), children: [tab('19:10'), tab('19:11'), tab('19:12'), { id: '19:13', type: 'FRAME', error: 'boom' }] };
+  // A failed sibling is a placeholder; the run beside it stays, declared once and used.
+  const failed = gen(frame([broken])).code;
+  assert.equal((failed.match(/^const brokenItems = \[/gm) || []).length, 1);
+  assert.match(failed, /\{brokenItems\.map\(/);
+  assert.match(failed, /data-error="the plugin could not read this layer \(boom\)"/);
+});

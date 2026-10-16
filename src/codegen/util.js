@@ -65,6 +65,15 @@ export function varIdent(name) {
 }
 
 /** 'var(--name,fallback)' when a variable is bound, else the fallback. */
+// The CSS names of the variables of the frame being generated, when two
+// Figma names would share one ('ink/500' and 'ink-500').
+let idents = null;
+
+/** Sets the CSS names to use (Figma name -> identifier) until reset with null. */
+export function useVarIdents(map) {
+  idents = map;
+}
+
 export function withVar(name, fallback) {
-  return name ? `var(--${varIdent(name)},${fallback})` : fallback;
+  return name ? `var(--${(idents && idents.get(name)) || varIdent(name)},${fallback})` : fallback;
 }
