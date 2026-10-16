@@ -240,6 +240,7 @@ struct ${calendar}View: View {
   let months: [Date]
   @Binding var selection: Date?
   let days: [String: ${model}]
+  @Environment(\\.accessibilityReduceMotion) private var reduceMotion
 
   private let columns = ${columns}
   private static let weekdays = [${role.labels.map((l) => sString(l)).join(', ')}]
@@ -260,7 +261,7 @@ struct ${calendar}View: View {
             if let date {
               let item = days[Self.key(date)] ?? ${model}()
               Button {
-                selection = date
+                withAnimation(reduceMotion ? nil : .snappy) { selection = date }
               } label: {
                 ${cellView}(day: Self.calendar.component(.day, from: date), item: item${selected ? ', isSelected: date == selection' : ''})
               }

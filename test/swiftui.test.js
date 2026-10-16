@@ -749,3 +749,19 @@ test('buttons filling a footer shrink on a narrower phone; tiles filling a row s
   assert.match(code, /\.layoutPriority\(1\)/);
   assert.match(code, /ViewThatFits\(in: \.horizontal\) \{[\s\S]*?ScrollView\(\.horizontal\) \{/);
 });
+
+test('a screen of data shows placeholders while loading; a full-bleed photo stretches when pulled', () => {
+  const photo = frame('Gallery', { w: 390, h: 300, fills: [{ type: 'IMAGE', visible: true, scaleMode: 'FILL', imageHash: 'hero' }],
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', children: [] });
+  const status = frame('Status bar', { w: 390, h: 47, mode: 'HORIZONTAL', layoutPositioning: 'ABSOLUTE', children: [text('9:41', { x: 32, y: 18 })] });
+  const items = ['Wi-Fi', 'Pool', 'Gym'].map((l, i) => frame(l, { x: 16, y: 320 + i * 30, w: 150, h: 18, mode: 'HORIZONTAL', layoutSizingHorizontal: 'FIXED',
+    children: [text(l, { x: 16, y: 320 + i * 30 })] }));
+  const list = frame('Amenities', { x: 16, y: 320, w: 358, h: 90, mode: 'VERTICAL', itemSpacing: 12, counterAxisAlignItems: 'MIN', layoutSizingHorizontal: 'FILL', children: items });
+  const root = frame('Hotel', { w: 390, h: 844, mode: 'VERTICAL', counterAxisAlignItems: 'MIN', fills: [solid(white)], children: [photo, list, status] });
+  const { code, shared } = toSwiftUI(root, assets);
+  assert.match(code, /var isLoading = false/);
+  assert.match(code, /\.shimmer\(isLoading\)/);
+  assert.match(shared, /struct Shimmer: ViewModifier/);
+  assert.match(code, /\.stretchesOnPull\(\)/);
+  assert.match(shared, /func stretchesOnPull\(\) -> some View/);
+});

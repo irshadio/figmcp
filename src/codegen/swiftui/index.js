@@ -1433,6 +1433,10 @@ class SwiftUIWriter {
       layer = clip(mod(clear(), 'overlay', [], [mod(mod(image, 'resizable'), 'scaledToFill')]));
     }
     if (paint.opacity !== undefined && paint.opacity < 1) layer = mod(layer, 'opacity', [[null, round(paint.opacity)]]);
+    if (this.heroPhotos && this.heroPhotos.has(node.id) && !this.inComponent) {
+      this.helpers.add('stretchy');
+      layer = mod(layer, 'stretchesOnPull');
+    }
     return mod(layer, 'accessibilityHidden', [[null, true]]);
   }
 
@@ -1598,6 +1602,10 @@ class SwiftUIWriter {
     const bleedHero = statusBottom > 0 ? shown.find((c) => c.width >= W * 0.95 && c.y - node.y <= 0.5 && c.height > statusBottom * 2 && photo(c) &&
       (!isAutoLayout(node) || shown.filter((k) => inFlow(k, node))[0] === c)) : null;
     const all = shown.map((c) => (c === bleedHero ? c : withoutSystemUi(c, node, chrome)));
+    // The hero's photo stretches when the page is pulled down past its top.
+    if (bleedHero) {
+      this.heroPhotos = new Set([bleedHero, ...visibleChildren(bleedHero)].filter((c) => hasImageFill(c) && c.width >= W * 0.95).map((c) => c.id));
+    }
     const rel = (c) => ({ top: c.y - node.y, bottom: c.y - node.y + c.height });
     const filled = (c) => visiblePaints(c.fills).length > 0;
     const wide = (c) => c.width >= W * 0.95;
@@ -1677,6 +1685,12 @@ class SwiftUIWriter {
           'opacity', [[null, raw(`${scrolled} ? 1 : 0`)]]), 'ignoresSafeArea')]);
         header = mod(header, 'animation', [[null, raw('.easeOut(duration: 0.2)')], ['value', raw(scrolled)]]);
       }
+    }
+    // A screen of data stands in placeholders while the owner loads it.
+    if (this.models.length) {
+      this.loading = true;
+      this.helpers.add('shimmer');
+      page = mod(page, 'shimmer', [[null, raw('isLoading')]]);
     }
     let out = mod(view('ScrollView', [], [page]), 'scrollBounceBehavior', [[null, raw('.basedOnSize')]]);
     if (bleeds) out = mod(out, 'ignoresSafeArea', [['edges', raw('.top')]]);
@@ -2395,6 +2409,7 @@ export function toSwiftUI(root, assets, options = {}) {
     `struct ${structName}: View {`,
     // In check mode the owner the screen asks is the check, which records each case.
     ...(writer.tapped ? [options.probe ? '  var action: (Action) -> Void = { checkAction("\\($0)") }' : '  var action: (Action) -> Void = { _ in }'] : []),
+    ...(writer.loading ? ['  /// Placeholders stand in for the content while its data loads.', '  var isLoading = false'] : []),
     ...writer.states,
     ...(writer.tapped || writer.states.length ? [''] : []),
     '  var body: some View {',
@@ -2426,7 +2441,7 @@ export function toSwiftUI(root, assets, options = {}) {
     }
     shared.push('}');
   }
-  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable', 'textStroke', 'designBar']) {
+  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable', 'textStroke', 'designBar', 'shimmer', 'stretchy']) {
     if (writer.helpers.has(name)) shared.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};

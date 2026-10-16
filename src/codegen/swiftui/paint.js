@@ -268,6 +268,54 @@ extension View {
     modifier(DesignLineHeight(height, font: name, size: size, relativeTo: style))
   }
 }`,
+  stretchy: `extension View {
+  /// Pulled down past the top of its scroll view, the view grows from its
+  /// bottom edge to fill the room instead of leaving a gap above it.
+  func stretchesOnPull() -> some View {
+    visualEffect { content, proxy in
+      let pull = max(0, proxy.frame(in: .scrollView).minY)
+      return content.scaleEffect(1 + pull / max(proxy.size.height, 1), anchor: .bottom)
+    }
+  }
+}`,
+  shimmer: `/// Content standing in while its data loads: drawn as placeholders with a
+/// light sweeping across them (held still when Reduce Motion is on).
+struct Shimmer: ViewModifier {
+  var active: Bool
+  @Environment(\\.accessibilityReduceMotion) private var reduceMotion
+  @State private var phase: CGFloat = -1
+
+  func body(content: Content) -> some View {
+    if active {
+      content
+        .redacted(reason: .placeholder)
+        .overlay {
+          GeometryReader { proxy in
+            LinearGradient(colors: [.clear, .white.opacity(0.6), .clear], startPoint: .leading, endPoint: .trailing)
+              .frame(width: proxy.size.width / 2)
+              .offset(x: proxy.size.width * (phase + 1) * 0.75 - proxy.size.width / 4)
+          }
+          .mask { content.redacted(reason: .placeholder) }
+          .allowsHitTesting(false)
+        }
+        .disabled(true)
+        .accessibilityLabel(Text("Loading"))
+        .onAppear {
+          guard !reduceMotion else { return }
+          withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) { phase = 1 }
+        }
+    } else {
+      content
+    }
+  }
+}
+
+extension View {
+  /// Placeholders with a moving light while [active] (see Shimmer).
+  func shimmer(_ active: Bool) -> some View {
+    modifier(Shimmer(active: active))
+  }
+}`,
   designBar: `/// A progress bar drawn as the design draws it: a [track] filled from its
 /// start in [fill] to the progress value, both with corners of [radius].
 struct DesignBarStyle: ProgressViewStyle {
