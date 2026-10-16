@@ -6,7 +6,7 @@
 // Usage: node tools/swiftui-check.js <nodeId|selection> [--snapshot <frame id>]
 //          [--export <design export.json>] [--fonts <dir>]... [--fetch-fonts]
 //          [--out <dir>] [--device <udid or name>] [--font-line-heights]
-//          [--dynamic-type <size>] [--interact]
+//          [--dynamic-type <size>] [--interact] [--width <points>]
 //          [--code <View.swift> [--assets <assets.json>]]
 //          [--project <dir> --file <View.swift> [--view <Struct>]]
 // Reads live through the running MCP server (the plugin must be connected),
@@ -63,6 +63,7 @@ function args(argv) {
     else if (a === '--font-line-heights') out.fontLineHeights = true;
     else if (a === '--dynamic-type') out.dynamicType = argv[++i];
     else if (a === '--interact') out.interact = true;
+    else if (a === '--width') out.width = Number(argv[++i]);
     else if (a === '--help' || a === '-h') out.help = true;
     else if (a.startsWith('--')) throw new Error(`Unknown option ${a}.\n${USAGE}`);
     else out.target = a;
@@ -555,10 +556,51 @@ async function bundleFonts(familyList, dirs, fetchFonts, missing) {
   return [...new Set(found)];
 }
 
+/**
+ * Layers drawn past the sides of a screen [width] points wide that stay
+ * within the design's frame: rows that do not fit. Layers in a row that
+ * scrolls, or reaching past the frame in the design, may run off.
+ */
+function overflowing(tree, rects, probeIds, width) {
+  const byId = new Map();
+  const parents = new Map();
+  const index = (n) => {
+    byId.set(n.id, n);
+    for (const c of n.children || []) {
+      parents.set(c.id, n);
+      index(c);
+    }
+  };
+  index(tree);
+  const scrolls = (n) => {
+    for (let p = n; p; p = parents.get(p.id)) {
+      if (p.overflowDirection === 'HORIZONTAL' || p.overflowDirection === 'BOTH') return true;
+      if (p !== tree && p.x + p.width > tree.x + tree.width + 0.5) return true;
+    }
+    return false;
+  };
+  const out = [];
+  for (const [key, r] of Object.entries(rects)) {
+    const id = key.includes('#') ? probeIds[key] : key;
+    const n = byId.get(id);
+    if (!n || n === tree || key.includes('#') && !key.startsWith('0#') || scrolls(n)) continue;
+    const over = Math.max(r.x + r.width - width, -r.x);
+    // What a frame clips is not seen past it.
+    let clipped = false;
+    for (let p = parents.get(n.id); p && p !== tree && !clipped; p = parents.get(p.id)) {
+      const pr = p.clipsContent && rects[p.id];
+      if (pr && Math.max(pr.x + pr.width - width, -pr.x) <= 0.5) clipped = true;
+    }
+    if (clipped) continue;
+    if (over > 0.5) out.push({ id, name: n.name, type: n.type, box: [r.x, r.y, r.width, r.height].map((v) => Math.round(v * 10) / 10), over: Math.round(over * 10) / 10 });
+  }
+  return out.sort((a, b) => b.over - a.over);
+}
+
 const USAGE = `Usage: node tools/swiftui-check.js <nodeId|selection> [--snapshot <frame id>]
          [--export <design export.json>] [--fonts <dir>]... [--fetch-fonts]
          [--out <dir>] [--device <udid or name>] [--font-line-heights]
-         [--dynamic-type <xSmall…xxxLarge, accessibility1…accessibility5>] [--interact]
+         [--dynamic-type <xSmall…xxxLarge, accessibility1…accessibility5>] [--interact] [--width <points>]
          [--code <View.swift> [--shared <DesignSystem.swift>] [--assets <assets.json>] [--view <Struct>]]
          [--project <dir> --file <View.swift> [--view <Struct>]]
 `;
@@ -609,6 +651,10 @@ async function main() {
   }
   const SIZES = ['xSmall', 'small', 'medium', 'large', 'xLarge', 'xxLarge', 'xxxLarge', 'accessibility1', 'accessibility2',
     'accessibility3', 'accessibility4', 'accessibility5'];
+  if (opts.width !== undefined && !(opts.width >= 200 && opts.width <= 1400)) {
+    process.stderr.write('--width takes a screen width in points, 200 to 1400.\n');
+    process.exit(2);
+  }
   if (opts.dynamicType && !SIZES.includes(opts.dynamicType)) {
     process.stderr.write(`--dynamic-type takes one of ${SIZES.join(', ')}.\n`);
     process.exit(2);
@@ -705,6 +751,7 @@ async function check(opts, design, out, sdk) {
   if (!fontFilesList) fontFilesList = await bundleFonts(fontFamilies, opts.fonts, opts.fetchFonts, fontsNotBundled);
   const build = path.join(out, 'build');
   const built = buildApp(build, { view, code, shared, catalogs, fontFilesList, sdk, dynamicType: opts.dynamicType || 'large' });
+  const resized = opts.width !== undefined && Math.abs(opts.width - tree.width) > 0.5;
   const report = {
     node: { id: tree.id, name: tree.name, width: tree.width, height: tree.height },
     view,
@@ -712,6 +759,7 @@ async function check(opts, design, out, sdk) {
     ...(built.stage ? { failedAt: built.stage } : {}),
     ...(tree.height * 2 > 4400 ? { capture: 'the frame is taller than a snapshot can be (about 4400 px), so it is drawn from its layers: materials and blurs are left out' } : {}),
     ...(opts.dynamicType && opts.dynamicType !== 'large' ? { dynamicType: `${opts.dynamicType} (the pixel comparison is with the design at the default size)` } : {}),
+    ...(resized ? { width: `${opts.width} pt (the design is ${tree.width} pt wide: no pixel or layer comparison, only what overflows the screen)` } : {}),
     fontsNotBundled,
     generatorWarnings: generated ? generated.warnings : [],
     files: { out, code: codeFile, design: path.join(out, 'design.png'), harness: build },
@@ -726,9 +774,17 @@ async function check(opts, design, out, sdk) {
     removeStaleApps(device);
     const rendered = path.join(out, 'rendered.png');
     try {
-      render(device, built.app, rendered, { w: tree.width, h: tree.height, top, bottom, interact: Boolean(opts.interact && generated) });
+      render(device, built.app, rendered, { w: resized ? opts.width : tree.width, h: tree.height, top, bottom, interact: Boolean(opts.interact && generated) });
     } catch (e) {
       Object.assign(report, { device, failedAt: 'render', renderError: e.message });
+      fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
+      return report;
+    }
+    if (resized) {
+      Object.assign(report, { device, systemUiLeftOut: chrome.map((c) => `${c.id} "${c.name}" (${c.kind})`) });
+      report.files.rendered = rendered;
+      const layout = `${rendered}.layout.json`;
+      if (generated && fs.existsSync(layout)) report.overflow = overflowing(tree, JSON.parse(fs.readFileSync(layout, 'utf8')), generated.probeIds, opts.width);
       fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
       return report;
     }

@@ -161,15 +161,18 @@ export const HELPERS = {
 /// (a 14.5 pt design size would be drawn at 15).
 struct DesignFont: ViewModifier {
   private let name: String
-  @ScaledMetric private var size: CGFloat
+  private let size: CGFloat
+  // A scaled metric rounds to the pixel grid: a large one gives the factor exactly.
+  @ScaledMetric private var scale: CGFloat
 
   init(_ name: String, size: CGFloat, relativeTo style: Font.TextStyle) {
     self.name = name
-    _size = ScaledMetric(wrappedValue: size, relativeTo: style)
+    self.size = size
+    _scale = ScaledMetric(wrappedValue: 1000, relativeTo: style)
   }
 
   func body(content: Content) -> some View {
-    content.font(.custom(name, fixedSize: size))
+    content.font(.custom(name, fixedSize: size * scale / 1000))
   }
 }
 
@@ -213,11 +216,12 @@ struct DesignLineHeight: ViewModifier {
     self.height = height
     font = name.flatMap { UIFont(name: $0, size: size) } ?? .systemFont(ofSize: size)
     scales = style != nil
-    _scale = ScaledMetric(wrappedValue: 1, relativeTo: style ?? .body)
+    // A scaled metric rounds to the pixel grid: a large one gives the factor exactly.
+    _scale = ScaledMetric(wrappedValue: 1000, relativeTo: style ?? .body)
   }
 
   func body(content: Content) -> some View {
-    let factor = scales ? scale : 1
+    let factor = scales ? scale / 1000 : 1
     let line = height * factor
     let natural = font.lineHeight * factor
     let box = DesignLineBox(line: line, natural: natural, ascender: font.ascender * factor)
@@ -244,7 +248,8 @@ struct DesignLineBox: Layout {
   func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
     guard let text = subviews.first else { return .zero }
     let size = text.sizeThatFits(proposal)
-    return CGSize(width: size.width, height: lines(size) * line)
+    // Figma sizes the box up to a whole point (lines 18.05 apart take 19).
+    return CGSize(width: size.width, height: (lines(size) * line - 0.01).rounded(.up))
   }
 
   func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
