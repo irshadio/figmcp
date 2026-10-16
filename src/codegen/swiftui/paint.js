@@ -199,15 +199,15 @@ struct LayerStack: Layout {
     }
   }
 }`,
-  designLineHeight: `/// Figma's line height: lines [height] points apart with the glyphs centred
-/// in each, set against the face's own line height on the device and scaled
-/// with Dynamic Type like the font.
+  designLineHeight: `/// Figma's line height: lines [height] points apart, each line's baseline
+/// where Figma puts it (half the room the face does not fill above the
+/// glyphs, then the face's ascender, on a whole point), read against the face's own metrics on
+/// the device and scaled with Dynamic Type like the font.
 struct DesignLineHeight: ViewModifier {
   private let height: CGFloat
   private let font: UIFont
   private let scales: Bool
   @ScaledMetric private var scale: CGFloat
-  @Environment(\\.displayScale) private var displayScale
 
   init(_ height: CGFloat, font name: String?, size: CGFloat, relativeTo style: Font.TextStyle?) {
     self.height = height
@@ -218,21 +218,42 @@ struct DesignLineHeight: ViewModifier {
 
   func body(content: Content) -> some View {
     let factor = scales ? scale : 1
+    let line = height * factor
     let natural = font.lineHeight * factor
-    let extra = height * factor - natural
-    if extra >= 0 {
-      // Text takes its height rounded up to whole pixels; the padding makes up the rest.
-      let rounded = (natural * displayScale).rounded(.up) / displayScale
-      content
-        .lineSpacing(extra)
-        .padding(.vertical, max(0, height * factor - rounded) / 2)
+    let box = DesignLineBox(line: line, natural: natural, ascender: font.ascender * factor)
+    if line >= natural {
+      box { content.lineSpacing(line - natural) }
     } else {
-      // Line spacing cannot be negative: each line is scaled down instead,
-      // which takes the room from above the glyphs, so they move back down.
-      content
-        .environment(\\._lineHeightMultiple, (natural + extra) / natural)
-        .offset(y: -extra / 2)
+      // Line spacing cannot be negative: each line is scaled down instead.
+      box { content.environment(\\._lineHeightMultiple, line / natural) }
     }
+  }
+}
+
+/// Lays text out in lines [line] points apart, its first baseline at Figma's place for it.
+struct DesignLineBox: Layout {
+  let line: CGFloat
+  let natural: CGFloat
+  let ascender: CGFloat
+
+  /// How many lines the text took: each advances [line], the last without its spacing.
+  private func lines(_ text: CGSize) -> CGFloat {
+    max(1, ((text.height + max(0, line - natural)) / line).rounded())
+  }
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    guard let text = subviews.first else { return .zero }
+    let size = text.sizeThatFits(proposal)
+    return CGSize(width: size.width, height: lines(size) * line)
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    guard let text = subviews.first else { return }
+    let size = text.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
+    let baseline = text.dimensions(in: ProposedViewSize(size))[VerticalAlignment.firstTextBaseline]
+    // Figma sets the first baseline on a whole point.
+    let target = ((line - natural) / 2 + ascender).rounded()
+    text.place(at: CGPoint(x: bounds.minX, y: bounds.minY + target - baseline), anchor: .topLeading, proposal: ProposedViewSize(size))
   }
 }
 

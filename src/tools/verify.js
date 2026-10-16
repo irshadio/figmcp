@@ -149,6 +149,27 @@ function frameworkOf(file, flutter) {
     'package or Xcode project: pass framework: "flutter" or "swiftui".');
 }
 
+/** Folders under [root] holding font files, a few levels deep. */
+function projectFontDirs(root) {
+  const out = new Set();
+  const walk = (dir, depth) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isFile() && /\.(ttf|otf)$/i.test(e.name)) out.add(dir);
+      else if (e.isDirectory() && depth < 5 && !e.name.startsWith('.') && !SKIPPED.has(e.name)) walk(path.join(dir, e.name), depth + 1);
+    }
+  };
+  walk(root, 1);
+  return [...out];
+}
+
+const SKIPPED = new Set(['node_modules', 'Pods', 'DerivedData', 'build', '.build', 'Carthage']);
+
 /** The SwiftUI check: compiles, renders in the simulator and compares pixels. */
 async function verifySwiftUI({ id, exported, file, view, fonts, device, interact, dynamicType }) {
   if (!hasXcode()) throw new Error('Xcode with the iOS simulator SDK is needed to check SwiftUI code, and was not found.');
@@ -161,7 +182,9 @@ async function verifySwiftUI({ id, exported, file, view, fonts, device, interact
     args.push('--project', project, '--file', path.relative(project, absolute));
     if (view) args.push('--view', view);
   }
-  for (const f of fonts) args.push('--fonts', f);
+  // The project's own font files first: they are the versions the app ships
+  // (a newer download can be spaced differently).
+  for (const f of [...fonts, ...projectFontDirs(process.cwd())]) args.push('--fonts', f);
   if (device) args.push('--device', device);
   if (interact && !file) args.push('--interact');
   if (dynamicType) args.push('--dynamic-type', dynamicType);
