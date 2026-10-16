@@ -354,3 +354,55 @@ test('a half-point size keeps its size under Dynamic Type', { skip }, () => {
   assert.match(r.shared, /struct DesignFont: ViewModifier/);
   assert.equal(typecheck([r]), '');
 });
+
+test('text in fixed boxes and control labels stop growing at a standard text size', { skip }, () => {
+  const card = frame('Card', { w: 200, h: 80, fills: [solid(ink)], clipsContent: true, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [{ ...text('Flat 1,000 off', { x: 16, y: 16, color: white }), constraints: { horizontal: 'MIN', vertical: 'MAX' } }] });
+  const r = generate(column('Deals', [card, chips('Fares', ['Regular', 'Student', 'Senior'], 0), text('Free text grows')], { h: 300 }));
+  assert.match(r.code, /Text\("Flat 1,000 off"\)[\s\S]*?\.dynamicTypeSize\(\.\.\.DynamicTypeSize\.xxxLarge\)/);
+  assert.match(r.code, /Text\(item\.title\)[\s\S]*?\.dynamicTypeSize\(\.\.\.DynamicTypeSize\.xLarge\)/);
+  assert.doesNotMatch(r.code.slice(r.code.indexOf('Text("Free text grows")'), r.code.indexOf('Text("Free text grows")') + 300), /dynamicTypeSize/);
+  assert.match(r.code, /\.accessibilityShowsLargeContentViewer\(\)/);
+  assert.equal(typecheck([r]), '');
+});
+
+test('a row Figma scrolls sideways scrolls; one only overflowing its column\'s padding overflows', { skip }, () => {
+  const tile = (t, x) => frame(t, { x, w: 104, h: 58, mode: 'HORIZONTAL', layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', fills: [solid(white)],
+    children: [text(t, { x: x + 20 })] });
+  const brands = frame('Brands', { w: 390, h: 58, mode: 'HORIZONTAL', itemSpacing: 10, paddingLeft: 12, layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'HUG',
+    overflowDirection: 'HORIZONTAL', clipsContent: true, children: ['Apple', 'Samsung', 'OnePlus', 'Sony', 'Lenovo'].map((t, i) => tile(t, 12 + i * 114)) });
+  const seat = (x) => frame('Seat', { x, w: 34, h: 34, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', fills: [solid(ink)], children: [] });
+  const seats = frame('Row 11', { x: 63, w: 264, h: 34, mode: 'HORIZONTAL', itemSpacing: 4, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    children: Array.from({ length: 7 }, (_, i) => seat(63 + i * 38)) });
+  const cabin = frame('Cabin', { x: 45, w: 300, h: 100, mode: 'VERTICAL', paddingLeft: 28, paddingRight: 28, counterAxisAlignItems: 'CENTER',
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG', children: [seats] });
+  const r = generate(column('Shop', [brands, cabin], { w: 390, h: 400 }));
+  assert.equal((r.code.match(/ScrollView\(\.horizontal\)/g) || []).length, 1, 'only the brands scroll');
+  assert.match(r.code.slice(r.code.indexOf('private var brandsSection')), /^private var brandsSection: some View \{\n    ScrollView\(\.horizontal\) \{/);
+  assert.match(r.code, /"Apple"/);
+  assert.equal(typecheck([r]), '');
+});
+
+test('a background with several layers stacks them from the top leading corner', { skip }, () => {
+  const nose = { ...frame('Nose', { x: 104, y: 26, w: 73, h: 30, mode: 'HORIZONTAL', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    children: [text('Front', { x: 114, y: 32 })] }), layoutPositioning: 'ABSOLUTE' };
+  const cabin = frame('Cabin', { w: 300, h: 200, mode: 'VERTICAL', paddingTop: 70, fills: [solid(white)], layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [nose, text('Row', { y: 70 })] });
+  const r = generate(column('Seats', [cabin], { h: 300 }));
+  assert.match(r.code, /\.background \{\n\s+ZStack\(alignment: \.topLeading\) \{/);
+  assert.match(r.code, /\.fixedSize\(horizontal: true, vertical: true\)/, 'a free hugging frame keeps its size');
+  assert.equal(typecheck([r]), '');
+});
+
+test('a scrim and the sheet over it cover the whole screen', { skip }, () => {
+  const scrim = { id: id(), name: 'Scrim', type: 'RECTANGLE', x: 0, y: 0, width: 390, height: 844, fills: [solid({ r: 0, g: 0, b: 0, a: 1 }, 0.4)] };
+  const sheet = { ...frame('Sheet', { y: 500, w: 390, h: 344, mode: 'VERTICAL', fills: [solid(white)], layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED',
+    children: [text('Choose a fare', { x: 16, y: 520 })] }), constraints: { horizontal: 'STRETCH', vertical: 'MAX' } };
+  const root = frame('Fares', { w: 390, h: 844, fills: [solid(white)], children: [text('Results', { x: 16, y: 100 }), scrim, sheet] });
+  const r = toSwiftUI(root, assets, { preview: false });
+  const scroll = r.code.indexOf('.scrollBounceBehavior');
+  const modal = r.code.indexOf('LayerStack', scroll);
+  assert.ok(modal > scroll, 'drawn over the scroll view');
+  assert.match(r.code.slice(modal), /\.ignoresSafeArea\(\)/);
+  assert.equal(typecheck([r]), '');
+});

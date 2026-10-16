@@ -36,6 +36,9 @@ const EXTRACT_TYPES = new Set(['FRAME', 'GROUP', 'INSTANCE', 'COMPONENT', 'COMPO
 const NAMED_COLORS = { white: 'FFFFFF', black: '000000' };
 // Members the screen struct may declare apart from member(): its body, the
 // action closure, environment values, and names closures use.
+// A carousel of more items than this is lazy; a LazyHStack takes its height
+// from the items it has drawn, not its tallest, so short rows are not.
+const LAZY_AFTER = 10;
 const RESERVED_MEMBERS = ['body', 'action', 'dismiss', 'openURL', 'dynamicTypeSize', 'reduceMotion', 'focusedField', 'index', 'item',
   'isSelected', 'namespace'];
 // Names of the Dynamic Type metrics scaledMetric declares.
@@ -602,6 +605,11 @@ class SwiftUIWriter {
     } finally {
       this.ancestors.pop();
     }
+    // A frame placed freely that hugs its content keeps its own size: the
+    // room its parent offers past it must not squeeze it.
+    if (ctx.kind === 'stack' && isAutoLayout(node) && ownSizing(node, 'x') === 'HUG') {
+      core = mod(core, 'fixedSize', [['horizontal', true], ['vertical', ownSizing(node, 'y') === 'HUG']]);
+    }
     core = this.limits(node, size, core);
     core = this.interactive(node, core);
     // For the render check: each layer reports where it was laid out.
@@ -707,6 +715,18 @@ class SwiftUIWriter {
       child = parent;
     }
     return null;
+  }
+
+  /**
+   * Whether the text being drawn lies in a box that cannot grow with it: a
+   * frame of fixed width and height (not the screen, not a section of it)
+   * that clips its content or has no auto layout.
+   */
+  boxed() {
+    const own = this.ancestors.slice(0, -1).reverse();
+    return own.some((a) => a !== this.screenNode && !(this.screen && a.id === this.screen.id) &&
+      ownSizing(a, 'x') === 'FIXED' && ownSizing(a, 'y') === 'FIXED' && (a.clipsContent || !isAutoLayout(a)) &&
+      a.width < (this.screenNode ? this.screenNode.width * 0.95 : Infinity));
   }
 
   /** Whether [node] is part of a logo or wordmark, whose text keeps its size at every text size. */
@@ -1117,6 +1137,14 @@ class SwiftUIWriter {
       v = this.frame(v, { w: size.w, h: round(node.height) }, `.${x}LastTextBaseline`);
       return this.effects(node, v);
     }
+    // Text in a box the design fixes (a control's label, a caption on a
+    // fixed card) grows no further than the largest standard text size, as
+    // Apple advises for space-limited UI; elsewhere text follows every size.
+    // A control's label stops earlier, as system tab bars do; a long press
+    // shows it enlarged (accessibilityShowsLargeContentViewer).
+    if (!this.brand(node) && (control || this.boxed())) {
+      v = mod(v, 'dynamicTypeSize', [[null, raw(control ? '...DynamicTypeSize.xLarge' : '...DynamicTypeSize.xxxLarge')]]);
+    }
     const fixedBox = node.textAutoResize === 'NONE' || node.textAutoResize === 'TRUNCATE';
     const align = alignmentOf(TEXT_X[node.textAlignHorizontal] ?? 'leading', fixedBox ? TEXT_Y[node.textAlignVertical] ?? 'top' : '');
     v = this.frame(v, size, align);
@@ -1403,10 +1431,14 @@ class SwiftUIWriter {
         if (content.underlay) v = mod(v, 'background', topLeading, [content.underlay]);
         if (content.overlay) v = mod(v, 'overlay', topLeading, [content.overlay]);
         v = isRectangle(shape) ? mod(v, 'clipped') : mod(v, 'clipShape', [[null, shape]]);
-        if (layers.length) v = mod(v, 'background', layers.length > 1 ? topLeading : [], layers);
+        // Several layers go in a ZStack: a background aligns its content as a
+        // whole, and stacks the views inside it centred.
+        if (layers.length) v = mod(v, 'background', [], layers.length > 1 ? [view('ZStack', topLeading, layers)] : layers);
       } else {
         if (content.underlay) layers.push(content.underlay);
-        if (layers.length) v = mod(v, 'background', layers.length > 1 || content.underlay ? [['alignment', raw('.topLeading')]] : [], layers);
+        if (layers.length) {
+          v = mod(v, 'background', [], layers.length > 1 ? [view('ZStack', [['alignment', raw('.topLeading')]], layers)] : layers);
+        }
         if (content.overlay) v = mod(v, 'overlay', [['alignment', raw('.topLeading')]], [content.overlay]);
       }
     }
@@ -1449,7 +1481,19 @@ class SwiftUIWriter {
     const H = node.height;
     // Where the app's own layers end: above a home indicator layer of its own.
     const floor = Math.min(H, ...chrome.filter((c) => c.kind === 'home indicator' && c.box[1] + c.box[3] >= H - 2).map((c) => c.box[1]));
-    const all = (node.children || []).filter((c) => c.visible !== false && !this.skip.has(c.id)).map((c) => withoutSystemUi(c, node, chrome));
+    // A full-width image section from the screen's top edge (a hero photo)
+    // runs on under the status bar: it keeps its room, and the page starts
+    // at the top of the screen.
+    const photo = (c) => hasImageFill(c) || visibleChildren(c).some((k) => hasImageFill(k) && k.width >= W * 0.95);
+    let shown = (node.children || []).filter((c) => c.visible !== false && !this.skip.has(c.id));
+    // A modal: a see-through layer over the whole screen (a scrim) and what
+    // lies above it (a sheet, a dialog) cover the screen, its bars included.
+    const scrimAt = shown.findIndex((c, i) => i > 0 && isScrim(c, W, H));
+    const modal = scrimAt > 0 ? shown.slice(scrimAt) : [];
+    if (modal.length) shown = shown.slice(0, scrimAt);
+    const bleedHero = statusBottom > 0 ? shown.find((c) => c.width >= W * 0.95 && c.y - node.y <= 0.5 && c.height > statusBottom * 2 && photo(c) &&
+      (!isAutoLayout(node) || shown.filter((k) => inFlow(k, node))[0] === c)) : null;
+    const all = shown.map((c) => (c === bleedHero ? c : withoutSystemUi(c, node, chrome)));
     const rel = (c) => ({ top: c.y - node.y, bottom: c.y - node.y + c.height });
     const filled = (c) => visiblePaints(c.fills).length > 0;
     const wide = (c) => c.width >= W * 0.95;
@@ -1475,7 +1519,8 @@ class SwiftUIWriter {
     const floating = loose.filter((c) => c !== bottomBar && c !== topBar && !wide(c) &&
       ((c.constraints && c.constraints.vertical === 'MAX') || fixed.has(c.id)) && rel(c).top > H / 2);
     const pinned = loose.filter((c) => fixed.has(c.id) && c !== topBar && c !== bottomBar && !floating.includes(c));
-    const top = topBar ? rel(topBar).bottom : statusBottom;
+    const bleeds = Boolean(bleedHero) && !topBar;
+    const top = topBar ? rel(topBar).bottom : bleeds ? 0 : statusBottom;
     // The phone keeps its own room for the home indicator under a bottom bar that runs to the screen's edge.
     const inset = indicator || (bottomBar && rel(bottomBar).bottom >= H - 2 && bottomBar.height > 70) ? 34 : 0;
     const bottom = bottomBar ? H - rel(bottomBar).top : H - floor + (floor < H ? 0 : inset);
@@ -1497,7 +1542,7 @@ class SwiftUIWriter {
     let page;
     if (flowRoot) {
       // The column without the status bar and the bars, as the content.
-      const inner = { ...node, paddingTop: Math.max(0, (node.paddingTop || 0) - statusBottom), paddingBottom: 0 };
+      const inner = { ...node, paddingTop: bleeds ? node.paddingTop || 0 : Math.max(0, (node.paddingTop || 0) - statusBottom), paddingBottom: 0 };
       page = this.box({ ...inner, fills: [], effects: [], strokes: [] }, { w: 'inf', h: null });
     } else {
       page = this.page(node, all.filter((c) => !this.skip.has(c.id)), top, H - bottom);
@@ -1524,6 +1569,7 @@ class SwiftUIWriter {
       }
     }
     let out = mod(view('ScrollView', [], [page]), 'scrollBounceBehavior', [[null, raw('.basedOnSize')]]);
+    if (bleeds) out = mod(out, 'ignoresSafeArea', [['edges', raw('.top')]]);
     // The visible height, for a page whose bottom layers stay at the bottom.
     if (this.viewport) out = view('GeometryReader', [], [out], 'proxy');
     if (header) out = mod(out, 'safeAreaInset', [['edge', raw('.top')], ['spacing', 0]], [header]);
@@ -1538,8 +1584,13 @@ class SwiftUIWriter {
       out = mod(out, 'safeAreaInset', [['edge', raw('.bottom')], ['spacing', 0]], [footer]);
     }
     const over = [...floating, ...pinned].map((c) => apart(c, { kind: 'stack', parent: { ...node, height: H - inset } })).filter(Boolean);
-    this.skip = new Set(chrome.map((c) => c.id));
     if (over.length) out = mod(out, 'overlay', [['alignment', raw('.topLeading')]], [view('ZStack', [['alignment', raw('.topLeading')]], over)]);
+    if (modal.length) {
+      // Placed on the whole screen as in the design, over the bars and the phone's own room.
+      const layers = modal.map((c) => withoutSystemUi(c, node, chrome)).map((c) => apart(c, { kind: 'stack', parent: node })).filter(Boolean);
+      out = mod(out, 'overlay', [['alignment', raw('.topLeading')]], [mod(this.layers(clear(), layers), 'ignoresSafeArea')]);
+    }
+    this.skip = new Set(chrome.map((c) => c.id));
     const fill = this.fillItems(node).find((f) => f.paint);
     if (fill) out = mod(out, 'background', [[null, fill.paint]]);
     return out;
@@ -1876,7 +1927,7 @@ class SwiftUIWriter {
       item = this.button(item, statements, { style: SELECTABLE.has(kind) ? 'plain' : 'pressable' });
       if (state) item = mod(item, 'accessibilityAddTraits', [[null, raw(`index == ${state} ? .isSelected : []`)]]);
       // At accessibility text sizes a long press shows the item enlarged, as in the system tab bar.
-      if (kind === 'tabBar') item = mod(item, 'accessibilityShowsLargeContentViewer');
+      if (SELECTABLE.has(kind)) item = mod(item, 'accessibilityShowsLargeContentViewer');
     }
     // Equal rows would share an identity: they are told apart by their place.
     const unique = !model || new Set(items.map((n, i) => fields.map((f) => f.values[i]).join('\u0000'))).size === items.length;
@@ -1943,11 +1994,20 @@ class SwiftUIWriter {
       const lineGap = node.counterAxisSpacing ? this.value(node.counterAxisSpacing, vars.counterAxisSpacing) : null;
       if (kind === 'grid' && runs.length === 1 && runs[0].items.length === flow.length && items.length === 1) {
         // Equal cards in columns that share the width.
-        const column = call('GridItem', [[null, raw('.flexible()')], ['spacing', gap]]);
+        // Cards of a fixed width keep it; cards that fill share the width.
+        const w = runs[0].items[0];
+        // Fixed cards that do not fill the row keep their width; cards that
+        // fill it share the width, so a wider phone widens them.
+        const [, padR, , padL] = this.paddingValues(node);
+        const filling = role.columns * w.width + (role.columns - 1) * (node.itemSpacing || 0) >= node.width - padL - padR - 1;
+        const fixedCards = !filling && sizingOf(w, node, 'x') === 'FIXED' && runs[0].items.every((c) => Math.abs(c.width - w.width) < 0.5);
+        const column = call('GridItem', [[null, raw(fixedCards ? `.fixed(${sNum(round(w.width))})` : '.flexible()')], ['spacing', gap]]);
         // One column when the text is set to an accessibility size.
         const count = role.columns > 1 && !this.inComponent ? raw(`${this.dynamicTypeSize()}.isAccessibilitySize ? 1 : ${role.columns}`) : role.columns;
         const columns = call('Array', [['repeating', column], ['count', count]]);
         v = view('LazyVGrid', [['columns', columns], ['spacing', lineGap]], items);
+        // A grid of fixed columns centres them in its width: it hugs them, and its frame places it.
+        if (fixedCards) v = mod(v, 'fixedSize', [['horizontal', true], ['vertical', false]]);
       } else {
         this.helpers.add('flow');
         v = view('FlowLayout', [['spacing', gap], ['lineSpacing', lineGap]], items.filter(Boolean));
@@ -1970,19 +2030,29 @@ class SwiftUIWriter {
         const extent = (row ? c.height : c.width) || 0;
         if (!item) return item;
         const fills = hugCross || sizingOf(c, node, cross) === 'FILL';
-        // A row wider than its column scrolls sideways; a carousel snaps to its cards.
-        if (!row && c.layoutMode === 'HORIZONTAL' && (this.margins.has(c.id) || (!fills && extent > availCross + 0.5))) {
+        // A row reaching past its column's own edge scrolls sideways (one
+        // only overflowing the padding is drawn overflowing, as in Figma); a
+        // carousel snaps to its cards.
+        if (!row && c.layoutMode === 'HORIZONTAL' && !scrollsItself(c) && (this.margins.has(c.id) || (!fills && extent > node.width + 0.5))) {
           let scroller = view('ScrollView', [[null, raw('.horizontal')]], [item]);
+          // Drawn scrolled to its end (its start off the leading edge, its end
+          // at the trailing one), as a right-to-left row rests: it opens there.
+          const inner = node.x + (this.paddingValues(node)[3] || 0);
+          const end = node.x + node.width - (this.paddingValues(node)[1] || 0);
+          if (c.x < inner - 1 && Math.abs(c.x + c.width - (end + (this.paddingValues(c)[1] || 0))) <= 2 + (this.paddingValues(c)[1] || 0)) {
+            scroller = mod(scroller, 'defaultScrollAnchor', [[null, raw('.trailing')]]);
+          }
           if (this.margins.has(c.id)) {
             scroller = mod(scroller, 'contentMargins', [[null, raw('.horizontal')], [null, this.margins.get(c.id)], ['for', raw('.scrollContent')]]);
             scroller = mod(scroller, 'scrollTargetBehavior', [[null, raw('.viewAligned')]]);
           }
-          scroller = mod(mod(scroller, 'scrollIndicators', [[null, raw('.hidden')]]), 'frame', [['minHeight', round(c.height)]]);
+          // As tall as its row: a scroll view would take all the height it is offered (a pinned bar offers the screen).
+          scroller = mod(mod(scroller, 'scrollIndicators', [[null, raw('.hidden')]]), 'fixedSize', [['horizontal', false], ['vertical', true]]);
           // A scroll view would report its content's width to the layout: it is as wide as the column.
-          if (fills) return mod(scroller, 'frame', [['maxWidth', INFINITY]]);
-          return this.screen && node.width >= this.screen.width * 0.95
-            ? mod(scroller, 'containerRelativeFrame', [[null, raw('.horizontal')]])
-            : mod(scroller, 'frame', [['width', round(availCross)]]);
+          // As wide as the column: a horizontal scroll view takes the width it
+          // is offered (containerRelativeFrame here loops with the stack's layout).
+          if (fills || (this.screen && node.width >= this.screen.width * 0.95)) return mod(scroller, 'frame', [['maxWidth', INFINITY]]);
+          return mod(scroller, 'frame', [['width', round(availCross)]]);
         }
         if (fills || extent <= availCross + 0.5) return item;
         // A frame of fixed size does not grow with what overflows it, unless
@@ -2017,7 +2087,7 @@ class SwiftUIWriter {
       if (row && !kind && !spread && !this.inComponent && flow.length >= 2 && flow.length <= 3 &&
           flow.every((c) => sizingOf(c, node, 'x') === 'FILL' && hasText(c))) {
         v = view(this.adaptiveLayout(node, spacing, align), [], items);
-      } else v = view(carousel ? 'LazyHStack' : row ? 'HStack' : 'VStack', [
+      } else v = view(carousel && flow.length > LAZY_AFTER ? 'LazyHStack' : row ? 'HStack' : 'VStack', [
         ['alignment', align ? raw(align) : null],
         ['spacing', spread ? 0 : this.value(spacing, vars.itemSpacing)],
       ], items);
@@ -2032,13 +2102,21 @@ class SwiftUIWriter {
       if (hugCross && crossFill.some(Boolean)) v = mod(v, 'fixedSize', [['horizontal', !row], ['vertical', row]]);
     }
     for (const [name, args] of this.containerMods.get(node.id) || []) v = mod(v, name, args);
+    const scrolled = scrollsItself(node) && !this.margins.has(node.id) && !this.inComponent;
+    if (scrolled) {
+      // Figma scrolls this row sideways: its items keep their widths and the
+      // row scrolls, its padding inside the scrolled content.
+      v = mod(view('ScrollView', [[null, raw('.horizontal')]], [padded(v, padding)]), 'scrollIndicators', [[null, raw('.hidden')]]);
+      v = mod(v, 'fixedSize', [['horizontal', false], ['vertical', true]]);
+      padding = [0, 0, 0, 0];
+    }
     const main = node.primaryAxisAlignItems || 'MIN';
     const counter = node.counterAxisAlignItems === 'BASELINE' ? 'MIN' : node.counterAxisAlignItems || 'MIN';
     const align = row ? alignmentOf(H_ALIGN[main] ?? 'leading', V_ALIGN[counter] ?? 'top')
       : alignmentOf(H_ALIGN[counter] ?? 'leading', V_ALIGN[main] ?? 'top');
-    const scroller = node.layoutWrap !== 'WRAP' && (kind === 'chips' || kind === 'tabs') ? this.chipScroller(node, flow, v) : null;
+    const scroller = !scrolled && node.layoutWrap !== 'WRAP' && (kind === 'chips' || kind === 'tabs') ? this.chipScroller(node, flow, v) : null;
     if (scroller) v = scroller;
-    else if (node.layoutWrap !== 'WRAP') v = this.overflow(node, flow, v, { row, hugMain, hugCross, crossFill, spacing, between, align });
+    else if (!scrolled && node.layoutWrap !== 'WRAP') v = this.overflow(node, flow, v, { row, hugMain, hugCross, crossFill, spacing, between, align });
     // Absolute layers before the first stacked one are drawn behind it.
     const first = children.findIndex((c) => inFlow(c, node));
     const layer = (list) => {
@@ -2059,6 +2137,20 @@ class SwiftUIWriter {
  */
 function dataValue(field, value) {
   return field.kind === 'text' && /\p{L}/u.test(String(value)) ? `String(localized: ${sString(value)})` : sString(value);
+}
+
+/** Whether [c] is a scrim: a plain see-through layer over (nearly) the whole [w] x [h] screen. */
+function isScrim(c, w, h) {
+  if (visibleChildren(c).length || c.width < w * 0.95 || c.height < h * 0.9 || hasImageFill(c)) return false;
+  const fills = visiblePaints(c.fills);
+  if (fills.length !== 1 || fills[0].type !== 'SOLID') return false;
+  const alpha = (fills[0].color.a ?? 1) * (fills[0].opacity ?? 1) * (typeof c.opacity === 'number' ? c.opacity : 1);
+  return alpha > 0.05 && alpha < 0.9;
+}
+
+/** Whether Figma scrolls [node], a row, sideways. */
+function scrollsItself(node) {
+  return node.layoutMode === 'HORIZONTAL' && node.layoutWrap !== 'WRAP' && ['HORIZONTAL', 'BOTH'].includes(node.overflowDirection);
 }
 
 /** A name for items by what they hold: single digits are digits, numbers numbers; else null. */
@@ -2136,6 +2228,11 @@ export function toSwiftUI(root, assets, options = {}) {
     }
   }
   tree = tree || writer.node(rootNode, { kind: 'root' }) || view('EmptyView');
+  const turnedIn = (rootNode.children || []).find((c) => c.visible !== false && isTurned(c) && c.width * c.height > rootNode.width * rootNode.height * 0.5);
+  if (isTurned(rootNode) || turnedIn) {
+    writer.warnings.push({ id: root.id, name: root.name, message: 'the frame is a turned mockup of a screen (a presentation, not an app ' +
+      'screen); the code draws its layers upright: generate the screen it shows instead' });
+  }
   // What only this screen uses lives in its namespace, so screens of one module do not clash.
   const fields = writer.finishFocus();
   const nested = [
@@ -2150,7 +2247,8 @@ export function toSwiftUI(root, assets, options = {}) {
     ...[...writer.connected.values()].map((m) => `// ${m.componentName}: ${m.source}${m.label ? ` (${m.label})` : ''}`),
     ...(writer.connected.size ? [''] : []),
     `struct ${structName}: View {`,
-    ...(writer.tapped ? ['  var action: (Action) -> Void = { _ in }'] : []),
+    // In check mode the owner the screen asks is the check, which records each case.
+    ...(writer.tapped ? [options.probe ? '  var action: (Action) -> Void = { checkAction("\\($0)") }' : '  var action: (Action) -> Void = { _ in }'] : []),
     ...writer.states,
     ...(writer.tapped || writer.states.length ? [''] : []),
     '  var body: some View {',

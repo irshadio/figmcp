@@ -233,7 +233,7 @@ test('toSwiftUI builds the roles as production patterns', () => {
   assert.doesNotMatch(code, /case swap\n/);
   assert.doesNotMatch(code, /struct PressableButtonStyle|enum DesignTokens|enum AppFonts|extension Color/);
   // Carousel, grid, header, fonts and decorative images.
-  assert.match(code, /LazyHStack\(spacing: 12\)/);
+  assert.match(code, /HStack\(spacing: 12\)/);
   assert.match(code, /\.scrollTargetLayout\(\)/);
   assert.match(code, /\.contentMargins\(\.horizontal, 16, for: \.scrollContent\)/);
   assert.match(code, /\.scrollTargetBehavior\(\.viewAligned\)/);

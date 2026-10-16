@@ -150,7 +150,7 @@ function frameworkOf(file, flutter) {
 }
 
 /** The SwiftUI check: compiles, renders in the simulator and compares pixels. */
-async function verifySwiftUI({ id, exported, file, view, fonts, device }) {
+async function verifySwiftUI({ id, exported, file, view, fonts, device, interact, dynamicType }) {
   if (!hasXcode()) throw new Error('Xcode with the iOS simulator SDK is needed to check SwiftUI code, and was not found.');
   const args = [];
   if (file) {
@@ -163,6 +163,8 @@ async function verifySwiftUI({ id, exported, file, view, fonts, device }) {
   }
   for (const f of fonts) args.push('--fonts', f);
   if (device) args.push('--device', device);
+  if (interact && !file) args.push('--interact');
+  if (dynamicType) args.push('--dynamic-type', dynamicType);
   const slug = id.replace(/[^0-9A-Za-z]+/g, '_');
   const report = await withExport(id, exported, (exportFile, dir) => oneAtATime(() => runCheck([
     id, '--export', exportFile, '--fetch-fonts', '--out', path.join(dir, `${slug}_swiftui${file ? '_project' : ''}`), ...args,
@@ -189,6 +191,9 @@ async function verifySwiftUI({ id, exported, file, view, fonts, device }) {
       ...(report.fontMismatches.length ? { fontMismatches: report.fontMismatches.length } : {}),
     } : {}),
     systemUiLeftOut: report.systemUiLeftOut,
+    ...(report.dynamicType ? { dynamicType: report.dynamicType } : {}),
+    ...(report.interactions ? { interactions: { ...report.interactions, each: brief(report.interactions.each.map((t) =>
+      `${t.label || '(no label)'}: ${t.hung ? 'hung' : [t.redrew ? 'redrew' : null, t.action ? `asked the owner ${t.action}` : null].filter(Boolean).join(', ') || 'no visible effect'}`), 40) } } : {}),
   });
   return [
     text(summary),
@@ -239,16 +244,23 @@ export function registerVerifyTools(server, bridge, source) {
         '(overflows) and layers pushed off screen instead of comparing.'),
       fonts: z.array(z.string()).optional().describe('Folders with font files (default: the project\'s assets/fonts and the system fonts).'),
       flutter: z.string().optional().describe('Flutter: path of the flutter tool, when it is not on PATH.'),
+      interact: z.boolean().optional().describe(
+        'SwiftUI, generated code: after rendering, tap every button of the screen and report what each did (redrew the ' +
+        'screen, asked its owner through the Action enum, did nothing visible, or hung).'),
+      dynamicType: z.enum(['xSmall', 'small', 'medium', 'large', 'xLarge', 'xxLarge', 'xxxLarge', 'accessibility1', 'accessibility2',
+        'accessibility3', 'accessibility4', 'accessibility5']).optional().describe(
+        'SwiftUI: render at this text size to check the layout under Dynamic Type (default large; the pixel comparison ' +
+        'stays with the design at the default size).'),
       device: z.string().optional().describe('SwiftUI: the simulator to render in, by udid or name (default: a booted iPhone 17 Pro, another booted iPhone, ' +
         'else an iPhone Pro it boots). Renders are 2x and light mode on any device.'),
     },
-  }, guard(async ({ nodeId, framework, file, widget, viewport, fonts = [], flutter, device }) => {
+  }, guard(async ({ nodeId, framework, file, widget, viewport, fonts = [], flutter, device, interact, dynamicType }) => {
     const chosen = framework || frameworkOf(file, flutter);
     if (chosen === 'swiftui') {
       const { id } = await source.resolveId(nodeId);
       const exported = await source.exportData(id);
       if (!exported.data.frames[0].previewPng2x) throw new Error(`There is no render of ${id} to compare with.`);
-      return verifySwiftUI({ id, exported, file, view: widget, fonts, device });
+      return verifySwiftUI({ id, exported, file, view: widget, fonts, device, interact, dynamicType });
     }
     const tool = flutterTool(flutter);
     if (!tool) throw new Error('The flutter tool was not found: pass `flutter` with its path, or set FLUTTER.');

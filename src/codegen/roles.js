@@ -28,6 +28,12 @@ const CONTENT_TYPES = [
 const CLOSE = /close|dismiss|cross|^x$/i;
 const SWAP = /swap|exchange|reverse|switch/i;
 
+/** Whether [n] or a layer in it is filled with an image. */
+function hasImage(n) {
+  return n.visible !== false && ((Array.isArray(n.fills) && n.fills.some((p) => p && p.visible !== false && p.type === 'IMAGE')) ||
+    (n.children || []).some(hasImage));
+}
+
 function texts(n, out = []) {
   if (!n || n.visible === false) return out;
   if (n.type === 'TEXT') out.push(n);
@@ -217,7 +223,10 @@ export function detectRoles(root, { screenWidth = root.width, screenHeight = roo
       const columns = Math.max(1, Math.floor((innerWidth(n) + gap) / (flow[0].width + gap)));
       set(n, 'grid', { items: flow.map((c) => c.id), columns }, 'high', `a wrapping row of ${flow.length} equal items, ${columns} per line`);
       flow.forEach((c) => set(c, 'card'));
-    } else if (row && parent && isAutoLayout(n) && flow.length >= 2 && n.width > innerWidth(parent) + 0.5) {
+    } else if (row && parent && isAutoLayout(n) && flow.length >= 2 &&
+        // Past its parent's edge (or scrolling in Figma), not only into its padding, with cards for items.
+        (n.width > parent.width + 0.5 || ['HORIZONTAL', 'BOTH'].includes(n.overflowDirection)) && n.width > innerWidth(parent) + 0.5 &&
+        flow.every((c) => c.width >= 60 || hasImage(c))) {
       set(n, 'carousel', { items: flow.map((c) => c.id) }, sameShape(flow) ? 'high' : 'medium',
         `a row of ${flow.length}${sameShape(flow) ? ' equal' : ''} items wider than its column`);
       flow.forEach((c) => set(c, 'card'));

@@ -6,6 +6,7 @@
 // Usage: node tools/swiftui-check.js <nodeId|selection> [--snapshot <frame id>]
 //          [--export <design export.json>] [--fonts <dir>]... [--fetch-fonts]
 //          [--out <dir>] [--device <udid or name>] [--font-line-heights]
+//          [--dynamic-type <size>] [--interact]
 //          [--code <View.swift> [--assets <assets.json>]]
 //          [--project <dir> --file <View.swift> [--view <Struct>]]
 // Reads live through the running MCP server (the plugin must be connected),
@@ -59,6 +60,8 @@ function args(argv) {
     else if (a === '--view') out.view = argv[++i];
     else if (a === '--device') out.device = argv[++i];
     else if (a === '--font-line-heights') out.fontLineHeights = true;
+    else if (a === '--dynamic-type') out.dynamicType = argv[++i];
+    else if (a === '--interact') out.interact = true;
     else if (a === '--help' || a === '-h') out.help = true;
     else if (a.startsWith('--')) throw new Error(`Unknown option ${a}.\n${USAGE}`);
     else out.target = a;
@@ -187,7 +190,7 @@ const HARNESS_PROBE = 'FigmcpCheckProbe';
  * [-bottom <pt>] renders the view at 2x in light mode and exits; a failed
  * write exits with 2.
  */
-function renderSource(view) {
+function renderSource(view, dynamicType = 'large') {
   return `import SwiftUI
 import UIKit
 
@@ -232,14 +235,21 @@ extension View {
       return
     }
     let size = CGSize(width: d.double(forKey: "w"), height: d.double(forKey: "h"))
+    if d.bool(forKey: "interact"), let lib = dlopen("/usr/lib/libAccessibility.dylib", RTLD_NOW),
+       let enable = dlsym(lib, "_AXSApplicationAccessibilitySetEnabled") {
+      // As UI tests do: the accessibility tree the buttons are found in exists only with accessibility on.
+      typealias Enable = @convention(c) (Bool) -> Void
+      unsafeBitCast(enable, to: Enable.self)(true)
+    }
     // The phone's own room above and below the screen, at the design's text
     // size, scale and appearance, whatever the simulator's settings.
     let root = ${view}()
       .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: d.double(forKey: "top")) }
       .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: d.double(forKey: "bottom")) }
-      .dynamicTypeSize(.large)
+      .dynamicTypeSize(.${dynamicType})
       .environment(\\.colorScheme, .light)
       .environment(\\.displayScale, 2)
+      .environment(\\.openURL, OpenURLAction { _ in .handled })
       .coordinateSpace(.named(${HARNESS_PROBE}Space))
       .onPreferenceChange(${HARNESS_PROBE}Key.self) { ${HARNESS_RENDER}.frames = $0 }
     let host = UIHostingController(rootView: root)
@@ -259,9 +269,17 @@ extension View {
       let format = UIGraphicsImageRendererFormat()
       format.scale = 2
       format.preferredRange = .standard
-      // Drawn from the render server, so materials and blurs are captured too.
-      let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-        _ = host.view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true)
+      // Drawn from the render server, so materials and blurs are captured
+      // too; a frame taller than its snapshots can be (about 4400 px) is drawn
+      // from its layers instead, which leaves materials out.
+      let tall = size.height * format.scale > 4400
+      if tall { FileHandle.standardError.write(Data("figmcp-check: tall frame, drawn from its layers\\n".utf8)) }
+      let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+        if tall {
+          host.view.layer.render(in: context.cgContext)
+        } else {
+          _ = host.view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true)
+        }
       }
       guard let data = image.pngData() else {
         FileHandle.standardError.write(Data("figmcp-check: the render could not be encoded as PNG\\n".utf8))
@@ -277,9 +295,87 @@ extension View {
         FileHandle.standardError.write(Data("figmcp-check: \\(error.localizedDescription)\\n".utf8))
         exit(2)
       }
-      exit(0)
+      if d.bool(forKey: "interact") {
+        interact(host: host, size: size, format: format, out: out)
+      } else {
+        exit(0)
+      }
     }
   }
+
+  /// The accessibility elements under [element] that are buttons, in reading order.
+  static func buttons(in element: NSObject, depth: Int = 0) -> [NSObject] {
+    if depth > 60 { return [] }
+    var found: [NSObject] = []
+    if element.isAccessibilityElement && element.accessibilityTraits.contains(.button) { found.append(element) }
+    if let children = element.accessibilityElements as? [NSObject], !children.isEmpty {
+      for child in children { found += buttons(in: child, depth: depth + 1) }
+    } else if let view = element as? UIView {
+      for child in view.subviews { found += buttons(in: child, depth: depth + 1) }
+    }
+    return found
+  }
+
+  /// Activates every button of the screen in turn and writes what each did to <out>.interact.json.
+  static func interact(host: UIViewController, size: CGSize, format: UIGraphicsImageRendererFormat, out: String) {
+    // Drawn from what is on screen: waiting for screen updates can stall on
+    // an animation the tap started, so each tap is given time to settle first.
+    let snapshot = { () -> Data in
+      UIGraphicsImageRenderer(size: size, format: format).image { _ in
+        _ = host.view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: false)
+      }.pngData() ?? Data()
+    }
+    let save = { (results: [[String: Any]]) in
+      if let json = try? JSONSerialization.data(withJSONObject: results) {
+        try? json.write(to: URL(fileURLWithPath: out + ".interact.json"), options: .atomic)
+      }
+    }
+    let labels = buttons(in: host.view).map { $0.accessibilityLabel ?? "" }
+    var results: [[String: Any]] = []
+    var before = snapshot()
+    // A tap that never returns (the main thread blocked) is recorded as hung.
+    let watchdog = DispatchQueue(label: "check.watchdog")
+    var current = -1
+    var finished = Set<Int>()
+    let lock = NSLock()
+    func step(_ index: Int) {
+      guard index < labels.count else {
+        save(results)
+        exit(0)
+      }
+      lock.lock(); current = index; lock.unlock()
+      watchdog.asyncAfter(deadline: .now() + 5) {
+        lock.lock(); let stuck = current == index && !finished.contains(index); let done = results; lock.unlock()
+        if stuck {
+          save(done + [["label": labels[index], "activated": true, "hung": true]])
+          exit(0)
+        }
+      }
+      // The tree is read again: an earlier tap can replace its elements.
+      let fresh = buttons(in: host.view)
+      let button = fresh.count == labels.count ? fresh[index] : fresh.first { ($0.accessibilityLabel ?? "") == labels[index] }
+      FileHandle.standardError.write(Data("figmcp-check: activating \\(index) \\(labels[index])\\n".utf8))
+      checkLastAction = nil
+      let activated = button?.accessibilityActivate() ?? false
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+        host.view.layoutIfNeeded()
+        let after = snapshot()
+        var result: [String: Any] = ["label": labels[index], "activated": activated, "redrew": after != before]
+        if let action = checkLastAction { result["action"] = action }
+        lock.lock(); results.append(result); finished.insert(index); lock.unlock()
+        before = after
+        step(index + 1)
+      }
+    }
+    step(0)
+  }
+}
+
+/// What the screen last asked its owner to do, recorded by the generated code in check mode.
+nonisolated(unsafe) var checkLastAction: String?
+
+func checkAction(_ action: String) {
+  checkLastAction = action
 }
 `;
 }
@@ -298,7 +394,7 @@ function diagnostics(text, severity) {
  * view), [catalogs] and [fontFilesList], for [sdk]. Returns { app, errors,
  * warnings }.
  */
-function buildApp(build, { view, code, shared, catalogs, fontFilesList, sdk }) {
+function buildApp(build, { view, code, shared, catalogs, fontFilesList, sdk, dynamicType }) {
   const systems = Array.isArray(shared) ? shared : shared ? [{ name: 'DesignSystem.swift', text: shared }] : [];
   fs.rmSync(build, { recursive: true, force: true });
   const src = path.join(build, 'src');
@@ -308,7 +404,7 @@ function buildApp(build, { view, code, shared, catalogs, fontFilesList, sdk }) {
   // Previews need Xcode's macro plugin, which swiftc alone lacks.
   fs.writeFileSync(path.join(src, `${view}.swift`), code.replace(/\n#Preview\b[^\n]*\{[\s\S]*?\n\}\n/g, '\n'));
   systems.forEach((f, i) => fs.writeFileSync(path.join(src, i ? `${i}_${f.name}` : f.name), f.text));
-  fs.writeFileSync(path.join(src, HARNESS_FILE), renderSource(view));
+  fs.writeFileSync(path.join(src, HARNESS_FILE), renderSource(view, dynamicType));
   const sources = fs.readdirSync(src).map((f) => path.join(src, f));
   const sw = run('xcrun', ['--sdk', 'iphonesimulator', 'swiftc', '-target', TARGET, '-sdk', sdk, '-parse-as-library', '-Onone',
     '-o', path.join(app, EXECUTABLE), ...sources]);
@@ -383,7 +479,7 @@ function crashReport(since) {
 }
 
 /** Renders [view] of the installed [app] on [device] into [out]. */
-function render(device, app, out, { w, h, top, bottom }) {
+function render(device, app, out, { w, h, top, bottom, interact = false }) {
   fs.rmSync(out, { force: true });
   run('xcrun', ['simctl', 'terminate', device, BUNDLE_ID]);
   const install = run('xcrun', ['simctl', 'install', device, app]);
@@ -391,8 +487,10 @@ function render(device, app, out, { w, h, top, bottom }) {
   const started = Date.now();
   try {
     // With --console the launch waits for the app to exit, so a crash is seen at once.
+    const limit = interact ? RENDER_TIMEOUT * 3 : RENDER_TIMEOUT;
     const launchApp = () => run('xcrun', ['simctl', 'launch', '--console', '--terminate-running-process', device, BUNDLE_ID,
-      '-out', out, '-w', String(w), '-h', String(h), '-top', String(top), '-bottom', String(bottom)], { timeout: RENDER_TIMEOUT });
+      '-out', out, '-w', String(w), '-h', String(h), '-top', String(top), '-bottom', String(bottom), '-interact', interact ? 'YES' : 'NO'],
+    { timeout: limit });
     let launch = launchApp();
     // A console pipe left by a stopped run blocks a launch whose simctl got the same pid.
     const stale = /Unable to establish FIFO at (\S+launch_console-\S+?): Error 17/.exec(`${launch.stderr || ''}`);
@@ -404,7 +502,7 @@ function render(device, app, out, { w, h, top, bottom }) {
     const log = `${launch.stdout || ''}\n${launch.stderr || ''}`.split('\n')
       .filter((l) => l.trim() && !/^dev\.figmcp\.swiftui-check/.test(l)).slice(-12).join('\n').trim();
     if (launch.error && launch.error.code === 'ETIMEDOUT') {
-      throw new Error(`The simulator did not render the view within ${RENDER_TIMEOUT / 1000} s.${log ? `\n${log}` : ''}`);
+      throw new Error(`The simulator did not ${interact ? 'finish tapping through' : 'render'} the view within ${limit / 1000} s.${log ? `\n${log}` : ''}`);
     }
     const crash = crashReport(started - 1000);
     throw new Error(`The view crashed while rendering${launch.status ? ` (exit ${launch.status})` : ''}.${log ? `\n${log}` : ''}${crash ? `\nCrash report: ${crash}` : ''}`);
@@ -454,7 +552,8 @@ async function bundleFonts(familyList, dirs, fetchFonts, missing) {
 
 const USAGE = `Usage: node tools/swiftui-check.js <nodeId|selection> [--snapshot <frame id>]
          [--export <design export.json>] [--fonts <dir>]... [--fetch-fonts]
-         [--out <dir>] [--device <udid or name>]
+         [--out <dir>] [--device <udid or name>] [--font-line-heights]
+         [--dynamic-type <xSmall…xxxLarge, accessibility1…accessibility5>] [--interact]
          [--code <View.swift> [--shared <DesignSystem.swift>] [--assets <assets.json>] [--view <Struct>]]
          [--project <dir> --file <View.swift> [--view <Struct>]]
 `;
@@ -501,6 +600,12 @@ async function main() {
   }
   if (opts.target && opts.target !== 'selection' && !/^I?\d+[:-]\d+([;:-]\d+)*$/.test(opts.target)) {
     process.stderr.write(`"${opts.target}" is not a node id (like 12:34) or "selection".\n${USAGE}`);
+    process.exit(2);
+  }
+  const SIZES = ['xSmall', 'small', 'medium', 'large', 'xLarge', 'xxLarge', 'xxxLarge', 'accessibility1', 'accessibility2',
+    'accessibility3', 'accessibility4', 'accessibility5'];
+  if (opts.dynamicType && !SIZES.includes(opts.dynamicType)) {
+    process.stderr.write(`--dynamic-type takes one of ${SIZES.join(', ')}.\n`);
     process.exit(2);
   }
   const sdk = simulatorSdk();
@@ -589,18 +694,20 @@ async function check(opts, design, out, sdk) {
   const fontsNotBundled = [];
   const fontFilesList = await bundleFonts(fontFamilies, opts.fonts, opts.fetchFonts, fontsNotBundled);
   const build = path.join(out, 'build');
-  const built = buildApp(build, { view, code, shared, catalogs, fontFilesList, sdk });
+  const built = buildApp(build, { view, code, shared, catalogs, fontFilesList, sdk, dynamicType: opts.dynamicType || 'large' });
   const report = {
     node: { id: tree.id, name: tree.name, width: tree.width, height: tree.height },
     view,
     compiler: { errors: built.errors, warnings: built.warnings },
     ...(built.stage ? { failedAt: built.stage } : {}),
+    ...(tree.height * 2 > 4400 ? { capture: 'the frame is taller than a snapshot can be (about 4400 px), so it is drawn from its layers: materials and blurs are left out' } : {}),
+    ...(opts.dynamicType && opts.dynamicType !== 'large' ? { dynamicType: `${opts.dynamicType} (the pixel comparison is with the design at the default size)` } : {}),
     fontsNotBundled,
     generatorWarnings: generated ? generated.warnings : [],
     files: { out, code: codeFile, design: path.join(out, 'design.png'), harness: build },
   };
   fs.writeFileSync(path.join(out, 'design.png'), design.render);
-  for (const f of ['rendered.png', 'rendered.png.layout.json', 'diff.png']) fs.rmSync(path.join(out, f), { force: true });
+  for (const f of ['rendered.png', 'rendered.png.layout.json', 'rendered.png.interact.json', 'diff.png']) fs.rmSync(path.join(out, f), { force: true });
   if (!built.errors.length) {
     const chrome = systemUi(tree);
     const top = Math.max(0, ...chrome.filter((c) => c.kind === 'status bar').map((c) => c.box[1] + c.box[3]));
@@ -609,7 +716,7 @@ async function check(opts, design, out, sdk) {
     removeStaleApps(device);
     const rendered = path.join(out, 'rendered.png');
     try {
-      render(device, built.app, rendered, { w: tree.width, h: tree.height, top, bottom });
+      render(device, built.app, rendered, { w: tree.width, h: tree.height, top, bottom, interact: Boolean(opts.interact && generated) });
     } catch (e) {
       Object.assign(report, { device, failedAt: 'render', renderError: e.message });
       fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
@@ -629,6 +736,19 @@ async function check(opts, design, out, sdk) {
     });
     report.files.rendered = rendered;
     report.files.diff = path.join(out, 'diff.png');
+    const taps = `${rendered}.interact.json`;
+    if (fs.existsSync(taps)) {
+      const list = JSON.parse(fs.readFileSync(taps, 'utf8'));
+      report.interactions = {
+        buttons: list.length,
+        redrew: list.filter((t) => t.redrew).length,
+        askedOwner: list.filter((t) => t.action).length,
+        noVisibleEffect: list.filter((t) => !t.hung && !t.redrew && !t.action).map((t) => t.label || '(no label)'),
+        hung: list.filter((t) => t.hung).map((t) => t.label || '(no label)'),
+        notActivated: list.filter((t) => !t.activated).map((t) => t.label || '(no label)'),
+        each: list,
+      };
+    }
     const layout = `${rendered}.layout.json`;
     if (generated && fs.existsSync(layout)) {
       // Layers drawn, outside the phone's own UI.
