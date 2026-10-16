@@ -199,11 +199,20 @@ function sign(v) {
 }
 
 /**
+ * Whether a baseline-aligned row places its children at Figma's offsets: a
+ * single line; a wrapping row keeps items-baseline, since a child on a later
+ * line has that line in its offset.
+ */
+export function placesBaselines(node) {
+  return node.layoutMode === 'HORIZONTAL' && node.counterAxisAlignItems === 'BASELINE' && node.layoutWrap !== 'WRAP';
+}
+
+/**
  * How far below the top of a baseline-aligned row Figma puts [node]: its
  * offset from the padding edge, or 0.
  */
 export function baselineOffset(node, parent) {
-  if (!parent || parent.layoutMode !== 'HORIZONTAL' || parent.counterAxisAlignItems !== 'BASELINE' || !inFlow(node, parent)) return 0;
+  if (!parent || !placesBaselines(parent) || !inFlow(node, parent)) return 0;
   const top = parent.y + (parent.paddingTop || 0) + strokeSpace(parent)[2];
   const offset = Math.round((node.y - top) * 100) / 100;
   return offset > 0.01 ? offset : 0;
@@ -297,7 +306,7 @@ export function containerClasses(node) {
   out.push(loneChildJustify(node, row) || JUSTIFY[node.primaryAxisAlignItems] || 'justify-start');
   // A row aligned on text baselines places its children where Figma has
   // them (baselineOffset), as browsers round font metrics differently.
-  out.push(row && node.counterAxisAlignItems === 'BASELINE' ? 'items-start' : ITEMS[node.counterAxisAlignItems] || 'items-start');
+  out.push(placesBaselines(node) ? 'items-start' : ITEMS[node.counterAxisAlignItems] || 'items-start');
   return [...out, ...padding(node)];
 }
 

@@ -116,9 +116,11 @@ function reactDetails(result, tree, { html = false } = {}) {
   }
   const fonts = Object.entries(result.fonts);
   if (fonts.length) {
+    const axes = result.fontAxes || {};
     out.push(text('Fonts used (load each family with these weights, e.g. with next/font, a Google Fonts ' +
-      `<link> or @font-face; the classes name the family itself):\n${
-        fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}`).join('\n')}`));
+      '<link> or @font-face; the classes name the family itself. Families with axes set the design\'s ' +
+      'variation with font-variation-settings: load their variable font with those axes):\n' +
+      fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}${axes[family] ? `; axes ${axes[family].join(', ')}` : ''}`).join('\n')));
   }
   if (result.textStyles.length) {
     out.push(text(`Figma text styles used (elements carry data-text-style${html ? '' : '; those used more than once are named ' +
@@ -168,6 +170,8 @@ function guidance({ tailwind, html }) {
     'variable: use the project token of that name. ' +
     (html ? '' : 'Runs of repeated items are data arrays with .map(), and Figma text styles used more than once ' +
       'are named in textStyles. ') +
+    'Rows marked data-align="baseline" align their children on text baselines in the design; the code ' +
+    'places them at the design\'s offsets. ' +
     'Elements carry data-node-id ' +
     '(call get_design_context on a child id for detail), data-component / ' +
     'data-variant, data-interactions (prototype actions) and data-rasterized ' +

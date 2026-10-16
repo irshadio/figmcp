@@ -3,7 +3,7 @@
 // CSS grids and everything else is placed by its constraints.
 import { linearTransform, rotationOf } from './geometry.js';
 import {
-  containerClasses, inFlow, isAutoLayout, isGrid, positionClasses, radiusClasses, sizingOf, strokeSpace,
+  containerClasses, inFlow, isAutoLayout, isGrid, placesBaselines, positionClasses, radiusClasses, sizingOf, strokeSpace,
 } from './layout.js';
 import { drawnAsSvg, hasImageFill, isTurned, straightLine, visibleChildren } from './nodes.js';
 import {
@@ -185,6 +185,7 @@ class Writer {
     this.placeholders = [];
     this.fonts = new Map();
     this.textStyles = new Map();
+    this.axes = new Map();
     this.inputs = new Map();
     this.arrays = [];
     this.runs = false;
@@ -250,6 +251,9 @@ class Writer {
     if (node.reactions && node.reactions.length) {
       out.push(`data-interactions=${jsxAttr(interactions(node))}`);
     }
+    // The design aligns this row's children on their text baselines; the code
+    // places them at Figma's offsets.
+    if (placesBaselines(node)) out.push('data-align="baseline"');
     for (const [k, v] of Object.entries(extra)) out.push(`${k}=${jsxAttr(v)}`);
     return ` ${out.join(' ')}`;
   }
@@ -334,6 +338,12 @@ class Writer {
     const key = `${cssWeight(seg)}${italic ? ' italic' : ''}`;
     if (!this.fonts.has(family)) this.fonts.set(family, new Set());
     this.fonts.get(family).add(key);
+    // Axes the classes set besides the weight: they need the variable font.
+    for (const [tag, v] of Object.entries(seg.fontName.variationSettings || {})) {
+      if (tag === 'wght' || tag === 'ital' || (tag === 'wdth' && v === 100) || (tag === 'slnt' && v === 0) || typeof v !== 'number') continue;
+      if (!this.axes.has(family)) this.axes.set(family, new Set());
+      this.axes.get(family).add(`${tag} ${num(v)}`);
+    }
   }
 
   text(node, pos, depth) {
@@ -352,7 +362,7 @@ class Writer {
     // An empty text keeps the line Figma gives it; an empty CSS box has none.
     const blank = !paras.some((p) => p.pieces.some((x) => x.text));
     const block = [...textBlockClasses(node), ...this.boxClasses(node, {}, false).classes,
-      blank ? `h-[${px(node.height)}]` : roundedHeight(node, paras)];
+      blank ? `h-[${px(node.height)}]` : roundedHeight(node, paras, !pos.includes('absolute'))];
     const valign = verticalAlign(node);
     const spacing = node.paragraphSpacing || 0;
     const characters = paras.map((p) => p.pieces.map((x) => (x.br ? '\u2028' : x.text)).join('')).join('\n');
@@ -835,15 +845,16 @@ function scrollsSideways(node, parent, screen) {
  * hugging text box's height up to a whole pixel, as it does its width: with
  * fractional line heights (scaled frames) the box is taller than its lines.
  */
-function roundedHeight(node, paras) {
+function roundedHeight(node, paras, flow = true) {
   if (node.textAutoResize !== 'WIDTH_AND_HEIGHT' && node.textAutoResize !== 'HEIGHT') return null;
   const segs = segmentsOf(node);
-  // Wrapping text Figma breaks onto two or more lines keeps that height: a
-  // font build a hair narrower would otherwise fit it on fewer and move
-  // everything below. It still grows when the browser wraps it further.
+  // Wrapping text in a layout that Figma breaks onto two or more lines
+  // keeps that height: a font build a hair narrower would otherwise fit it
+  // on fewer and move everything below. It still grows when the browser
+  // wraps it further. A positioned text moves nothing, so it needs none.
   const line = Math.max(...segs.map((s) => (s.lineHeight && s.lineHeight.unit === 'PIXELS' ? s.lineHeight.value
     : (s.fontSize || 14) * (s.lineHeight && s.lineHeight.unit === 'PERCENT' ? s.lineHeight.value / 100 : 1.25))));
-  if (node.textAutoResize === 'HEIGHT' && node.height >= line * 1.75) return `min-h-[${px(node.height)}]`;
+  if (node.textAutoResize === 'HEIGHT' && flow && node.height >= line * 1.75) return `min-h-[${px(node.height)}]`;
   const lh = segs[0].lineHeight;
   if (!lh || lh.unit !== 'PIXELS' || !lh.value || !segs.every((s) => s.lineHeight && s.lineHeight.unit === 'PIXELS' && s.lineHeight.value === lh.value)) return null;
   const spacing = (node.paragraphSpacing || 0) * Math.max(0, paras.length - 1);
@@ -984,6 +995,7 @@ export function toReactTailwind(root, assets, {
     assets: map,
     files: Object.fromEntries(writer.files),
     fonts,
+    fontAxes: Object.fromEntries([...writer.axes].map(([family, set]) => [family, [...set].sort()])),
     textStyles: [...writer.textStyles].map(([name, classes]) => ({ name, classes: classList(classes) })),
     screen: asScreen,
     page: asPage,

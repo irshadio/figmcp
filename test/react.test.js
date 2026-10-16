@@ -442,14 +442,21 @@ test('corpus findings, second round: font axes, empty texts, baseline rows, hugg
   assert.doesNotMatch(code(frame([text('Hi', {}, { fontName: { family: 'Inter', style: 'Bold', variationSettings: { wght: 700 } } })])), /font-variation/);
 
   assert.match(code(frame([text('', { height: 16 })])), /h-4[^"]*" data-name="T"/, 'an empty text keeps its line');
-  assert.match(code(frame([text('A long title that wraps', { textAutoResize: 'HEIGHT', height: 60 }, { lineHeight: { unit: 'PIXELS', value: 30 } })])),
-    /min-h-\[60px\]/, 'wrapped text keeps the height Figma gives it');
+  const wrapped = text('A long title that wraps', { textAutoResize: 'HEIGHT', height: 60 }, { lineHeight: { unit: 'PIXELS', value: 30 } });
+  assert.match(code(frame([wrapped], { layoutMode: 'VERTICAL' })), /min-h-\[60px\]/, 'wrapped text in a layout keeps the height Figma gives it');
+  assert.doesNotMatch(code(frame([wrapped])), /min-h-/, 'a positioned text moves nothing');
 
   const priceRow = frame([text('AED 3,899', { id: '20:2', y: 0, height: 28 }), { ...box('20:3', { name: 'Save', y: 8, height: 20 }) }],
     { layoutMode: 'HORIZONTAL', counterAxisAlignItems: 'BASELINE', height: 28 });
   const baseline = code(priceRow);
   assert.match(baseline, /className="[^"]*flex justify-start items-start[^"]*" data-name="Root"/);
   assert.match(baseline, /mt-2[^"]*" data-name="Save"/, 'each child sits where Figma has it');
+  assert.match(baseline, /data-name="Root" data-node-id="1:1" data-align="baseline"/, 'the design\'s alignment is named');
+  const wrapRow = code({ ...priceRow, layoutWrap: 'WRAP', children: [...priceRow.children, { ...box('20:4', { name: 'Tag', y: 36, height: 20 }) }] });
+  assert.match(wrapRow, /items-baseline/, 'a wrapping row keeps baseline alignment');
+  assert.doesNotMatch(wrapRow, /mt-|data-align/);
+  assert.deepEqual(gen(frame([text('Get paid', {}, { fontName: { family: 'Bricolage Grotesque', style: 'Bold', variationSettings: { opsz: 14, wdth: 100, wght: 700 } } })])).fontAxes,
+    { 'Bricolage Grotesque': ['opsz 14'] });
 
   const phone = (column) => ({ id: '21:1', name: 'Screen', type: 'FRAME', x: 0, y: 0, width: 390, height: 844, children: [{
     ...box('21:2', { name: 'Week', layoutMode: 'HORIZONTAL', width: 134, height: 42, x: 100, y: 100, layoutSizingHorizontal: 'HUG' }),

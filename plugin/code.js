@@ -152,7 +152,9 @@ async function variableName(ctx, alias) {
 async function resolvedColor(ctx, alias, consumer) {
   if (!alias || alias.type !== 'VARIABLE_ALIAS') return null;
   try {
-    const variable = await figma.variables.getVariableByIdAsync(alias.id);
+    if (!ctx.variableObjects) ctx.variableObjects = new Map();
+    if (!ctx.variableObjects.has(alias.id)) ctx.variableObjects.set(alias.id, await figma.variables.getVariableByIdAsync(alias.id));
+    const variable = ctx.variableObjects.get(alias.id);
     const resolved = variable && variable.resolveForConsumer ? variable.resolveForConsumer(consumer) : null;
     const v = resolved && resolved.resolvedType === 'COLOR' ? resolved.value : null;
     return v && typeof v.r === 'number' ? { r: v.r, g: v.g, b: v.b } : null;
