@@ -114,6 +114,12 @@ function fileStem(name, fallback) {
   return stem || fallback;
 }
 
+/** Six hex digits of a stored asset's content hash (its file name), or ''. */
+function contentTag(source) {
+  const m = /([0-9a-f]{16,})\.[a-z0-9]+(?:[?#].*)?$/i.exec(String(source));
+  return m ? m[1].slice(0, 6).toLowerCase() : '';
+}
+
 function extOf(url) {
   const m = /\.([a-z0-9]+)(?:[?#].*)?$/i.exec(String(url));
   return m ? m[1].toLowerCase() : 'png';
@@ -213,7 +219,11 @@ class Writer {
     this.names.add(id);
     let url = source;
     if (this.assetDir) {
-      const stem = fileStem(name, fallback.toLowerCase());
+      // Named after the layer, with a short hash of the content: frames
+      // implemented into one folder never overwrite each other's files, and
+      // the same image is one file.
+      const hash = contentTag(source);
+      const stem = `${fileStem(name, fallback.toLowerCase())}${hash ? `-${hash}` : ''}`;
       const ext = extOf(source);
       let file = `${stem}.${ext}`;
       for (let i = 2; this.fileNames.has(file); i++) file = `${stem}-${i}.${ext}`;

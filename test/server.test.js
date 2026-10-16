@@ -25,9 +25,11 @@ test('reads imported snapshots without the plugin', async () => {
 
   const ctx = await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', fileKey: 'abc' } });
   assert.match(texts(ctx), /export default function SampleScreen/);
-  assert.match(texts(ctx), /const imgPhoto = "\/figma\/photo.png";/);
-  assert.match(texts(ctx), /"public\/figma\/photo.png": \{\s+"url": "\/figma\/photo.png",\s+"source": "[^"]+\/assets\/[a-f0-9]{64}\.png"/);
-  assert.match(texts(ctx), /^cp '[^']+\.png' 'public\/figma\/photo.png'$/m);
+  // Files are named after the layer and a short hash of their content.
+  const hash = /"public\/figma\/photo-([a-f0-9]{6}).png"/.exec(texts(ctx))[1];
+  assert.match(texts(ctx), new RegExp(`const imgPhoto = "/figma/photo-${hash}.png";`));
+  assert.match(texts(ctx), new RegExp(`"public/figma/photo-${hash}.png": \\{\\s+"url": "/figma/photo-${hash}.png",\\s+"source": "[^"]+/assets/${hash}[a-f0-9]{58}\\.png"`));
+  assert.match(texts(ctx), new RegExp(`^cp '[^']+\\.png' 'public/figma/photo-${hash}.png'$`, 'm'));
   assert.match(texts(ctx), /Fonts used[^\n]*\n- Inter: 500, 600/);
   assert.ok(ctx.content.some((c) => c.type === 'image'), 'includes a screenshot');
 
