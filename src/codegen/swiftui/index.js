@@ -7,7 +7,7 @@ import { inFlow, isAutoLayout, isGrid, sizingOf } from '../layout.js';
 import { drawnAsSvg, hasImageFill, isTurned, straightLine, visibleChildren } from '../nodes.js';
 import { sideWeights } from '../paint.js';
 import { detectRoles, SWIFTUI_PATTERNS } from '../roles.js';
-import { isPhoneScreen, TALL_SCREEN, WRAPPING_PARENTS } from '../screen.js';
+import { isPhoneScreen, TALL_SCREEN, WRAPPING_PARENTS } from '../page.js';
 import { systemUi } from '../system-ui.js';
 import { fontWeight, segmentsOf } from '../text.js';
 import { visiblePaints } from '../util.js';

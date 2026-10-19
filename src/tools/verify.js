@@ -1,13 +1,14 @@
-// Render check: draws Flutter code with `flutter test`, or SwiftUI code in
-// the iOS simulator, and compares it with Figma's own render of the node.
+// Render checks: draw Flutter code with `flutter test`, SwiftUI code in the
+// iOS simulator, or React + Tailwind in headless Chrome, and compare it with
+// Figma's own render of the node.
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { detectFramework } from '../project.js';
 import { fitPng } from '../png.js';
+import { detectFramework, tailwindVersion } from '../project.js';
 import { DATA_DIR } from '../store.js';
 import { fileKeySchema, guard, image, nodeIdSchema, text } from './common.js';
 
@@ -42,10 +43,49 @@ function projectOf(file, isRoot) {
 const hasPubspec = (dir) => fs.existsSync(path.join(dir, 'pubspec.yaml'));
 const isSwiftRoot = (dir) => fs.existsSync(path.join(dir, 'Package.swift')) ||
   fs.readdirSync(dir).some((f) => /\.(xcodeproj|xcworkspace)$/.test(f));
+const hasPackageJson = (dir) => fs.existsSync(path.join(dir, 'package.json'));
 
 /** Whether Xcode's iOS simulator SDK is installed. */
 function hasXcode() {
   return spawnSync('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-path'], { encoding: 'utf8' }).status === 0;
+}
+
+const IMAGE_FILE = /\.(svg|png|jpe?g|webp|gif|avif)$/i;
+
+/**
+ * Files a component's images load from: URLs into the project's public
+ * folder ('/figma/logo.svg') and images it imports ('./logo.svg').
+ */
+function componentAssets(code, file, project) {
+  const out = {};
+  for (const m of code.matchAll(/["'`]([^"'`\s:]+)["'`]/g)) {
+    if (!IMAGE_FILE.test(m[1])) continue;
+    // A root path is served from the public folder; a relative one sits by the file.
+    const hits = m[1].startsWith('/') ? ['public', 'static'].map((dir) => path.join(project, dir, m[1]))
+      : [path.resolve(path.dirname(file), m[1])];
+    const hit = hits.find((h) => fs.existsSync(h));
+    if (hit) out[m[1]] = hit;
+  }
+  for (const m of code.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/gm)) {
+    if (!IMAGE_FILE.test(m[2])) continue;
+    const hit = m[2].startsWith('.') ? path.resolve(path.dirname(file), m[2]) : path.join(project, m[2].replace(/^@\//, 'src/'));
+    if (fs.existsSync(hit)) out[m[1]] = hit;
+  }
+  return out;
+}
+
+/** A stylesheet for the browser build: Tailwind's own imports and directives dropped. */
+function pageCss(file) {
+  return fs.readFileSync(file, 'utf8')
+    .replace(/^\s*@import\s+["']tailwindcss[^"']*["'][^;]*;\s*$/gm, '')
+    .replace(/^\s*@tailwind\s+\w+;\s*$/gm, '')
+    .replace(/^\s*@(plugin|source|config)\s[^;]*;\s*$/gm, '');
+}
+
+let reactCheck = null;
+async function runReactCheck(opts) {
+  if (!reactCheck) ({ reactCheck } = await import('../../tools/visual-check.js'));
+  return reactCheck(opts);
 }
 
 function runCheck(args, project = null, script = CHECK) {
@@ -134,19 +174,17 @@ const FAILED_AT = {
 };
 
 /**
- * The framework to check: from the file's extension, else the project
- * (a Swift project checks SwiftUI, a Flutter one Flutter). Other projects
- * must say which.
+ * The framework to check: from the file's extension, then a flutter path,
+ * then as get_design_context picks (the client, then the project).
  */
-function frameworkOf(file, flutter) {
+function frameworkOf(input) {
+  const { file, flutter } = input;
   if (file && /\.swift$/i.test(file)) return 'swiftui';
   if (file && /\.dart$/i.test(file)) return 'flutter';
-  const detected = detectFramework({});
-  if (detected === 'swiftui' || detected === 'flutter') return detected;
-  if (flutter || (flutterTool() && !hasXcode())) return 'flutter';
-  if (hasXcode() && !flutterTool()) return 'swiftui';
-  throw new Error('verify_code checks Flutter or SwiftUI code, and this project is neither a Flutter project nor a Swift ' +
-    'package or Xcode project: pass framework: "flutter" or "swiftui".');
+  if (file && /\.(jsx|tsx|js|ts)$/i.test(file)) return 'react';
+  if (file && /\.html?$/i.test(file)) return 'html';
+  if (flutter) return 'flutter';
+  return detectFramework(input);
 }
 
 /** Folders under [root] holding font files, a few levels deep. */
@@ -230,15 +268,23 @@ export function registerVerifyTools(server, bridge, source) {
     title: 'Verify Code',
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description:
-      'Check Flutter or SwiftUI code against the design and compare the render ' +
+      'Check Flutter, SwiftUI or React + Tailwind code against the design and compare the render ' +
       'with Figma\'s own 2x render of the node: Flutter code is analyzed and ' +
       'rendered with `flutter test`; SwiftUI code is compiled and rendered in ' +
-      'the booted iOS simulator (Xcode needed). Returns compiler or analyzer ' +
-      'errors, runtime errors (Flutter: overflows, missing assets), the share ' +
+      'the booted iOS simulator (Xcode needed); React and HTML render in headless Chrome with Tailwind. ' +
+      'Returns compiler or analyzer ' +
+      'errors, runtime errors (Flutter: overflows, missing assets; React: broken images), the share ' +
       'of differing pixels and a diff image (the design in grey, differing ' +
-      'pixels in red). The framework comes from `framework`, else from the ' +
-      'project like get_design_context.\n\n' +
-      'With `file`, it checks that widget or view inside its own project: a ' +
+      'pixels in red). The framework comes from `framework`, else from the file\'s language, else from the ' +
+      'client and the project like get_design_context.\n\n' +
+      'React and HTML: without `file` it checks the code get_design_context generates ' +
+      'and compares every layer\'s box too. With `file` (a .jsx or .tsx under ' +
+      'a folder with package.json, or an .html page) it renders that file\'s default export or page: it ' +
+      'must be self-contained apart from React and image imports; images load ' +
+      'from the project\'s public folder. Pass `css` for the stylesheet with ' +
+      'its tokens. React and Tailwind load from a CDN and the fonts from the ' +
+      'system or Google Fonts. Needs Chrome and the puppeteer-core package.\n\n' +
+      'Flutter and SwiftUI: with `file`, it checks that widget or view inside its own project: a ' +
       'Flutter widget with the project\'s packages and assets, inside a ' +
       'MaterialApp, scaled by flutter_screenutil to the frame size when the ' +
       'project uses it; a SwiftUI view compiled with the project\'s ' +
@@ -255,13 +301,17 @@ export function registerVerifyTools(server, bridge, source) {
     inputSchema: {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
-      framework: z.enum(['flutter', 'swiftui']).optional().describe(
-        'What to check: flutter or swiftui (default: from the file\'s extension, else swiftui for a Swift package or ' +
-        'Xcode project and flutter for a Flutter project).'),
+      framework: z.enum(['flutter', 'swiftui', 'react', 'html']).optional().describe(
+        'What to check (default: from the file\'s extension, else as get_design_context picks: the client, then the project).'),
+      clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" or "swift" (picks the framework).'),
+      clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" or "swiftui" (picks the framework).'),
       file: z.string().optional().describe(
-        'The .dart file with the widget, under the project\'s lib/, or the .swift file with the view (absolute, or relative to the ' +
-        'project root above the server\'s working folder).'),
+        'Flutter: the .dart file with the widget, under the project\'s lib/. SwiftUI: the .swift file with the view. ' +
+        'React: the .jsx/.tsx component file. HTML: the .html page. Absolute, or relative to the project.'),
       widget: z.string().optional().describe('The widget class or SwiftUI view struct in `file` (default: its first one).'),
+      css: z.string().optional().describe('React: a CSS file to load with the component, e.g. its global stylesheet with the design tokens.'),
+      tailwind: z.union([z.literal(3), z.literal(4)]).optional().describe(
+        'React: the Tailwind major version (default: the project\'s, else 4).'),
       viewport: z.string().regex(/^\d+(\.\d+)?x\d+(\.\d+)?$/).optional().describe(
         'Flutter: lay the code out on a screen of this size, e.g. "360x780", and report runtime errors ' +
         '(overflows) and layers pushed off screen instead of comparing.'),
@@ -277,9 +327,11 @@ export function registerVerifyTools(server, bridge, source) {
       device: z.string().optional().describe('SwiftUI: the simulator to render in, by udid or name (default: a booted iPhone 17 Pro, another booted iPhone, ' +
         'else an iPhone Pro it boots). Renders are 2x and light mode on any device.'),
     },
-  }, guard(async ({ nodeId, framework, file, widget, viewport, fonts = [], flutter, device, interact, dynamicType }) => {
-    const chosen = framework || frameworkOf(file, flutter);
-    if (chosen === 'swiftui') {
+  }, guard(async (input) => {
+    const { nodeId, file, widget, viewport, fonts = [], flutter, device, interact, dynamicType } = input;
+    const framework = input.framework || frameworkOf(input);
+    if (framework === 'react' || framework === 'html') return verifyReact(source, { ...input, html: framework === 'html' });
+    if (framework === 'swiftui') {
       const { id } = await source.resolveId(nodeId);
       const exported = await source.exportData(id);
       if (!exported.data.frames[0].previewPng2x) throw new Error(`There is no render of ${id} to compare with.`);
@@ -344,4 +396,74 @@ export function registerVerifyTools(server, bridge, source) {
       image(fitPng(fs.readFileSync(report.files.diff), DIFF_MAX)),
     ];
   }));
+}
+
+async function verifyReact(source, { nodeId, file, viewport, fonts = [], css, tailwind, html = false }) {
+  const size = viewport ? viewport.split('x').map(Number) : null;
+  if (size && size.some((v) => v < 1 || v > 10000)) throw new Error('Each side of `viewport` must be between 1 and 10000.');
+  const { id } = await source.resolveId(nodeId);
+  const exported = await source.exportData(id);
+  const frame = exported.data.frames[0];
+  if (!frame.previewPng2x && !size) throw new Error(`There is no render of ${id} to compare with.`);
+  const design = {
+    tree: frame.tree, images: exported.data.images || {},
+    render: frame.previewPng2x ? Buffer.from(frame.previewPng2x, 'base64') : null,
+  };
+  let code = null;
+  let assets = null;
+  let project = null;
+  if (file) {
+    const absolute = path.resolve(file);
+    project = projectOf(fs.existsSync(absolute) ? absolute : path.join(process.cwd(), 'x'), hasPackageJson);
+    const inProject = fs.existsSync(absolute) ? absolute : path.resolve(project || process.cwd(), file);
+    if (!fs.existsSync(inProject)) throw new Error(`${file} does not exist.`);
+    project = projectOf(inProject, hasPackageJson) || path.dirname(inProject);
+    code = fs.readFileSync(inProject, 'utf8');
+    assets = componentAssets(code, inProject, project);
+  }
+  const slug = id.replace(/[^0-9A-Za-z]+/g, '_');
+  const out = path.join(DATA_DIR, 'verify', `${slug}_${html ? 'html' : 'react'}${file ? '_project' : ''}${viewport ? `_${viewport}` : ''}`);
+  const report = await oneAtATime(() => runReactCheck({
+    design, out, code, assets, viewport: size, html,
+    css: css ? pageCss(path.resolve(project || process.cwd(), css)) : '',
+    fonts: [...fonts, ...(project ? [path.join(project, 'public'), path.join(project, 'src', 'fonts'), path.join(project, 'assets', 'fonts')] : [])],
+    fetchFonts: true,
+    tailwind: tailwind || tailwindVersion(project || process.cwd()) || 4,
+  }));
+  const summary = {
+    node: report.node,
+    ...(exported.source === 'snapshot' ? { source: `snapshot saved ${exported.exportedAt || 'earlier'}` } : {}),
+    tailwind: report.tailwind,
+    runtimeErrors: report.runtimeErrors,
+    brokenImages: report.brokenImages,
+    renderedSize: report.renderedSize,
+  };
+  if (report.viewport) {
+    Object.assign(summary, {
+      viewport: report.viewport, pageSize: report.pageSize, horizontalOverflow: report.horizontalOverflow,
+      offscreenLayers: brief(report.offscreenLayers), files: report.files,
+    });
+    return [
+      text(summary),
+      text(`Rendered at ${report.viewport.width}x${report.viewport.height}:`),
+      image(fs.readFileSync(report.files.rendered)),
+    ];
+  }
+  Object.assign(summary, {
+    pixels: report.pixels,
+    ...(report.checkedBoxes ? {
+      checkedLayers: report.checkedBoxes,
+      layoutMismatches: brief(report.geometryMismatches),
+      textRoundingMismatches: report.textRoundingMismatches.length,
+      missingLayers: brief(report.missingElements),
+    } : {}),
+    fontsNotFound: report.fontsNotBundled,
+    ...(report.generatorWarnings && report.generatorWarnings.length ? { generatorWarnings: brief(report.generatorWarnings) } : {}),
+    files: report.files,
+  });
+  return [
+    text(summary),
+    text('Diff (the design in grey, differing pixels in red):'),
+    image(fs.readFileSync(report.files.diff)),
+  ];
 }

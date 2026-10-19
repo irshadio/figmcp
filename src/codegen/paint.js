@@ -66,16 +66,26 @@ export function blendClass(mode) {
   return BLEND[mode] ? `mix-blend-${BLEND[mode]}` : null;
 }
 
+/** Whether a paint draws nothing: zero opacity, or only transparent colours. */
+export function invisiblePaint(p) {
+  if ((p.opacity ?? 1) <= 0) return true;
+  if (p.type === 'SOLID') return (p.color && (p.color.a ?? 1)) <= 0;
+  if (String(p.type).startsWith('GRADIENT')) {
+    return Array.isArray(p.gradientStops) && p.gradientStops.length > 0 && p.gradientStops.every((s) => (s.color.a ?? 1) <= 0);
+  }
+  return false;
+}
+
 /**
- * Fill layers bottom to top: { kind: 'color', value, blend } or
- * { kind: 'image', paint }.
+ * Fill layers bottom to top. Transparent paints are left out: they draw
+ * nothing, and in Figma cast no shadow either.
  */
 export function fillLayers(node) {
   const vars = node.vars || {};
   const list = Array.isArray(node.fills) ? node.fills : [];
   const out = [];
   list.forEach((p, i) => {
-    if (!p || p.visible === false) return;
+    if (!p || p.visible === false || invisiblePaint(p)) return;
     if (p.type === 'IMAGE') out.push({ kind: 'image', paint: p });
     else {
       const value = paintValue(p, node.width, node.height, vars[`fill.${i}`]);

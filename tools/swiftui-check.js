@@ -32,7 +32,7 @@ import { fontFaceMap } from '../src/fonts.js';
 import { systemUi } from '../src/codegen/system-ui.js';
 import { DATA_DIR, imageExt } from '../src/store.js';
 import { compareBoxes, expectedBoxes, families, loadDesign, pixelDiff } from './compare.js';
-import { familyFiles, fetchGoogleFont, FONT_CACHE, fontFiles, SYSTEM_FONTS } from './flutter-check.js';
+import { familyFiles, fetchGoogleFont, FONT_CACHE, fontFiles, SYSTEM_FONTS } from './fonts.js';
 
 const CHECK_DIR = path.join(DATA_DIR, 'swiftui-check');
 // One app per run, so runs side by side do not stop each other's.

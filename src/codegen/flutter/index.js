@@ -5,7 +5,9 @@
 import { linearTransform, rotationOf } from '../geometry.js';
 import { inFlow, isAutoLayout, isGrid, sizingOf } from '../layout.js';
 import { drawnAsSvg, isTurned, straightLine, visibleChildren } from '../nodes.js';
-import { isPhoneScreen, minPageHeight, TALL_SCREEN, WRAPPING_PARENTS } from '../screen.js';
+import {
+  isPhoneScreen, minPageHeight, pinnedChildren, scrollsOnScreen, stretchesOnScreen, TALL_SCREEN, WRAPPING_PARENTS,
+} from '../page.js';
 import { autoLineRatios, fontWeight, segmentsOf } from '../text.js';
 import { visiblePaints } from '../util.js';
 import {
@@ -244,8 +246,7 @@ class FlutterWriter {
       ? node.constraints : { horizontal: 'MIN', vertical: 'MIN' };
     // On a phone screen, a section that spans the width or sits centred
     // with equal margins stretches with the screen.
-    if (parent === this.screen && cons.horizontal !== 'MAX' && cons.horizontal !== 'STRETCH' && !hugsWidth(node) &&
-        node.width >= parent.width / 2 && Math.abs(x - (parent.width - x - node.width)) <= 2) {
+    if (parent === this.screen && stretchesOnScreen(node, parent, hugsWidth(node))) {
       cons = { ...cons, horizontal: 'STRETCH' };
     }
     const axis = (mode, pos, size, total, hug) => {
@@ -746,10 +747,8 @@ class FlutterWriter {
    * the design's, so at the design size the result is the same.
    */
   screenRoot(node) {
-    this.scrolls = ['VERTICAL', 'BOTH'].includes(node.overflowDirection) || node.height > TALL_SCREEN;
-    const all = node.children || [];
-    const fixedCount = isAutoLayout(node) ? 0 : Math.max(0, Math.min(node.numberOfFixedChildren || 0, all.length));
-    const fixed = new Set(all.slice(all.length - fixedCount).map((c) => c.id));
+    this.scrolls = scrollsOnScreen(node);
+    const fixed = pinnedChildren(node);
     const children = visibleChildren(node);
     const H = isAutoLayout(node) ? Math.round(node.height * 100) / 100
       : minPageHeight(node, children.filter((c) => !fixed.has(c.id)));

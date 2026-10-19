@@ -19,7 +19,7 @@ const env: [string, Default, string][] = [
     { mac: "~/.figma-local-mcp", win: "%USERPROFILE%\\.figma-local-mcp" },
     "Data folder: plugin, pairing code, snapshots and assets.",
   ],
-  ["FIGMA_LOCAL_MCP_FRAMEWORK", null, "Force flutter or react when the client doesn't say."],
+  ["FIGMA_LOCAL_MCP_FRAMEWORK", null, "Force flutter, react or html when the client doesn't say."],
   [
     "FIGMA_LOCAL_MCP_CODE_CONNECT",
     { mac: ".figma-local/code-connect.json", win: ".figma-local\\code-connect.json" },

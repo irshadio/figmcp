@@ -1,14 +1,15 @@
-// Phone screens: which frames are drawn as a screen, and how short their
-// page may get before it scrolls.
+// Phone screens, shared by the code generators: which frames are screens,
+// the shortest page their layers fit on, the layers pinned while scrolling
+// and the sections that stretch with the screen.
+import { isAutoLayout } from './layout.js';
 
-// Children of these keep their place; constraints apply to frames only.
-export const WRAPPING_PARENTS = new Set(['GROUP', 'BOOLEAN_OPERATION']);
 // Taller than any phone: the design scrolls.
 export const TALL_SCREEN = 1000;
 // How much further than in the design two overlapping layers may slide over
 // each other on a shorter screen, as a share of the smaller one's height.
 const EXTRA_OVERLAP = 0.15;
 const SCREEN_TYPES = new Set(['FRAME', 'COMPONENT', 'INSTANCE']);
+export const WRAPPING_PARENTS = new Set(['GROUP', 'BOOLEAN_OPERATION']);
 
 /** A portrait frame of a phone's width, drawn as a screen. */
 export function isPhoneScreen(node) {
@@ -16,10 +17,40 @@ export function isPhoneScreen(node) {
     node.height >= node.width * 1.5;
 }
 
+// Wide enough to be a tablet or desktop page.
+const PAGE_MIN_WIDTH = 768;
+
+/** A frame of a tablet's width or wider, drawn as a web page. */
+export function isWebPage(node) {
+  return Boolean(node) && SCREEN_TYPES.has(node.type) && node.width >= PAGE_MIN_WIDTH && !isPhoneScreen(node);
+}
+
+/**
+ * Whether a child of a web page spans the page's width (a bar, a banner, a
+ * footer): it stretches with the viewport. A child within a pixel of both
+ * sides counts.
+ */
+export function spansPage(node, page) {
+  const x = node.x - page.x;
+  return x <= 1 && x + node.width >= page.width - 1;
+}
+
+/** Whether the screen's page scrolls: Figma says so, or it is taller than a phone. */
+export function scrollsOnScreen(node) {
+  return ['VERTICAL', 'BOTH'].includes(node.overflowDirection) || node.height > TALL_SCREEN;
+}
+
+/** Ids of the children Figma keeps in place when the frame scrolls (the last ones). */
+export function pinnedChildren(node) {
+  const all = node.children || [];
+  const count = isAutoLayout(node) ? 0 : Math.max(0, Math.min(node.numberOfFixedChildren || 0, all.length));
+  return new Set(all.slice(all.length - count).map((c) => c.id));
+}
+
 /**
  * The shortest page the screen's [children] fit on as their constraints
- * move them: each layer stays on the page, layers apart in the design never
- * run into each other, and layers that overlap in the design slide only a
+ * move them: layers that do not overlap in the design never do, and
+ * layers that overlap (a sheet over a header) may slide over each other a
  * little further. A layer's top and bottom move up by k times the height
  * the page loses: 0 when pinned to the top, 1 to the bottom, 0.5 centred,
  * and in proportion when scaled.
@@ -55,4 +86,16 @@ export function minPageHeight(node, children) {
     }
   }
   return Math.ceil((Hd - Math.max(0, lost)) * 100) / 100;
+}
+
+/**
+ * Whether a child of a screen stretches with it: a section that spans the
+ * width, or sits centred with equal margins, unless it is pinned to the
+ * right, already stretches, or hugs its content.
+ */
+export function stretchesOnScreen(node, screen, hugs) {
+  const cons = (!WRAPPING_PARENTS.has(screen.type) && node.constraints) || { horizontal: 'MIN' };
+  if (cons.horizontal === 'MAX' || cons.horizontal === 'STRETCH' || hugs) return false;
+  const x = node.x - screen.x;
+  return node.width >= screen.width / 2 && Math.abs(x - (screen.width - x - node.width)) <= 2;
 }

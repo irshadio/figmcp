@@ -19,15 +19,15 @@ const groups: { title: string; tools: Tool[] }[] = [
     tools: [
       {
         name: "get_design_context",
-        desc: "The main tool for design to code. Returns reference code (Flutter or React + Tailwind), the assets it uses, a screenshot and the variables in the node. Large nodes return metadata instead of code unless forceCode is set.",
+        desc: "The main tool for design to code. Returns reference code (Flutter, React + Tailwind or HTML + Tailwind), the assets it uses, a screenshot and the variables in the node. Large nodes return metadata instead of code unless forceCode is set.",
         args: [
           node,
-          ["framework", "flutter or react. Default: from the client, then FIGMA_LOCAL_MCP_FRAMEWORK, then pubspec.yaml."],
+          ["framework", "react, html or flutter. Default: from the client, then FIGMA_LOCAL_MCP_FRAMEWORK, then the project (pubspec.yaml, or a static site)."],
           ["clientLanguages", 'Comma separated languages of the client, e.g. "dart".'],
           ["clientFrameworks", 'Comma separated frameworks of the client, e.g. "flutter".'],
-          ["screen", "Flutter: draw the node as a phone screen that fills the screen and scrolls when tall."],
+          ["screen", "Draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide)."],
           ["screenUtil", "Flutter: write lengths with flutter_screenutil (.w, .h, .r, .sp). Default: when pubspec.yaml depends on flutter_screenutil."],
-          ["assetsDir", "Flutter: folder of the asset paths in the code."],
+          ["assetsDir", "Folder of the assets in the code. Flutter: from pubspec.yaml; React: public/figma; HTML: assets/figma."],
           ["excludeScreenshot", "Leave the screenshot out of the response."],
           ["forceCode", "Always return code, even for very large nodes."],
           ["disableCodeConnect", "Draw mapped components from their layers instead of naming the code component."],
@@ -60,11 +60,14 @@ const groups: { title: string; tools: Tool[] }[] = [
       },
       {
         name: "verify_code",
-        desc: "Check Flutter code against the design: analyzes it, renders it with flutter test at 2x and compares the render with Figma's own. Returns analyzer and runtime errors, the share of differing pixels and a diff image. With file, it checks your widget inside your project, with its packages, assets and flutter_screenutil scaling; without it, the generated reference code, layer by layer.",
+        desc: "Check Flutter, React or HTML code against the design: renders it at 2x (Flutter with flutter test, React and HTML in headless Chrome with Tailwind) and compares the render with Figma's own. Returns analyzer or runtime errors, broken images, the share of differing pixels and a diff image. With file, it checks your widget, component or page inside your project; without it, the generated reference code, layer by layer.",
         args: [
           node,
-          ["file", "The .dart file with the widget, under the project's lib/."],
-          ["widget", "The widget class in file (default: its first widget class)."],
+          ["framework", "flutter, react or html (default: from the file, then the client and the project)."],
+          ["file", "Flutter: the .dart file under lib/. React: a .jsx or .tsx component. HTML: an .html page."],
+          ["widget", "Flutter: the widget class in file (default: its first widget class)."],
+          ["css", "React and HTML: a stylesheet to load, e.g. the one with the design tokens."],
+          ["tailwind", "React and HTML: Tailwind 3 or 4 (default: the project's, else 4)."],
           ["viewport", 'Lay the code out on a screen of this size, e.g. "360x780", and report overflows with the render.'],
           ["fonts", "Folders with font files (default: the project's assets/fonts and the system fonts)."],
           ["flutter", "Path of the flutter tool, when it is not on PATH."],

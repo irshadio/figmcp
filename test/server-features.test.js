@@ -47,7 +47,7 @@ test('code connect maps a component set and names it in the design context', asy
 
   const ctx = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true } }));
   assert.match(ctx, /^\/\/ AppPrimaryButton: lib\/widgets\/app_primary_button.dart \(Flutter\)/);
-  assert.match(ctx, /<AppPrimaryButton className="relative shrink-0 w-full h-\[40px\]"/);
+  assert.match(ctx, /<div className="relative shrink-0 w-full h-10"[^>]*data-node-id="10:3"[^>]*>\n\s+\{\/\* AppPrimaryButton texts in the design: "Continue" \*\/\}\n\s+<AppPrimaryButton \/>/);
   const raw = texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '10:1', excludeScreenshot: true, disableCodeConnect: true } }));
   assert.doesNotMatch(raw, /<AppPrimaryButton/);
 
@@ -277,4 +277,24 @@ test('a node the open file does not have comes from a snapshot, else a clear err
   const status = texts(await client.callTool({ name: 'whoami', arguments: {} }));
   assert.ok(status.length < 4000);
   plugin.stop();
+});
+
+test('desktop frames are web pages unless the agent passes page: false', async () => {
+  const dir = tmpDir();
+  const sample = JSON.parse(fs.readFileSync(FIXTURE));
+  const frame = sample.frames[0];
+  const wide = { ...sample, frames: [{ ...frame, id: '30:1', tree: { ...frame.tree, id: '30:1', name: 'Landing', width: 1440, height: 900, layoutMode: undefined, children: [] } }] };
+  const file = path.join(dir, 'wide.json');
+  fs.writeFileSync(file, JSON.stringify(wide));
+  const { client, transport } = await startClient(dir, nextPort());
+  await client.callTool({ name: 'import_design_export', arguments: { path: file } });
+  const ask = async (extra) => texts(await client.callTool({ name: 'get_design_context', arguments: { nodeId: '30:1', excludeScreenshot: true, ...extra } }));
+  const page = await ask({});
+  assert.match(page, /className="relative w-full min-w-\[1440px\] h-\[900px\]/);
+  assert.match(page, /Landing is drawn as a web page/);
+  const fixed = await ask({ page: false });
+  assert.match(fixed, /className="relative w-\[1440px\] h-\[900px\]/);
+  assert.doesNotMatch(fixed, /drawn as a web page/);
+  assert.match(await ask({ framework: 'html', page: false }), /<div class="relative w-\[1440px\] h-\[900px\]/);
+  await transport.close();
 });

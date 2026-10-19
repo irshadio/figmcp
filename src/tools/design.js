@@ -5,6 +5,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { listMappings, lookup } from '../connect.js';
 import { toFlutter } from '../codegen/flutter/index.js';
+import { toHtmlTailwind } from '../codegen/html.js';
 import { boundedMetadataXml } from '../codegen/metadata.js';
 import { countNodes, toReactTailwind } from '../codegen/react.js';
 import { mergeDesignSystem } from '../codegen/swiftui/design-system.js';
@@ -12,11 +13,12 @@ import { toSwiftUI } from '../codegen/swiftui/index.js';
 import { systemUi } from '../codegen/system-ui.js';
 import { projectFontFaces } from '../fonts.js';
 import {
-  assetCatalog, designSystemFile, detectFramework, flutterAssetDirs, FRAMEWORKS, isSwiftPackage, usesScreenUtil,
+  assetCatalog, designSystemFile, detectFramework, flutterAssetDirs, FRAMEWORKS, isSwiftPackage, reactAssetDir,
+  tailwindVersion, usesScreenUtil,
 } from '../project.js';
 import { ASSETS, imageExt, saveAsset, snapshotSummary } from '../store.js';
 import {
-  assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, resolver, selectionBlock,
+  assetEntry, fileKeySchema, fileResolver, guard, image, nodeIdSchema, selectionBlock,
   sourceNote, text,
 } from './common.js';
 
@@ -122,11 +124,7 @@ function sharedDetails(result, tree) {
     out.push(text(`${result.className || result.structName} is drawn as a phone screen: it fills the screen` +
       `${result.scrolls ? ' and scrolls (the design is taller than a phone)' : ', and scrolls on a phone too short for its layers'}.`));
   }
-  const chrome = systemUi(tree);
-  if (chrome.length) {
-    out.push(text(`System UI in the design (drawn by the phone, not the app):\n${
-      chrome.map((c) => `- ${c.id} "${c.name}": ${c.kind}, ${c.box[2]}x${c.box[3]} at (${c.box[0]}, ${c.box[1]})`).join('\n')}`));
-  }
+  out.push(systemUiBlock(tree));
   if (result.connected.length) {
     out.push(text('Mapped components used (Code Connect). Their exact look is in the design: call ' +
       'get_design_context with disableCodeConnect: true on the instance id when the ' +
@@ -265,17 +263,106 @@ function swiftuiDetails(result, tree, catalog, pkg = false) {
   return [...out, ...sharedDetails(result, tree)];
 }
 
-const GUIDANCE =
-  'IMPORTANT: the code above is reference React + Tailwind generated from the ' +
-  'design. Convert it to the target project\'s framework, components, tokens ' +
-  'and conventions instead of copying it. Every value is exact: sizes, ' +
-  'spacing, radii, colours and fonts. var(--name,value) marks a design ' +
-  'variable: use the project token of that name, with that value. Each ' +
-  'element carries data-node-id; call get_design_context on a child id for ' +
-  'detail. data-component / data-variant name the component and its variant; ' +
-  'data-interactions list prototype actions; data-rasterized marks a layer ' +
-  'shipped as an image (a mask or a rotated group). Compare the result with ' +
-  'the screenshot.';
+/** The phone's own layers (status bar, home indicator) in the design, or null. */
+function systemUiBlock(tree) {
+  const chrome = systemUi(tree);
+  if (!chrome.length) return null;
+  return text(`System UI in the design (drawn by the phone, not the app):\n${
+    chrome.map((c) => `- ${c.id} "${c.name}": ${c.kind}, ${c.box[2]}x${c.box[3]} at (${c.box[0]}, ${c.box[1]})`).join('\n')}`);
+}
+
+/** The React and HTML response blocks after the code: tokens, assets, fonts, notes. */
+function reactDetails(result, tree, { html = false } = {}) {
+  const out = [];
+  if (result.css) {
+    out.push(text('Design variables used, as CSS: add them to the global stylesheet (or map each to the ' +
+      `project's token of the same name) so the var() fallbacks are not needed:\n${result.css}`));
+  }
+  const files = Object.entries(result.files);
+  if (files.length) {
+    const dirs = [...new Set(files.map(([file]) => path.posix.dirname(file)))];
+    const copy = [`mkdir -p ${dirs.map(shellQuote).join(' ')}`,
+      ...files.map(([file, { source }]) => `cp ${shellQuote(source)} ${shellQuote(file)}`)].join('\n');
+    out.push(text(`Assets used in the code (project path -> file on disk). Copy them into the ${html ? 'folder of the page' : 'project root'}; ` +
+      `the code loads each from its URL:\n${JSON.stringify(Object.fromEntries(files.map(([file, { url, source }]) => [file, { url, source }])), null, 2)}\n\n${copy}`));
+  } else if (Object.keys(result.assets).length) {
+    const map = {};
+    for (const [name, url] of Object.entries(result.assets)) {
+      map[name] = { url, path: path.join(ASSETS, url.split('/').pop()) };
+    }
+    out.push(text('Assets used in the code (served by the local MCP server; ' +
+      `the same files are on disk at each path):\n${JSON.stringify(map, null, 2)}`));
+  }
+  const fonts = Object.entries(result.fonts);
+  if (fonts.length) {
+    const axes = result.fontAxes || {};
+    out.push(text('Fonts used (load each family with these weights, e.g. with next/font, a Google Fonts ' +
+      '<link> or @font-face; the classes name the family itself. Families with axes need their variable font ' +
+      'with those axes: font-variation-settings sets the values, and opsz auto follows the font size as in Figma, ' +
+      'the browser default):\n' +
+      fonts.map(([family, weights]) => `- ${family}: ${weights.join(', ')}${axes[family] ? `; axes ${axes[family].join(', ')}` : ''}`).join('\n')));
+  }
+  if (result.textStyles.length) {
+    out.push(text(`Figma text styles used (elements carry data-text-style${html ? '' : '; those used more than once are named ' +
+      "in the code's textStyles object"}; map each to the project's type scale):\n${
+      result.textStyles.map((s) => `- ${s.name}: ${s.classes}`).join('\n')}`));
+  }
+  if (result.screen) {
+    out.push(text(`${result.componentName} is drawn as a phone screen: it fills the viewport width up to the ` +
+      `design's ${tree.width}px, is at least as tall as the screen` +
+      `${result.scrolls ? ' and scrolls (the design is taller than a phone)' : ', and scrolls on a phone too short for its layers'}.`));
+  }
+  if (result.page) {
+    out.push(text(`${result.componentName} is drawn as a web page: it fills the viewport and is never narrower than ` +
+      `the design's ${tree.width}px (narrower screens scroll sideways). Layers spanning the design's width stretch ` +
+      'across the screen; layers on its left or right edge stay there; everything else keeps its place in a centred ' +
+      `column (left-[calc(50%-...)]). Pass page: false for the fixed ${tree.width}px artboard.`));
+  }
+  out.push(systemUiBlock(tree));
+  if (result.connected.length) {
+    out.push(text('Mapped components used (Code Connect). Each sits in a wrapper with its position; set its ' +
+      'props from the hint comment and the variant. Their exact look is in the design: call ' +
+      'get_design_context with disableCodeConnect: true on the instance id when the ' +
+      `component's defaults may differ:\n${JSON.stringify(result.connected, null, 2)}`));
+  }
+  if (result.rasterized.length) {
+    out.push(text(`Layers shipped as 2x images (masks, rotated groups):\n${JSON.stringify(result.rasterized, null, 2)}`));
+  }
+  if (result.warnings.length) {
+    out.push(text(`Approximations (the design has more than this code draws):\n${
+      result.warnings.map((w) => `- ${w.id} "${w.name}": ${w.message}`).join('\n')}`));
+  }
+  if (result.placeholders.length) {
+    out.push(text(`Layers drawn as placeholders:\n${result.placeholders.map((w) => `- ${w.id} "${w.name}": ${w.error}`).join('\n')}`));
+  }
+  return out.filter(Boolean);
+}
+
+function guidance({ tailwind, html }) {
+  return [
+    `IMPORTANT: the code above is reference ${html ? 'HTML' : 'React'} + Tailwind generated from the ` +
+    'design. Adapt it to the target project\'s components, tokens ' +
+    'and conventions instead of copying it. Values are exact, in CSS pixels at ' +
+    'the design size: sizes, spacing, radii, colours, font families, weights ' +
+    'and line heights. Theme classes (px-4, rounded-full, font-bold) are used ' +
+    'only where they equal the design value at the default 16px root size; the classes work in Tailwind 3.4 and 4' +
+    `${tailwind ? ` (the project uses Tailwind ${tailwind})` : ''}. var(--name,value) marks a design ` +
+    'variable: use the project token of that name. ' +
+    (html ? '' : 'Runs of repeated items are data arrays with .map(), and Figma text styles used more than once ' +
+      'are named in textStyles. ') +
+    'Rows marked data-align="baseline" align their children on text baselines in the design; the code ' +
+    'places them at the design\'s offsets. ' +
+    'Elements carry data-node-id ' +
+    '(call get_design_context on a child id for detail), data-component / ' +
+    'data-variant, data-interactions (prototype actions) and data-rasterized ' +
+    '(a layer shipped as an image). Buttons, links, landmarks and text inputs come ' +
+    'from prototype taps, layer names and placeholders: add the handlers, state and ' +
+    'routes the design implies, and give content images real alt text. Layers listed as ' +
+    'system UI belong to the phone: leave them out. Frames without auto layout ' +
+    'are absolutely positioned: rebuild such sections with flex or grid when ' +
+    'they must reflow. Compare the result with the screenshot.',
+  ].join('\n\n');
+}
 
 export function registerDesignTools(server, bridge, source) {
   server.registerTool('get_design_context', {
@@ -284,7 +371,7 @@ export function registerDesignTools(server, bridge, source) {
     description:
       'Get design context for a Figma node — the primary tool for design-to-code ' +
       'workflows. Returns reference code (Flutter widgets for Flutter projects, ' +
-      'SwiftUI views for Swift packages and Xcode projects, React + Tailwind ' +
+      'SwiftUI views for Swift packages and Xcode projects, HTML + Tailwind for static sites, React + Tailwind ' +
       'otherwise), the assets it uses, a screenshot and the variables in the ' +
       'node. SwiftUI code comes with a Structure block naming what each part ' +
       'is (tab bar, segmented control, chips, carousel, grid, buttons, fields) ' +
@@ -297,16 +384,21 @@ export function registerDesignTools(server, bridge, source) {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
       framework: z.enum(FRAMEWORKS).optional().describe(
-        'Code to generate: flutter, swiftui or react. Default: from clientFrameworks / clientLanguages, ' +
+        'Code to generate: react, html, flutter or swiftui. Default: from clientFrameworks / clientLanguages, ' +
         'else FIGMA_LOCAL_MCP_FRAMEWORK, else flutter when the project has a pubspec.yaml, swiftui when it has a ' +
-        'Package.swift, .xcodeproj or .xcworkspace, else react.'),
+        'Package.swift, .xcodeproj or .xcworkspace, html for a static site (index.html without package.json), else react.'),
       clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" or "swift" (picks the framework).'),
       clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" or "swiftui" (picks the framework).'),
       screen: z.boolean().optional().describe(
-        'Flutter and SwiftUI: draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
+        'Draw the node as a phone screen that fills the screen and scrolls when tall (default: portrait frames 300-480 wide).'),
+      page: z.boolean().optional().describe(
+        'React and HTML: draw the node as a web page that fills the viewport, never narrower than the design, with ' +
+        'full-width sections stretching (default: frames 768 or more wide).'),
       assetsDir: z.string().optional().describe(
-        'Flutter: folder of the asset paths in the code (default: the svg/png/images folders of the project\'s pubspec.yaml, else assets/figma). ' +
-        'SwiftUI: the asset catalog to add image sets to (default: the project\'s *.xcassets, else Assets.xcassets).'),
+        'Folder of the asset files in the code. Flutter default: the svg/png/images folders of the project\'s ' +
+        'pubspec.yaml, else assets/figma. SwiftUI: the asset catalog to add image sets to (default: the project\'s ' +
+        '*.xcassets, else Assets.xcassets). React default: public/figma (static/figma for SvelteKit), loaded by URL ' +
+        '(/figma/name.svg). HTML default: assets/figma, relative to the page.'),
       screenUtil: z.boolean().optional().describe(
         'Flutter: write lengths with flutter_screenutil (.w, .h, .r, .sp) so the layout scales from the design size ' +
         '(default: when the project\'s pubspec.yaml depends on flutter_screenutil).'),
@@ -320,7 +412,7 @@ export function registerDesignTools(server, bridge, source) {
       skillNames: z.string().optional().describe('Accepted for compatibility (logging only).'),
     },
   }, guard(async (args) => {
-    const { nodeId, excludeScreenshot, forceCode, disableCodeConnect, assetsDir, screen } = args;
+    const { nodeId, excludeScreenshot, forceCode, disableCodeConnect, assetsDir, screen, page } = args;
     const scaled = args.screenUtil ?? usesScreenUtil();
     const { id } = await source.resolveId(nodeId);
     // Variables and the screenshot are read while the layers are.
@@ -365,21 +457,14 @@ export function registerDesignTools(server, bridge, source) {
           connect, screen, variableModes: node.variableModes, exactLineHeights: args.exactLineHeights ?? true, fontFaces: projectFontFaces(),
         });
         out = [text(result.code), ...swiftuiDetails(result, node.tree, catalog, isSwiftPackage())];
+      } else if (framework === 'html') {
+        const dir = (assetsDir || 'assets/figma').replace(/^\.?\/+|\/+$/g, '');
+        const result = toHtmlTailwind(node.tree, fileResolver(node.images), { screen, page, assetDir: dir });
+        out = [text(result.code), ...reactDetails(result, node.tree, { html: true })];
       } else {
-        const result = toReactTailwind(node.tree, resolver(bridge, node.images), { connect });
-        out = [text(result.code)];
-        if (Object.keys(result.assets).length) {
-          out.push(text('Assets used in the code, served by the local MCP server; each file is also on disk in ' +
-            `${ASSETS} under the last part of its URL:\n${JSON.stringify(result.assets, null, 2)}`));
-        }
-        if (result.connected.length) {
-          out.push(text('Mapped components used (Code Connect). Their exact look is in ' +
-            'the design: call get_design_context with disableCodeConnect: true on the ' +
-            `instance id when the component's defaults may differ:\n${JSON.stringify(result.connected, null, 2)}`));
-        }
-        if (result.warnings.length) {
-          out.push(text(`Layers drawn as placeholders:\n${result.warnings.map((w) => `- ${w.id} "${w.name}": ${w.error}`).join('\n')}`));
-        }
+        const dir = (assetsDir || reactAssetDir()).replace(/^\.?\/+|\/+$/g, '');
+        const result = toReactTailwind(node.tree, fileResolver(node.images), { connect, screen, page, assetDir: dir });
+        out = [text(result.code), ...reactDetails(result, node.tree)];
       }
     } catch (e) {
       // The generators isolate each layer; this is a last resort so a read
@@ -407,7 +492,8 @@ export function registerDesignTools(server, bridge, source) {
     if (vars && vars.source === 'live' && Object.keys(vars.defs).length) {
       out.push(text(`These variables and styles are used in the design:\n${JSON.stringify(vars.defs, null, 2)}`));
     }
-    out.push(text({ flutter: FLUTTER_GUIDANCE, swiftui: SWIFTUI_GUIDANCE }[framework] || GUIDANCE));
+    out.push(text({ flutter: FLUTTER_GUIDANCE, swiftui: SWIFTUI_GUIDANCE }[framework]
+      || guidance({ tailwind: tailwindVersion(), html: framework === 'html' })));
     out = withinBudget(out, RESPONSE_CHARS);
     // A node too large to render still gets its code.
     const shot = shotRead && await shotRead;

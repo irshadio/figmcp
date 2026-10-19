@@ -1,9 +1,10 @@
-// What the project the agent works in expects: the code framework and, for
-// Flutter, the asset folders it declares; for SwiftUI, its asset catalog.
+// What the project the agent works in expects: the code framework, for
+// Flutter the asset folders it declares, for SwiftUI its asset catalog, and
+// for React its Tailwind version and public folder.
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const FRAMEWORKS = ['react', 'flutter', 'swiftui'];
+export const FRAMEWORKS = ['react', 'html', 'flutter', 'swiftui'];
 const DEFAULT_ASSETS = 'assets/figma';
 const DEFAULT_CATALOG = 'Assets.xcassets';
 // Folders never holding a project's own asset catalog.
@@ -55,7 +56,8 @@ function namedFrameworks(said) {
   if (/flutter|dart/.test(said)) out.push('flutter');
   if (/react.?native|expo|ionic|capacitor|cordova/.test(said)) out.push('react');
   if (/swiftui|\bswift\b|\bios\b|xcode|uikit|objective-?c/.test(said)) out.push('swiftui');
-  if (/react|next|vue|svelte|angular|html|tailwind|javascript|typescript/.test(said)) out.push('react');
+  if (/\bhtml\b/.test(said) && !/react|next|vue|svelte|angular|jsx|tsx/.test(said)) out.push('html');
+  if (/react|next|vue|svelte|angular|tailwind|javascript|typescript/.test(said)) out.push('react');
   return [...new Set(out)];
 }
 
@@ -63,14 +65,17 @@ function namedFrameworks(said) {
 function projectFramework(cwd) {
   if (fs.existsSync(path.join(cwd, 'pubspec.yaml'))) return 'flutter';
   if (isSwiftProject(cwd)) return 'swiftui';
-  return fs.existsSync(path.join(cwd, 'package.json')) ? 'react' : null;
+  if (fs.existsSync(path.join(cwd, 'package.json'))) return 'react';
+  // A static site: an index.html without a package.json.
+  return fs.existsSync(path.join(cwd, 'index.html')) ? 'html' : null;
 }
 
 /**
- * 'flutter', 'swiftui' or 'react': the explicit [framework], then the
- * client's frameworks and languages (the project decides between several),
- * then FIGMA_LOCAL_MCP_FRAMEWORK, then the project's files (a pubspec.yaml,
- * a Swift package or Xcode project); React otherwise.
+ * 'flutter', 'swiftui', 'html' or 'react': the explicit [framework], then
+ * the client's frameworks and languages (the project decides between
+ * several), then FIGMA_LOCAL_MCP_FRAMEWORK, then the project's files (a
+ * pubspec.yaml, a Swift package or Xcode project, a static site's
+ * index.html without a package.json); React otherwise.
  */
 export function detectFramework({ framework, clientFrameworks, clientLanguages } = {}, cwd = process.cwd()) {
   if (FRAMEWORKS.includes(framework)) return framework;
@@ -164,4 +169,38 @@ export function designSystemFile(cwd = process.cwd()) {
   const aside = (f) => /preview|widget|extension|tests?\b/i.test(f.rel);
   found.sort((a, b) => aside(a) - aside(b) || a.depth - b.depth || a.rel.localeCompare(b.rel));
   return found.length ? found[0].rel : null;
+}
+
+function packageJson(cwd) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function dependencies(pkg) {
+  return { ...(pkg && pkg.dependencies), ...(pkg && pkg.devDependencies), ...(pkg && pkg.peerDependencies) };
+}
+
+/**
+ * The Tailwind major version the project's package.json uses (3 or 4), or
+ * null: Tailwind 4 ships its PostCSS and Vite plugins as @tailwindcss/*.
+ */
+export function tailwindVersion(cwd = process.cwd()) {
+  const deps = dependencies(packageJson(cwd));
+  if (deps['@tailwindcss/postcss'] || deps['@tailwindcss/vite'] || deps['@tailwindcss/cli']) return 4;
+  const m = /(\d+)/.exec(String(deps.tailwindcss || ''));
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * The folder React code loads assets from by URL: SvelteKit serves
+ * static/, other web frameworks public/.
+ */
+export function reactAssetDir(cwd = process.cwd()) {
+  const deps = dependencies(packageJson(cwd));
+  const base = deps['@sveltejs/kit'] || fs.existsSync(path.join(cwd, 'static')) && !fs.existsSync(path.join(cwd, 'public'))
+    ? 'static' : 'public';
+  return `${base}/figma`;
 }

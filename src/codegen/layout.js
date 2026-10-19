@@ -69,7 +69,13 @@ export function gridAnchor(node, parent, key) {
  * Where a child sits in its parent.
  * [opts.fixedSize] gives hugging nodes their size too (an <img> has no
  * content size of its own); [opts.index] is the child's position among the
- * siblings the layout places, [opts.count] their number.
+ * siblings the layout places, [opts.count] their number. On a phone screen,
+ * [opts.stretch] stretches a positioned child across the width,
+ * [opts.narrow] lets a fixed width shrink to the column and [opts.shrink]
+ * lets a child of a row shrink when the row is too narrow. On a web page,
+ * [opts.center] keeps a positioned child in the page's centred column,
+ * [opts.pin] ('MIN' or 'MAX') keeps it on an edge, [opts.fill] makes a
+ * child of a column fill it and [opts.indent] is a left margin.
  */
 export function positionClasses(node, parent, opts = {}) {
   const vars = node.vars || {};
@@ -84,9 +90,9 @@ export function positionClasses(node, parent, opts = {}) {
   const out = [];
 
   if (inFlow(node, parent)) {
-    out.push('relative', 'shrink-0');
+    out.push('relative', opts.shrink ? 'min-w-0' : 'shrink-0');
     const row = parent.layoutMode === 'HORIZONTAL';
-    let sizeW = sizingOf(node, parent, 'x');
+    let sizeW = opts.fill && !row ? 'FILL' : sizingOf(node, parent, 'x');
     let sizeH = sizingOf(node, parent, 'y');
     if (opts.fixedSize) {
       if (sizeW === 'HUG') sizeW = 'FIXED';
@@ -111,13 +117,16 @@ export function positionClasses(node, parent, opts = {}) {
       }
     } else {
       if (sizeW === 'FILL') out.push(...(row ? ['flex-[1_0_0]', 'min-w-px'] : ['w-full']));
-      else if (sizeW === 'FIXED' && !hugsWidth) out.push(w);
+      else if (sizeW === 'FIXED' && !hugsWidth) out.push(...(opts.narrow && !row ? ['w-full', size('max-w', node.width, vars.width)] : [w]));
       if (sizeH === 'FILL') out.push(...(row ? ['self-stretch'] : ['flex-[1_0_0]', 'min-h-px']));
       else if (sizeH === 'FIXED' && !hugsHeight) out.push(h);
       if (parent.itemSpacing < 0 && opts.index > 0) {
         out.push(`${row ? 'ml' : 'mt'}-[${px(parent.itemSpacing)}]`);
       }
     }
+    if (opts.indent) out.push(`ml-[${opts.indent}]`);
+    const lift = baselineOffset(node, parent);
+    if (lift) out.push(`mt-[${px(lift)}]`);
     if (parent.itemReverseZIndex && typeof opts.index === 'number') {
       out.push(`z-[${(opts.count || 0) - opts.index}]`);
     }
@@ -133,8 +142,11 @@ export function positionClasses(node, parent, opts = {}) {
   const y = node.y - parent.y;
   const pw = parent.width;
   const ph = parent.height;
-  const cons = !WRAPPING_PARENTS.has(parent.type) && node.constraints
+  let cons = !WRAPPING_PARENTS.has(parent.type) && node.constraints
     ? node.constraints : { horizontal: 'MIN', vertical: 'MIN' };
+  if (opts.stretch) cons = { ...cons, horizontal: 'STRETCH' };
+  else if (opts.center) cons = { ...cons, horizontal: 'CENTER' };
+  else if (opts.pin) cons = { ...cons, horizontal: opts.pin };
 
   switch (cons.horizontal) {
     case 'MAX':
@@ -186,7 +198,28 @@ function sign(v) {
   return v < 0 ? n : `+${n}`;
 }
 
-function strokeSpace(node) {
+/**
+ * Whether a baseline-aligned row places its children at Figma's offsets: a
+ * single line; a wrapping row keeps items-baseline, since a child on a later
+ * line has that line in its offset.
+ */
+export function placesBaselines(node) {
+  return node.layoutMode === 'HORIZONTAL' && node.counterAxisAlignItems === 'BASELINE' && node.layoutWrap !== 'WRAP';
+}
+
+/**
+ * How far below the top of a baseline-aligned row Figma puts [node]: its
+ * offset from the padding edge, or 0.
+ */
+export function baselineOffset(node, parent) {
+  if (!parent || !placesBaselines(parent) || !inFlow(node, parent)) return 0;
+  const top = parent.y + (parent.paddingTop || 0) + strokeSpace(parent)[2];
+  const offset = Math.round((node.y - top) * 100) / 100;
+  return offset > 0.01 ? offset : 0;
+}
+
+/** Room a border takes in a layout (left, right, top, bottom), when Figma counts strokes in it. */
+export function strokeSpace(node) {
   if (!node.strokesIncludedInLayout) return [0, 0, 0, 0];
   const visible = Array.isArray(node.strokes) && node.strokes.some((p) => p && p.visible !== false);
   if (!visible) return [0, 0, 0, 0];
@@ -222,6 +255,27 @@ function track(t) {
   return `minmax(0,${num(t.value || 1)}fr)`;
 }
 
+/**
+ * The placement of a lone child of a space-between layout, from where it
+ * is: Figma starts it, but files whose layout was not recomputed since
+ * (imports, older versions) draw it centred or at the end.
+ */
+function loneChildJustify(node, row) {
+  if (node.primaryAxisAlignItems !== 'SPACE_BETWEEN') return null;
+  const flow = (node.children || []).filter((c) => c && c.visible !== false && !c.isMask && inFlow(c, node));
+  if (flow.length !== 1) return null;
+  const c = flow[0];
+  const offset = row ? c.x - node.x : c.y - node.y;
+  const size = row ? node.width : node.height;
+  const length = row ? c.width : c.height;
+  const before = (row ? node.paddingLeft : node.paddingTop) || 0;
+  const after = (row ? node.paddingRight : node.paddingBottom) || 0;
+  if (Math.abs(offset - before) < 0.5) return 'justify-start';
+  if (Math.abs(offset - (before + (size - before - after - length) / 2)) < 0.5) return 'justify-center';
+  if (Math.abs(offset - (size - after - length)) < 0.5) return 'justify-end';
+  return null;
+}
+
 export function containerClasses(node) {
   const vars = node.vars || {};
   if (isGrid(node)) {
@@ -249,8 +303,10 @@ export function containerClasses(node) {
   } else if (spacing) {
     out.push(`gap-[${tw(spacing)}]`);
   }
-  out.push(JUSTIFY[node.primaryAxisAlignItems] || 'justify-start');
-  out.push(ITEMS[node.counterAxisAlignItems] || 'items-start');
+  out.push(loneChildJustify(node, row) || JUSTIFY[node.primaryAxisAlignItems] || 'justify-start');
+  // A row aligned on text baselines places its children where Figma has
+  // them (baselineOffset), as browsers round font metrics differently.
+  out.push(placesBaselines(node) ? 'items-start' : ITEMS[node.counterAxisAlignItems] || 'items-start');
   return [...out, ...padding(node)];
 }
 
