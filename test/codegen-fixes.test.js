@@ -35,17 +35,17 @@ function code(root, opts) {
 
 test('A1: opacity 0 hides the layer', () => {
   assert.match(code(frame([{ id: '1:2', name: 'Ghost', type: 'FRAME', x: 0, y: 0, width: 10, height: 10, opacity: 0, fills: [solid()] }])),
-    /opacity-\[0\]/);
+    /opacity-0/);
 });
 
 test('A2: a wrapping row keeps its own vertical gap, 0 when not given', () => {
   const row = (extra) => code(frame([], { layoutMode: 'HORIZONTAL', layoutWrap: 'WRAP', itemSpacing: 8, ...extra }));
   const zero = row({ counterAxisSpacing: 0 });
-  assert.match(zero, /gap-x-\[8px\]/);
-  assert.match(zero, /gap-y-\[0px\]/);
+  assert.match(zero, /gap-x-2/);
+  assert.match(zero, /gap-y-0/);
   assert.doesNotMatch(zero, / gap-\[/);
-  assert.match(row({}), /gap-y-\[0px\]/, 'older exports dropped a 0 gap');
-  assert.match(row({ counterAxisSpacing: 12 }), /gap-y-\[12px\]/);
+  assert.match(row({}), /gap-y-0/, 'older exports dropped a 0 gap');
+  assert.match(row({ counterAxisSpacing: 12 }), /gap-y-3/);
 });
 
 test('A3: grid anchors at 0 are placed; negative anchors are ignored', () => {
@@ -78,7 +78,7 @@ test('B2: paragraph spacing is not counted as line height', () => {
   const t = text('A\nB', { height: 58, paragraphSpacing: 20 }, { lineHeight: { unit: 'AUTO' } });
   const out = code(frame([t]));
   assert.match(out, /leading-\[19px\]/);
-  assert.match(out, /mb-\[20px\]/);
+  assert.match(out, /mb-5/);
 });
 
 test('B3: a drop shadow on text follows the glyphs', () => {
@@ -134,7 +134,7 @@ test('C1: outside strokes stay visible on clipping frames, with a matching radiu
   assert.match(out, /outline-\[#ff0000\]/);
   const open = code(frame([{ id: '1:2', name: 'Card', type: 'FRAME', x: 10, y: 10, width: 50, height: 50,
     cornerRadius: 8, strokeWeight: 4, strokeAlign: 'OUTSIDE', strokes: [solid(red)] }]));
-  assert.match(open, /inset-\[-4px\][^"]*rounded-\[12px\]/);
+  assert.match(open, /-inset-1[^"]*rounded-xl/);
 });
 
 test('C2: drop-shadow filters use half the radius (a standard deviation)', () => {
@@ -160,7 +160,7 @@ test('C4: fill blend modes are kept', () => {
 test('C7: per-side outside strokes are offset per side', () => {
   const out = code(frame([], { strokeWeight: 'mixed', strokeTopWeight: 2, strokeBottomWeight: 0, strokeLeftWeight: 0,
     strokeRightWeight: 0, strokeAlign: 'OUTSIDE', strokes: [solid(red)] }));
-  assert.match(out, /top-\[-2px\] right-0 bottom-0 left-0/);
+  assert.match(out, /-top-0.5 right-0 bottom-0 left-0/);
   assert.match(out, /border-t-\[2px\]/);
 });
 
@@ -170,8 +170,8 @@ test('D1: negative spacing skips absolute siblings', () => {
     { id: '3:2', name: 'A', type: 'FRAME', x: 0, y: 0, width: 20, height: 20 },
     { id: '3:3', name: 'B', type: 'FRAME', x: 12, y: 0, width: 20, height: 20 },
   ], { layoutMode: 'HORIZONTAL', itemSpacing: -8 }));
-  assert.doesNotMatch(out, /ml-\[-8px\][^\n]*data-name="A"/);
-  assert.match(out, /ml-\[-8px\][^\n]*data-name="B"/);
+  assert.doesNotMatch(out, /-ml-2[^\n]*data-name="A"/);
+  assert.match(out, /-ml-2[^\n]*data-name="B"/);
 });
 
 test('D3: mirrored layers keep their mirror', () => {
@@ -184,8 +184,8 @@ test('D5: a straight line becomes a box that follows its layout', () => {
   const line = { id: '1:2', name: 'Divider', type: 'LINE', x: 0, y: 20, width: 200, height: 0, svg: '<svg/>',
     strokes: [solid(red)], strokeWeight: 1, strokeAlign: 'CENTER', layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'FIXED' };
   const out = code(frame([line], { layoutMode: 'VERTICAL' }));
-  assert.match(out, /relative shrink-0 w-full h-\[0px\]/, 'a line takes no height in the layout, as in Figma');
-  assert.match(out, /absolute left-0 right-0 top-\[-0\.5px\] h-\[1px\] bg-\[#ff0000\]/);
+  assert.match(out, /relative shrink-0 w-full h-0/, 'a line takes no height in the layout, as in Figma');
+  assert.match(out, /absolute left-0 right-0 top-\[-0\.5px\] h-px bg-\[#ff0000\]/);
   assert.doesNotMatch(out, /<img/);
 });
 
@@ -198,5 +198,5 @@ test('malformed layers render as placeholders instead of failing the frame', () 
   ]), assets);
   assert.match(res.code, /data-name="Fine"/);
   assert.match(res.code, /data-name="Errored"/);
-  assert.ok(res.warnings.some((w) => w.id === '9:3'));
+  assert.ok(res.placeholders.some((w) => w.id === '9:3'));
 });

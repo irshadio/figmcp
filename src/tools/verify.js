@@ -1,11 +1,12 @@
-// Render check: draws Flutter code with `flutter test` and compares it with
-// Figma's own render of the node.
+// Render checks: draw Flutter code with `flutter test`, or React + Tailwind in
+// headless Chrome, and compare it with Figma's own render of the node.
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { detectFramework, tailwindVersion } from '../project.js';
 import { DATA_DIR } from '../store.js';
 import { fileKeySchema, guard, image, nodeIdSchema, text } from './common.js';
 
@@ -25,12 +26,50 @@ export function flutterTool(explicit) {
   return candidates.find((c) => c && fs.existsSync(c)) || null;
 }
 
-/** The folder holding the pubspec.yaml above [file], or null. */
-function projectOf(file) {
+/** The folder holding [marker] (pubspec.yaml, package.json) above [file], or null. */
+function projectOf(file, marker = 'pubspec.yaml') {
   for (let dir = path.dirname(file); ; dir = path.dirname(dir)) {
-    if (fs.existsSync(path.join(dir, 'pubspec.yaml'))) return dir;
+    if (fs.existsSync(path.join(dir, marker))) return dir;
     if (path.dirname(dir) === dir) return null;
   }
+}
+
+const IMAGE_FILE = /\.(svg|png|jpe?g|webp|gif|avif)$/i;
+
+/**
+ * Files a component's images load from: URLs into the project's public
+ * folder ('/figma/logo.svg') and images it imports ('./logo.svg').
+ */
+function componentAssets(code, file, project) {
+  const out = {};
+  for (const m of code.matchAll(/["'`]([^"'`\s:]+)["'`]/g)) {
+    if (!IMAGE_FILE.test(m[1])) continue;
+    // A root path is served from the public folder; a relative one sits by the file.
+    const hits = m[1].startsWith('/') ? ['public', 'static'].map((dir) => path.join(project, dir, m[1]))
+      : [path.resolve(path.dirname(file), m[1])];
+    const hit = hits.find((h) => fs.existsSync(h));
+    if (hit) out[m[1]] = hit;
+  }
+  for (const m of code.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/gm)) {
+    if (!IMAGE_FILE.test(m[2])) continue;
+    const hit = m[2].startsWith('.') ? path.resolve(path.dirname(file), m[2]) : path.join(project, m[2].replace(/^@\//, 'src/'));
+    if (fs.existsSync(hit)) out[m[1]] = hit;
+  }
+  return out;
+}
+
+/** A stylesheet for the browser build: Tailwind's own imports and directives dropped. */
+function pageCss(file) {
+  return fs.readFileSync(file, 'utf8')
+    .replace(/^\s*@import\s+["']tailwindcss[^"']*["'][^;]*;\s*$/gm, '')
+    .replace(/^\s*@tailwind\s+\w+;\s*$/gm, '')
+    .replace(/^\s*@(plugin|source|config)\s[^;]*;\s*$/gm, '');
+}
+
+let reactCheck = null;
+async function runReactCheck(opts) {
+  if (!reactCheck) ({ reactCheck } = await import('../../tools/visual-check.js'));
+  return reactCheck(opts);
 }
 
 function runCheck(args, project = null) {
@@ -68,14 +107,23 @@ const brief = (list, n = 15) => (list.length > n ? [...list.slice(0, n), `… ${
 
 export function registerVerifyTools(server, bridge, source) {
   server.registerTool('verify_code', {
-    title: 'Verify Flutter Code',
+    title: 'Verify Code',
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description:
-      'Check Flutter code against the design: analyzes it, renders it with ' +
-      '`flutter test` at 2x, and compares the render with Figma\'s own 2x ' +
-      'render of the node. Returns analyzer errors, runtime errors (overflows, ' +
-      'missing assets), the share of differing pixels and a diff image (the ' +
+      'Check Flutter or React + Tailwind code against the design: renders it ' +
+      'at 2x (Flutter with `flutter test`, React in headless Chrome with ' +
+      'Tailwind) and compares the render with Figma\'s own 2x render of the ' +
+      'node. Returns analyzer or runtime errors (overflows, missing assets, ' +
+      'broken images), the share of differing pixels and a diff image (the ' +
       'design in grey, differing pixels in red).\n\n' +
+      'React and HTML: without `file` it checks the code get_design_context generates ' +
+      'and compares every layer\'s box too. With `file` (a .jsx or .tsx under ' +
+      'a folder with package.json, or an .html page) it renders that file\'s default export or page: it ' +
+      'must be self-contained apart from React and image imports; images load ' +
+      'from the project\'s public folder. Pass `css` for the stylesheet with ' +
+      'its tokens. React and Tailwind load from a CDN and the fonts from the ' +
+      'system or Google Fonts. Needs Chrome and the puppeteer-core package.\n\n' +
+      'Flutter: ' +
       'With `file`, it checks that widget inside its own Flutter project: the ' +
       'project\'s packages and assets, inside a MaterialApp, scaled by ' +
       'flutter_screenutil to the frame size when the project uses it. The ' +
@@ -88,15 +136,30 @@ export function registerVerifyTools(server, bridge, source) {
     inputSchema: {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
-      file: z.string().optional().describe('The .dart file with the widget, under the project\'s lib/ (absolute, or relative to the project).'),
-      widget: z.string().optional().describe('The widget class in `file` (default: its first widget class).'),
+      framework: z.enum(['flutter', 'react', 'html']).optional().describe(
+        'flutter or react (default: from the file, else as get_design_context picks: the client, then the project).'),
+      clientLanguages: z.string().optional().describe('Comma separated languages of the client, e.g. "dart" (picks the framework).'),
+      clientFrameworks: z.string().optional().describe('Comma separated frameworks of the client, e.g. "flutter" (picks the framework).'),
+      file: z.string().optional().describe(
+        'Flutter: the .dart file with the widget, under the project\'s lib/. React: the .jsx/.tsx component file. ' +
+        'Absolute, or relative to the project.'),
+      widget: z.string().optional().describe('Flutter: the widget class in `file` (default: its first widget class).'),
+      css: z.string().optional().describe('React: a CSS file to load with the component, e.g. its global stylesheet with the design tokens.'),
+      tailwind: z.union([z.literal(3), z.literal(4)]).optional().describe(
+        'React: the Tailwind major version (default: the project\'s, else 4).'),
       viewport: z.string().regex(/^\d+(\.\d+)?x\d+(\.\d+)?$/).optional().describe(
         'Lay the code out on a screen of this size, e.g. "360x780", and report runtime errors ' +
         '(overflows) and layers pushed off screen instead of comparing.'),
       fonts: z.array(z.string()).optional().describe('Folders with font files (default: the project\'s assets/fonts and the system fonts).'),
       flutter: z.string().optional().describe('Path of the flutter tool, when it is not on PATH.'),
     },
-  }, guard(async ({ nodeId, file, widget, viewport, fonts = [], flutter }) => {
+  }, guard(async (input) => {
+    // Flutter-only inputs pick Flutter; then the file's language, then the client and the project.
+    const framework = input.framework || (input.flutter || input.widget ? 'flutter'
+      : input.file ? (/\.(jsx|tsx|js|ts)$/i.test(input.file) ? 'react' : /\.html?$/i.test(input.file) ? 'html' : 'flutter')
+        : detectFramework(input));
+    if (framework === 'react' || framework === 'html') return verifyReact(source, { ...input, html: framework === 'html' });
+    const { nodeId, file, widget, viewport, fonts = [], flutter } = input;
     const tool = flutterTool(flutter);
     if (!tool) throw new Error('The flutter tool was not found: pass `flutter` with its path, or set FLUTTER.');
     if (viewport && viewport.split('x').some((v) => Number(v) < 1 || Number(v) > 10000)) {
@@ -162,4 +225,74 @@ export function registerVerifyTools(server, bridge, source) {
       image(fs.readFileSync(report.files.diff)),
     ];
   }));
+}
+
+async function verifyReact(source, { nodeId, file, viewport, fonts = [], css, tailwind, html = false }) {
+  const size = viewport ? viewport.split('x').map(Number) : null;
+  if (size && size.some((v) => v < 1 || v > 10000)) throw new Error('Each side of `viewport` must be between 1 and 10000.');
+  const { id } = await source.resolveId(nodeId);
+  const exported = await source.exportData(id);
+  const frame = exported.data.frames[0];
+  if (!frame.previewPng2x && !size) throw new Error(`There is no render of ${id} to compare with.`);
+  const design = {
+    tree: frame.tree, images: exported.data.images || {},
+    render: frame.previewPng2x ? Buffer.from(frame.previewPng2x, 'base64') : null,
+  };
+  let code = null;
+  let assets = null;
+  let project = null;
+  if (file) {
+    const absolute = path.resolve(file);
+    project = projectOf(fs.existsSync(absolute) ? absolute : path.join(process.cwd(), 'x'), 'package.json');
+    const inProject = fs.existsSync(absolute) ? absolute : path.resolve(project || process.cwd(), file);
+    if (!fs.existsSync(inProject)) throw new Error(`${file} does not exist.`);
+    project = projectOf(inProject, 'package.json') || path.dirname(inProject);
+    code = fs.readFileSync(inProject, 'utf8');
+    assets = componentAssets(code, inProject, project);
+  }
+  const slug = id.replace(/[^0-9A-Za-z]+/g, '_');
+  const out = path.join(DATA_DIR, 'verify', `${slug}_${html ? 'html' : 'react'}${file ? '_project' : ''}${viewport ? `_${viewport}` : ''}`);
+  const report = await oneAtATime(() => runReactCheck({
+    design, out, code, assets, viewport: size, html,
+    css: css ? pageCss(path.resolve(project || process.cwd(), css)) : '',
+    fonts: [...fonts, ...(project ? [path.join(project, 'public'), path.join(project, 'src', 'fonts'), path.join(project, 'assets', 'fonts')] : [])],
+    fetchFonts: true,
+    tailwind: tailwind || tailwindVersion(project || process.cwd()) || 4,
+  }));
+  const summary = {
+    node: report.node,
+    ...(exported.source === 'snapshot' ? { source: `snapshot saved ${exported.exportedAt || 'earlier'}` } : {}),
+    tailwind: report.tailwind,
+    runtimeErrors: report.runtimeErrors,
+    brokenImages: report.brokenImages,
+    renderedSize: report.renderedSize,
+  };
+  if (report.viewport) {
+    Object.assign(summary, {
+      viewport: report.viewport, pageSize: report.pageSize, horizontalOverflow: report.horizontalOverflow,
+      offscreenLayers: brief(report.offscreenLayers), files: report.files,
+    });
+    return [
+      text(summary),
+      text(`Rendered at ${report.viewport.width}x${report.viewport.height}:`),
+      image(fs.readFileSync(report.files.rendered)),
+    ];
+  }
+  Object.assign(summary, {
+    pixels: report.pixels,
+    ...(report.checkedBoxes ? {
+      checkedLayers: report.checkedBoxes,
+      layoutMismatches: brief(report.geometryMismatches),
+      textRoundingMismatches: report.textRoundingMismatches.length,
+      missingLayers: brief(report.missingElements),
+    } : {}),
+    fontsNotFound: report.fontsNotBundled,
+    ...(report.generatorWarnings && report.generatorWarnings.length ? { generatorWarnings: brief(report.generatorWarnings) } : {}),
+    files: report.files,
+  });
+  return [
+    text(summary),
+    text('Diff (the design in grey, differing pixels in red):'),
+    image(fs.readFileSync(report.files.diff)),
+  ];
 }
