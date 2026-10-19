@@ -757,12 +757,15 @@ test('a screen of data shows placeholders while loading; a full-bleed photo stre
   const items = ['Wi-Fi', 'Pool', 'Gym'].map((l, i) => frame(l, { x: 16, y: 320 + i * 30, w: 150, h: 18, mode: 'HORIZONTAL', layoutSizingHorizontal: 'FIXED',
     children: [text(l, { x: 16, y: 320 + i * 30 })] }));
   const list = frame('Amenities', { x: 16, y: 320, w: 358, h: 90, mode: 'VERTICAL', itemSpacing: 12, counterAxisAlignItems: 'MIN', layoutSizingHorizontal: 'FILL', children: items });
-  const root = frame('Hotel', { w: 390, h: 844, mode: 'VERTICAL', counterAxisAlignItems: 'MIN', fills: [solid(white)], children: [photo, list, status] });
+  const root = frame('Hotel', { w: 390, h: 844, mode: 'VERTICAL', counterAxisAlignItems: 'MIN', fills: [solid(white)], children: [photo, list, status],
+    overflowDirection: 'VERTICAL' });
   const { code, shared } = toSwiftUI(root, assets);
   assert.match(code, /var isLoading = false/);
   assert.match(code, /\.shimmer\(isLoading\)/);
   assert.match(shared, /struct Shimmer: ViewModifier/);
   assert.match(code, /\.stretchesOnPull\(\)/);
+  assert.match(code, /var refresh: \(\) async -> Void = \{\}/);
+  assert.match(code, /\.refreshable \{\n\s+await refresh\(\)\n\s+\}/);
   assert.match(shared, /func stretchesOnPull\(\) -> some View/);
 });
 
@@ -788,4 +791,33 @@ test('a shrinking item drawn as layers keeps its width as a bound', () => {
   const root = frame('Done', { w: 390, h: 844, mode: 'VERTICAL', counterAxisAlignItems: 'MIN', children: [footer] });
   const { code } = toSwiftUI(root, assets);
   assert.match(code, /\.frame\((idealWidth: 170, )?maxWidth: 170[,)]/);
+});
+
+test('groups drawn as tiny frames take their layers\' extent: a bar across the screen stretches and scales, evenly spread tiles scale as one row', () => {
+  const tiny = (name, x, y, children) => frame(name, { x, y, w: 1, h: 1, children });
+  const counter = (x) => frame('Counter', { x, y: 46, w: 62, h: 38, fills: [solid(ink)], children: [text('5', { x: x + 30, y: 56, color: white })] });
+  const top = tiny('Top bar', 0, 50, [counter(6), { ...counter(320), name: 'Gear' }]);
+  const tile = (i) => tiny(`Nav ${i}`, 10 + i * 94, 740, [frame('Tile', { x: 10 + i * 94, y: 730, w: 90, h: 72, fills: [solid(brand)], children: [] })]);
+  const root = frame('Game', { w: 390, h: 844, fills: [solid(ink)], children: [top, tile(0), tile(1), tile(2), tile(3)] });
+  const { code, shared } = toSwiftUI(root, assets);
+  assert.match(code, /\.scalesToFit\(width: 376, height: 38, stretches: true\)/);
+  assert.match(code, /\.scalesToFit\(width: 372, height: 72\)/);
+  assert.match(shared, /func scalesToFit\(width: CGFloat, height: CGFloat, stretches: Bool = false\) -> some View/);
+});
+
+test('a centred text sets its alignment around its line height, so the line box places it', () => {
+  const label = { ...text('MISSIONS', { x: 20, y: 100, w: 80 }), textAlignHorizontal: 'CENTER' };
+  const root = frame('Menu', { w: 390, h: 844, mode: 'VERTICAL', counterAxisAlignItems: 'CENTER', children: [label] });
+  const { code } = toSwiftUI(root, assets);
+  assert.match(code, /\.designLineHeight\([^)]*\)\n\s+\.multilineTextAlignment\(\.center\)/);
+});
+
+test('a section Figma keeps stuck while scrolling is a pinned section header', () => {
+  const block = (name, y, h) => frame(name, { y, w: 390, h, fills: [solid(white)], children: [text(name, { x: 16, y: y + 10 })] });
+  const tabs = { ...frame('Tabs', { y: 300, w: 390, h: 48, children: [text('Overview', { x: 16, y: 312 })] }), scrollBehavior: 'STICKY_SCROLLS' };
+  const root = frame('Detail', { w: 390, h: 1600, fills: [solid({ r: 0.96, g: 0.96, b: 0.98, a: 1 })],
+    children: [block('Hero', 0, 300), tabs, block('Body', 348, 900), block('More', 1260, 300)] });
+  const { code } = toSwiftUI(root, assets);
+  assert.match(code, /LazyVStack\(alignment: \.leading, spacing: \d+, pinnedViews: \[\.sectionHeaders\]\)/);
+  assert.match(code, /Section \{[\s\S]*?\} header: \{[\s\S]*?Overview[\s\S]*?\.fill\(Color\(hex: 0xF5F5FA\)\)/);
 });

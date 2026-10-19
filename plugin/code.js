@@ -28,7 +28,7 @@ const PROPS = [
   'layoutSizingHorizontal', 'layoutSizingVertical', 'layoutAlign',
   'layoutGrow', 'layoutPositioning', 'constraints',
   'minWidth', 'maxWidth', 'minHeight', 'maxHeight',
-  'overflowDirection', 'numberOfFixedChildren',
+  'overflowDirection', 'numberOfFixedChildren', 'scrollBehavior',
   'maxLines', 'textTruncation', 'paragraphSpacing', 'paragraphIndent',
   'listSpacing', 'leadingTrim', 'arcData',
 ];
@@ -48,7 +48,7 @@ const DEFAULTS = {
   layoutMode: 'NONE', layoutWrap: 'NO_WRAP', itemReverseZIndex: false,
   counterAxisAlignContent: 'AUTO', layoutAlign: 'INHERIT', layoutGrow: 0,
   layoutPositioning: 'AUTO', overflowDirection: 'NONE',
-  numberOfFixedChildren: 0, textTruncation: 'DISABLED', leadingTrim: 'NONE',
+  numberOfFixedChildren: 0, scrollBehavior: 'SCROLLS', textTruncation: 'DISABLED', leadingTrim: 'NONE',
   paragraphSpacing: 0, paragraphIndent: 0, listSpacing: 0,
 };
 const SEGMENT_FIELDS = [

@@ -202,7 +202,6 @@ export function textView(node, ctx) {
     });
     out = build(pieces);
   }
-  if (ALIGN[node.textAlignHorizontal]) out = mod(out, 'multilineTextAlignment', [[null, raw(ALIGN[node.textAlignHorizontal])]]);
   if (node.textAlignHorizontal === 'JUSTIFIED') ctx.warn('justified text is drawn left aligned');
   const truncate = node.textTruncation === 'ENDING';
   const hug = node.textAutoResize === 'WIDTH_AND_HEIGHT';
@@ -221,6 +220,8 @@ export function textView(node, ctx) {
       ['relativeTo', custom && !ctx.fixed ? raw(textStyleFor(seg.fontSize || 17)) : raw('nil')],
     ]);
   }
+  // Outside the line height, which places the text in its box as aligned.
+  if (ALIGN[node.textAlignHorizontal]) out = mod(out, 'multilineTextAlignment', [[null, raw(ALIGN[node.textAlignHorizontal])]]);
   for (const e of effectsOf(node, 'DROP_SHADOW')) out = mod(out, 'shadow', shadowArgs(e, ctx.color));
   return { view: out, lineHeight: lh };
 }

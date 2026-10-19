@@ -225,6 +225,37 @@ function withIllustrations(node) {
  * layers, no text: a doodle wallpaper) drawn as one SVG, so it is one
  * image set instead of one per layer.
  */
+/**
+ * [node] with each group drawn as a tiny frame (a point or so, no fill, not
+ * clipping) that its layers overflow sized to those layers: Figma draws
+ * them in full, so their extent is the group's real box.
+ */
+function withContentBounds(node) {
+  if (!node || !node.children) return node;
+  let children = node.children.map(withContentBounds);
+  if (children.every((c, i) => c === node.children[i])) children = node.children;
+  const tiny = node.type === 'FRAME' && node.width <= 1.5 && node.height <= 1.5 && !node.clipsContent && !node.layoutMode &&
+    !visiblePaints(node.fills).length && !visiblePaints(node.strokes).length;
+  const shown = children.filter((c) => c.visible !== false);
+  // Exported whole (an SVG, or a render that is already turned), its drawing's bounds are its box.
+  const b = node.svg ? node.svgBounds : node.render ? node.renderBounds : null;
+  if (tiny && !shown.length && b && b.width > 1.5) {
+    return { ...node, x: b.x, y: b.y, width: b.width, height: b.height, rawWidth: b.width, rawHeight: b.height, rotation: 0, transform: undefined, contentBounds: true };
+  }
+  if (!tiny || !shown.length) return children === node.children ? node : { ...node, children };
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const c of shown) {
+    x0 = Math.min(x0, c.x);
+    y0 = Math.min(y0, c.y);
+    x1 = Math.max(x1, c.x + c.width);
+    y1 = Math.max(y1, c.y + c.height);
+  }
+  return { ...node, children, x: x0, y: y0, width: x1 - x0, height: y1 - y0, contentBounds: true };
+}
+
 function withPatterns(node) {
   if (!node || !node.children) return node;
   const kids = node.children.filter((c) => c.visible !== false);
@@ -624,6 +655,10 @@ class SwiftUIWriter {
     // room its parent offers past it must not squeeze it.
     if (ctx.kind === 'stack' && isAutoLayout(node) && ownSizing(node, 'x') === 'HUG') {
       core = mod(core, 'fixedSize', [['horizontal', true], ['vertical', ownSizing(node, 'y') === 'HUG']]);
+    } else if (ctx.kind === 'stack' && core && Array.isArray(core.mods) && this.stackPlacement(node, ctx.parent).v.mode !== 'stretch' &&
+        core.mods.some((m) => m.name === 'frame' && m.args.some(([k]) => k === 'minHeight'))) {
+      // A box of text that grows takes its own height, not all the room the stack offers it.
+      core = mod(core, 'fixedSize', [['horizontal', false], ['vertical', true]]);
     }
     core = this.limits(node, size, core);
     core = this.interactive(node, core);
@@ -1033,6 +1068,7 @@ class SwiftUIWriter {
 
   /** A section of a page column placed across the page by its constraints; the column places it down the page. */
   pagePlace(node, parent, v) {
+    if (this.scaledGroup(node, parent)) return this.scaledPlace(node, parent, v, false);
     const p = this.stackPlacement(node, parent).h;
     // A section sized by its content keeps at least the design's height, and grows with its text.
     if (hugsHeight(node) || (isAutoLayout(node) && ownSizing(node, 'y') === 'HUG')) {
@@ -1050,11 +1086,45 @@ class SwiftUIWriter {
     }
   }
 
+  /** Whether [node] is a large group drawn as a tiny frame (see withContentBounds) on a screen-wide [parent], kept whole and scaled to fit. */
+  scaledGroup(node, parent) {
+    return Boolean(node.contentBounds && !this.inComponent && this.screen && parent.width >= this.screen.width - 1 &&
+      node.width >= parent.width * 0.6 && (node.width >= parent.width * 0.9 || Math.abs(node.x - parent.x + node.width / 2 - parent.width / 2) <= 2));
+  }
+
   /**
-   * How a ZStack child is placed from its constraints, per axis: 'min'
-   * (offset from the start), 'max' (inset from the end), 'center' (offset
-   * from the centre) or 'stretch' (inset from both ends).
+   * Three or more like layers of [members] spread evenly across most of a
+   * screen-wide [area] in one band (tiles of a game's menu), left to right;
+   * else null.
    */
+  spreadGroup(members, area) {
+    if (!this.screen || area.width < this.screen.width - 1) return null;
+    const like = (a, b) => Math.abs(a.width - b.width) <= 8 && Math.abs(a.y - b.y) <= 12 && Math.abs(a.height - b.height) <= 12;
+    for (const first of members) {
+      const group = members.filter((c) => !isText(c) && like(c, first)).sort((a, b) => a.x - b.x);
+      if (group.length < 3) continue;
+      const gaps = group.slice(1).map((c, i) => c.x - group[i].x - group[i].width);
+      const extent = group[group.length - 1].x + group[group.length - 1].width - group[0].x;
+      if (Math.max(...gaps) - Math.min(...gaps) <= 4 && Math.min(...gaps) >= -1 && extent >= area.width * 0.8) return group;
+    }
+    return null;
+  }
+
+  /** The [group] (from spreadGroup) as one row placed in [parent], drawn at its design width and scaled down on a narrower screen. */
+  spreadRow(group, parent) {
+    const x0 = Math.min(...group.map((c) => c.x));
+    const y0 = Math.min(...group.map((c) => c.y));
+    const x1 = Math.max(...group.map((c) => c.x + c.width));
+    const y1 = Math.max(...group.map((c) => c.y + c.height));
+    const row = { ...parent, x: x0, y: y0, width: x1 - x0, height: y1 - y0, layoutMode: undefined, children: group };
+    const items = group.map((c) => this.node(c, { kind: 'stack', parent: row })).filter(Boolean);
+    this.helpers.add('scalesToFit');
+    if (items.length > 1) this.helpers.add('layerStack');
+    const box = this.layers(this.layerBox(row, { w: row.width, h: row.height }), items);
+    const v = mod(box, 'scalesToFit', [['width', round(row.width)], ['height', round(row.height)]]);
+    return padded(v, [round(y0 - parent.y), round(parent.x + parent.width - x1), 0, round(x0 - parent.x)]);
+  }
+
   /** The in-flow items of the row [row] and how much of its width they take in the design (0 to 1). */
   rowFill(row) {
     const flow = visibleChildren(row).filter((c) => inFlow(c, row));
@@ -1095,6 +1165,11 @@ class SwiftUIWriter {
     return Math.max(...gaps) - Math.min(...gaps) <= 4;
   }
 
+  /**
+   * How a ZStack child is placed from its constraints, per axis: 'min'
+   * (offset from the start), 'max' (inset from the end), 'center' (offset
+   * from the centre) or 'stretch' (inset from both ends).
+   */
   stackPlacement(node, parent) {
     const x = node.x - parent.x;
     const y = node.y - parent.y;
@@ -1106,7 +1181,15 @@ class SwiftUIWriter {
     // Most of the screen's width: such a frame follows the screen's width (or keeps its own, where this changes nothing).
     const wide = this.screen && parent.width >= this.screen.width * 0.8;
     const stretchy = parent === this.screen || this.stretchCells.has(parent.id) || screenWide;
-    if (stretchy && cons.horizontal !== 'MAX' && cons.horizontal !== 'STRETCH' && !hugsWidth(node) &&
+    const group = node.contentBounds && wide && cons.horizontal === 'MIN';
+    if (group && node.width >= parent.width * 0.9) {
+      // A group across the screen (a top bar) follows its width.
+      cons = { ...cons, horizontal: 'STRETCH' };
+    } else if (group && Math.abs(x + node.width / 2 - parent.width / 2) <= 2) {
+      cons = { ...cons, horizontal: 'CENTER' };
+    } else if (group && node.width < parent.width / 2 && x + node.width / 2 > parent.width * 0.6 && !this.distributed(node, parent)) {
+      cons = { ...cons, horizontal: 'MAX' };
+    } else if (stretchy && cons.horizontal !== 'MAX' && cons.horizontal !== 'STRETCH' && !hugsWidth(node) &&
         node.width >= parent.width / 2 && Math.abs(x - (parent.width - x - node.width)) <= 2) {
       cons = { ...cons, horizontal: 'STRETCH' };
     } else if (wide && cons.horizontal === 'MIN' && node.width < parent.width / 3 && !this.distributed(node, parent)) {
@@ -1126,7 +1209,22 @@ class SwiftUIWriter {
     return { h: axis(cons.horizontal, x, node.width, parent.width), v: axis(cons.vertical, y, node.height, parent.height) };
   }
 
+  /**
+   * A scaled group (see scaledGroup) kept whole: laid out across the screen,
+   * or at its size, and scaled down where it does not fit; [top] places it
+   * down its parent too.
+   */
+  scaledPlace(node, parent, v, top) {
+    const stretches = node.width >= parent.width * 0.9;
+    this.helpers.add('scalesToFit');
+    const x = node.x - parent.x;
+    let out = mod(v, 'scalesToFit', [['width', round(node.width)], ['height', round(node.height)], ['stretches', stretches || null]]);
+    out = padded(out, [top ? round(node.y - parent.y) : 0, round(parent.width - x - node.width), 0, round(x)]);
+    return stretches ? out : mod(out, 'frame', [['maxWidth', INFINITY]]);
+  }
+
   positioned(node, parent, v) {
+    if (this.scaledGroup(node, parent)) return this.scaledPlace(node, parent, v, true);
     const p = this.stackPlacement(node, parent);
     const pad = [0, 0, 0, 0];
     if (p.h.mode === 'max') pad[1] = round(p.h.end);
@@ -1145,9 +1243,10 @@ class SwiftUIWriter {
     }
     const dx = p.h.offset !== undefined ? round(p.h.offset) : 0;
     const dy = p.v.offset !== undefined ? round(p.v.offset) : 0;
-    // A layer placed from the start takes its room in the parent (padding);
-    // one placed from the centre, or outside the start, is only moved.
-    const room = (a, d) => a.mode === 'min' && d > 0;
+    // A layer placed from the start takes its room in the parent (padding),
+    // one past the start gives it back (negative padding), as Figma counts
+    // only the frame's own box; one placed from the centre is only moved.
+    const room = (a, d) => a.mode === 'min' && d !== 0;
     if (room(p.h, dx) || room(p.v, dy)) out = padded(out, [room(p.v, dy) ? dy : 0, 0, 0, room(p.h, dx) ? dx : 0]);
     const mx = room(p.h, dx) ? 0 : dx;
     const my = room(p.v, dy) ? 0 : dy;
@@ -1729,6 +1828,8 @@ class SwiftUIWriter {
       page = mod(page, 'shimmer', [[null, raw('isLoading')]]);
     }
     let out = mod(view('ScrollView', [], [page]), 'scrollBounceBehavior', [[null, raw('.basedOnSize')]]);
+    // Pulled down, a screen of data asks its owner to load it again.
+    if (this.loading && this.scrolls) out = mod(out, 'refreshable', [], [raw('await refresh()')]);
     if (bleeds) out = mod(out, 'ignoresSafeArea', [['edges', raw('.top')]]);
     // The visible height, for a page whose bottom layers stay at the bottom.
     if (this.viewport) out = view('GeometryReader', [], [out], 'proxy');
@@ -1807,9 +1908,19 @@ class SwiftUIWriter {
       }
       const parent = { ...area, y: area.y + bandTop(band), height: bandBottom(band) - bandTop(band) };
       const members = [...band, ...band.flatMap((c) => floats.get(c.id) || [])].sort((a, b) => order(a) - order(b));
-      const items = members.map((c) => this.node(c, { kind: 'stack', parent })).filter(Boolean);
+      const spread = this.spreadGroup(members, area);
+      const items = [];
+      for (const c of members) {
+        if (spread && spread.includes(c)) {
+          if (c === members.find((m) => spread.includes(m))) items.push(this.spreadRow(spread, parent));
+          continue;
+        }
+        const v = this.node(c, { kind: 'stack', parent });
+        if (v) items.push(v);
+      }
+      // The band takes the screen's width: a layer past it does not widen the page.
       return mod(view('ZStack', [['alignment', raw('.topLeading')]], items), 'frame', [
-        ['maxWidth', INFINITY], ['minHeight', round(parent.height)], ['alignment', raw('.topLeading')],
+        ['minWidth', 0], ['maxWidth', INFINITY], ['minHeight', round(parent.height)], ['alignment', raw('.topLeading')],
       ]);
     };
     // On a screen that does not scroll, the last sections anchored to the bottom stay there.
@@ -1828,6 +1939,7 @@ class SwiftUIWriter {
     const tops = bands.map((b) => Math.max(...[...b, ...b.flatMap((c) => floats.get(c.id) || [])].map(order)));
     const reordered = tops.some((t, i) => i && t < tops[i - 1]);
     const ranks = [...tops].sort((a, b) => a - b);
+    const stickies = new Set();
     bands.forEach((band, i) => {
       let v = drawBand(band);
       if (!v) return;
@@ -1841,10 +1953,30 @@ class SwiftUIWriter {
         gap = Math.min(0, room);
       }
       if (gap) v = mod(v, 'padding', [[null, raw('.top')], [null, gap]]);
+      // A section Figma keeps stuck to the top while the page scrolls.
+      if (this.scrolls && band.length === 1 && band[0].scrollBehavior === 'STICKY_SCROLLS') {
+        const paint = !visiblePaints(band[0].fills).length && this.fillItems(node).find((f) => f.paint);
+        if (paint) v = mod(v, 'background', [], [mod(view('Rectangle'), 'fill', [[null, paint.paint]])]);
+        stickies.add(items.length);
+      }
       items.push(v);
     });
     const last = bands.length ? round(area.height - bandBottom(bands[bands.length - 1])) : 0;
-    let page = view('VStack', [['alignment', raw('.leading')], ['spacing', spacing]], items);
+    let page;
+    if (stickies.size) {
+      // Pinned section headers: each sticky section heads what follows it.
+      const out = [];
+      let section = null;
+      items.forEach((v, i) => {
+        if (stickies.has(i)) {
+          section = { header: v, body: [] };
+          out.push(section);
+        } else if (section) section.body.push(v);
+        else out.push(v);
+      });
+      const rows = out.map((x) => (x.header ? trailing(view('Section', [], x.body), 'header', [x.header]) : x));
+      page = view('LazyVStack', [['alignment', raw('.leading')], ['spacing', spacing], ['pinnedViews', raw('[.sectionHeaders]')]], rows);
+    } else page = view('VStack', [['alignment', raw('.leading')], ['spacing', spacing]], items);
     if (last > 0) page = mod(page, 'padding', [[null, raw('.bottom')], [null, last]]);
     page = this.viewport
       ? mod(page, 'frame', [['maxWidth', INFINITY], ['minHeight', raw(this.viewport)], ['alignment', raw('.topLeading')]])
@@ -2384,7 +2516,7 @@ function printProperty(p) {
  * pattern the code uses for it.
  */
 export function toSwiftUI(root, assets, options = {}) {
-  const rootNode = withPatterns(withIllustrations({ ...root, x: root.x ?? 0, y: root.y ?? 0 }));
+  const rootNode = withPatterns(withIllustrations(withContentBounds({ ...root, x: root.x ?? 0, y: root.y ?? 0 })));
   const screen = options.screen ?? isPhoneScreen(rootNode);
   let structName = options.structName || sType(root.name, 'Design');
   if (SWIFT_TYPE_NAMES.has(structName)) structName = `${structName}Screen`;
@@ -2446,6 +2578,7 @@ export function toSwiftUI(root, assets, options = {}) {
     // In check mode the owner the screen asks is the check, which records each case.
     ...(writer.tapped ? [options.probe ? '  var action: (Action) -> Void = { checkAction("\\($0)") }' : '  var action: (Action) -> Void = { _ in }'] : []),
     ...(writer.loading ? ['  /// Placeholders stand in for the content while its data loads.', '  var isLoading = false'] : []),
+    ...(writer.loading && writer.scrolls ? ['  /// Loads the data again when the page is pulled down.', '  var refresh: () async -> Void = {}'] : []),
     ...writer.states,
     ...(writer.tapped || writer.states.length ? [''] : []),
     '  var body: some View {',
@@ -2477,7 +2610,7 @@ export function toSwiftUI(root, assets, options = {}) {
     }
     shared.push('}');
   }
-  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable', 'textStroke', 'designBar', 'shimmer', 'stretchy', 'designSwitch']) {
+  for (const name of ['color', 'dynamicColor', 'designFont', 'designLineHeight', 'layerStack', 'flow', 'pressable', 'textStroke', 'designBar', 'shimmer', 'stretchy', 'designSwitch', 'scalesToFit']) {
     if (writer.helpers.has(name)) shared.push('', HELPER_CODE[name]);
   }
   const assetsMap = {};

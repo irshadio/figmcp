@@ -210,6 +210,7 @@ struct DesignLineHeight: ViewModifier {
   private let height: CGFloat
   private let font: UIFont
   private let scales: Bool
+  @Environment(\\.multilineTextAlignment) private var alignment
   @ScaledMetric private var scale: CGFloat
 
   init(_ height: CGFloat, font name: String?, size: CGFloat, relativeTo style: Font.TextStyle?) {
@@ -224,7 +225,7 @@ struct DesignLineHeight: ViewModifier {
     let factor = scales ? scale / 1000 : 1
     let line = height * factor
     let natural = font.lineHeight * factor
-    let box = DesignLineBox(line: line, natural: natural, ascender: font.ascender * factor)
+    let box = DesignLineBox(line: line, natural: natural, ascender: font.ascender * factor, alignment: alignment)
     if line >= natural {
       box { content.lineSpacing(line - natural) }
     } else {
@@ -239,6 +240,7 @@ struct DesignLineBox: Layout {
   let line: CGFloat
   let natural: CGFloat
   let ascender: CGFloat
+  var alignment = TextAlignment.leading
 
   /// How many lines the text took: each advances [line], the last without its spacing.
   private func lines(_ text: CGSize) -> CGFloat {
@@ -248,8 +250,10 @@ struct DesignLineBox: Layout {
   func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
     guard let text = subviews.first else { return .zero }
     let size = text.sizeThatFits(proposal)
-    // Figma sizes the box up to whole points (lines 18.05 apart take 19).
-    let width = min((size.width - 0.01).rounded(.up), proposal.width ?? .infinity)
+    // Figma sizes the box up to whole points (lines 18.05 apart take 19);
+    // centred or trailing text keeps its place, so its box keeps its width.
+    let rounded = alignment == .leading ? (size.width - 0.01).rounded(.up) : size.width
+    let width = min(rounded, proposal.width ?? .infinity)
     return CGSize(width: max(width, size.width), height: (lines(size) * line - 0.01).rounded(.up))
   }
 
@@ -259,7 +263,10 @@ struct DesignLineBox: Layout {
     let baseline = text.dimensions(in: ProposedViewSize(size))[VerticalAlignment.firstTextBaseline]
     // Figma sets the first baseline on a whole point.
     let target = ((line - natural) / 2 + ascender).rounded()
-    text.place(at: CGPoint(x: bounds.minX, y: bounds.minY + target - baseline), anchor: .topLeading, proposal: ProposedViewSize(size))
+    // In a box wider than its text, the text sits as it is aligned.
+    let share: CGFloat = alignment == .center ? 0.5 : alignment == .trailing ? 1 : 0
+    let x = bounds.minX + max(0, bounds.width - size.width) * share
+    text.place(at: CGPoint(x: x, y: bounds.minY + target - baseline), anchor: .topLeading, proposal: ProposedViewSize(size))
   }
 }
 
@@ -307,6 +314,24 @@ struct DesignSwitchStyle: ToggleStyle {
         }
         .sensoryFeedback(.selection, trigger: isOn)
     }
+  }
+}`,
+  scalesToFit: `extension View {
+  /// Drawn at [width] x [height] (wider when it [stretches] and is offered
+  /// more) and scaled down, never up, to the width it is offered: a group
+  /// that keeps its look on a narrower phone.
+  func scalesToFit(width: CGFloat, height: CGFloat, stretches: Bool = false) -> some View {
+    Color.clear
+      .frame(maxWidth: stretches ? .infinity : width)
+      .frame(height: height)
+      .overlay {
+        GeometryReader { proxy in
+          self
+            .frame(width: stretches ? max(width, proxy.size.width) : width, height: height)
+            .scaleEffect(min(1, proxy.size.width / width))
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+      }
   }
 }`,
   stretchy: `extension View {
