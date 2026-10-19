@@ -248,8 +248,9 @@ struct DesignLineBox: Layout {
   func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
     guard let text = subviews.first else { return .zero }
     let size = text.sizeThatFits(proposal)
-    // Figma sizes the box up to a whole point (lines 18.05 apart take 19).
-    return CGSize(width: size.width, height: (lines(size) * line - 0.01).rounded(.up))
+    // Figma sizes the box up to whole points (lines 18.05 apart take 19).
+    let width = min((size.width - 0.01).rounded(.up), proposal.width ?? .infinity)
+    return CGSize(width: max(width, size.width), height: (lines(size) * line - 0.01).rounded(.up))
   }
 
   func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
