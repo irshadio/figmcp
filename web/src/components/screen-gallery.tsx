@@ -49,7 +49,7 @@ export function ScreenGallery({ screens, desktop = false, wideAspect, label }: {
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={s.src} alt={`${label}: ${s.name}`} loading="lazy" className={`size-full object-cover ${wide && !desktop ? "object-left-top" : "object-top"}`} />
+              <img src={s.thumb ?? s.src} alt={`${label}: ${s.name}`} loading="lazy" className={`size-full object-cover ${wide && !desktop ? "object-left-top" : "object-top"}`} />
             </div>
             <div className="mt-3 flex items-baseline gap-2 text-sm">
               <span className="font-mono text-xs text-dim">{String(i + 1).padStart(2, "0")}</span>

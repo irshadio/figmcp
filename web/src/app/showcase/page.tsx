@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CopyCommand } from "@/components/copy-command";
-import { ArrowRight } from "@/components/icons";
+import { ArrowRight, FigmaIcon } from "@/components/icons";
 import { Reveal } from "@/components/reveal";
 import { ScreenGallery } from "@/components/screen-gallery";
 import { ByFilter, FilterItem, FilterScope, FilterTabs, type ShowcaseKind } from "@/components/showcase-filter";
@@ -29,18 +29,6 @@ export const metadata: Metadata = pageMeta({
   description:
     "App, web, brand and deck designs built in Figma by a coding agent through figmcp: a Series A pitch deck, an electronics brand identity, a coffee brand identity, an electronics store, a dating app, a travel booking app, an invoicing website, a project management tool, a healthcare app, a food delivery app, a restaurant dashboard, a stock trading app and a coffee ordering app, each with its own design system.",
 });
-
-function FigmaIcon() {
-  return (
-    <svg width="12" height="18" viewBox="0 0 38 57" aria-hidden="true">
-      <path fill="#1abcfe" d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" />
-      <path fill="#0acf83" d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" />
-      <path fill="#ff7262" d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" />
-      <path fill="#f24e1e" d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" />
-      <path fill="#a259ff" d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" />
-    </svg>
-  );
-}
 
 function Eyebrow({ children }: { children: ReactNode }) {
   return (

@@ -101,3 +101,17 @@ export const MenuIcon = (p: P) => (
     <path d="M4 7h16M4 12h16M4 17h16" />
   </svg>
 );
+export const FigmaIcon = (p: P) => (
+  <svg width="12" height="18" viewBox="0 0 38 57" aria-hidden="true" {...p}>
+    <path fill="#1abcfe" d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" />
+    <path fill="#0acf83" d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" />
+    <path fill="#ff7262" d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" />
+    <path fill="#f24e1e" d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" />
+    <path fill="#a259ff" d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" />
+  </svg>
+);
+export const PlayIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M7 4.5v15l12-7.5z" />
+  </svg>
+);
