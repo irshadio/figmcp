@@ -1,6 +1,6 @@
 import tekvo from "./tekvo.json";
 
-export type ProjectImage = { src: string; width: number; height: number };
+export type ProjectImage = { src: string; width: number; height: number; thumb?: string };
 export type NamedImage = ProjectImage & { name: string };
 export type FlowScreen = { code: string; name: string; light?: ProjectImage; dark?: ProjectImage };
 export type Flow = { key: string; name: string; screens: FlowScreen[] };
@@ -146,3 +146,39 @@ export const tekvoJourney: JourneyStep[] = [
     screen: story("s09-remittance-light"),
   },
 ];
+
+export const tekvoBuild = {
+  stats: [
+    ["622", "variables, light and dark"],
+    ["430", "components in 60 sets"],
+    ["208", "prototype flows"],
+    ["4,714", "interactive links"],
+  ] as [string, string][],
+  steps: [
+    {
+      title: "Design system first",
+      text: "Foundations for colour, type, spacing, shape and layout, then the core components, with tokens checked for contrast before any screen existed.",
+    },
+    {
+      title: "A brand of its own",
+      text: "Asked to create everything, the agent named the store Tekvo, chose a blue and volt-lime palette and built a commerce widget library on top of the system.",
+    },
+    {
+      title: "The customer app, one flow at a time",
+      text: "Splash to Tekvo Plus, screen by screen, each one prototyped. Dark versions were made by rebinding every layer to the dark token collection.",
+    },
+    {
+      title: "The rider app",
+      text: "Corrected mid-build: riders are Tekvo employees, so runs are assigned by dispatch with Express and Normal SLAs instead of gig-style offers.",
+    },
+    {
+      title: "Head office, hubs and stores",
+      text: "The order and money blueprint came first, then the admin dashboard and one shared dashboard for every hub and store, built from a web component library.",
+    },
+    {
+      title: "Ready to launch",
+      text: "App icons for iOS and Android, App Store and Google Play screenshots and the project covers, exported at every size the stores ask for.",
+    },
+  ],
+  quotes: ["Create your own everything.", "Design should be the same for all dashboards, if it is a hub or a store."],
+};

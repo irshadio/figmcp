@@ -1,18 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CopyCommand } from "@/components/copy-command";
 import { ArrowRight, FigmaIcon, GitHubIcon, PlayIcon } from "@/components/icons";
 import { ProjectExplorer } from "@/components/project-explorer";
 import { HeroStack, Journey } from "@/components/project-story";
 import { PrototypeEmbed } from "@/components/prototype-embed";
 import { Reveal } from "@/components/reveal";
 import { ScreenGallery } from "@/components/screen-gallery";
-import { tekvoHero, tekvoJourney, tekvoProject as p } from "@/lib/projects";
+import { tekvoBuild, tekvoHero, tekvoJourney, tekvoProject as p } from "@/lib/projects";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
   title: "Tekvo",
   path: "/projects/tekvo",
+  image: { url: "/showcase/tekvo/og.jpg", width: 1200, height: 630 },
   description:
     "Tekvo, a full electronics e-commerce platform designed in Figma: customer app, rider app, admin dashboard and hub and store dashboard, every flow in light and dark.",
 });
@@ -126,6 +128,7 @@ export default function Page() {
               {[
                 ["#prototype", "Try the prototype"],
                 ["#journey", "Life of an order"],
+                ["#made", "How it was made"],
                 ["#products", "Every screen"],
                 ["#system", "Design system"],
                 ["#store", "App store"],
@@ -193,6 +196,60 @@ export default function Page() {
           </SectionHead>
           <div className="mt-14">
             <Journey steps={tekvoJourney} label={p.name} />
+          </div>
+        </div>
+      </section>
+
+      <section id="made" className="scroll-mt-20 border-t border-line py-20 sm:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <SectionHead eyebrow="Made with figmcp" title="How it was made">
+            Every screen, component, variable and prototype link in Tekvo was created in Figma by a coding agent through figmcp, from plain-language prompts,
+            then checked with screenshots and fixed by the same agent.
+          </SectionHead>
+          <Reveal className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {tekvoBuild.stats.map(([value, label]) => (
+              <div key={label} className="rounded-2xl border border-line bg-white/[0.02] px-5 py-5">
+                <div className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{value}</div>
+                <div className="mt-1 text-sm text-muted">{label}</div>
+              </div>
+            ))}
+          </Reveal>
+          <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {tekvoBuild.steps.map((step, i) => (
+              <Reveal as="li" key={step.title} delay={i * 40} className="h-full rounded-2xl border border-line bg-panel/60 p-6">
+                <span className="font-mono text-xs" style={{ color: p.accent }}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <h3 className="mt-3 text-lg font-medium text-fg">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-pretty text-muted">{step.text}</p>
+              </Reveal>
+            ))}
+          </ol>
+          <div className="mt-12 grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <Reveal>
+              <div className="font-mono text-xs tracking-wider text-dim uppercase">From the brief</div>
+              <div className="mt-4 space-y-3">
+                {tekvoBuild.quotes.map((q) => (
+                  <blockquote key={q} className="flex gap-3 rounded-xl border border-line bg-bg/60 px-4 py-3 text-sm leading-relaxed text-muted">
+                    <span className="select-none font-mono text-sky">›</span>
+                    <span>{q}</span>
+                  </blockquote>
+                ))}
+              </div>
+            </Reveal>
+            <Reveal delay={80} className="rounded-2xl border border-line bg-panel/60 p-6 sm:p-8">
+              <h3 className="text-xl font-semibold tracking-[-0.02em] text-fg">Design your own</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                Install figmcp, open a file in Figma Desktop, run the plugin and describe the product you want.
+              </p>
+              <div className="mt-5">
+                <CopyCommand command="npx -y @irshad.io/figma-local-mcp@latest setup" />
+              </div>
+              <Link href="/docs/design-in-figma" className="mt-5 inline-flex items-center gap-2 text-sm text-sky hover:text-ice">
+                How designing in Figma works
+                <ArrowRight width={14} height={14} />
+              </Link>
+            </Reveal>
           </div>
         </div>
       </section>
