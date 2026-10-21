@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { projectLinks } from "@/lib/projects";
 import { site } from "@/lib/site";
 import { GitHubIcon, MenuIcon, NpmIcon } from "./icons";
 import { Logo } from "./logo";
@@ -43,6 +44,28 @@ export function Nav() {
           <Logo height={24} />
         </Link>
         <nav className="hidden items-center gap-1 md:flex">
+          <div className="group relative">
+            <button
+              type="button"
+              aria-haspopup="true"
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition hover:text-fg ${pathname.startsWith("/projects") ? "text-fg" : "text-muted"}`}
+            >
+              Projects
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className="transition group-hover:rotate-180 group-focus-within:rotate-180">
+                <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <div className="invisible absolute top-full left-0 pt-2 opacity-0 transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+              <div className="w-72 rounded-xl border border-line-2 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                {projectLinks.map((p) => (
+                  <Link key={p.href} href={p.href} className="block rounded-lg px-3 py-2.5 transition hover:bg-white/6">
+                    <div className="text-sm text-fg">{p.name}</div>
+                    <div className="mt-0.5 text-xs text-muted">{p.kind}</div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
           {links.map((l) => (
             <Link
               key={l.href}
@@ -100,6 +123,12 @@ export function Nav() {
       </div>
       {open && (
         <nav className="border-t border-line px-4 pt-2 pb-4 md:hidden">
+          <div className="px-2 pt-2.5 pb-1 font-mono text-xs tracking-wider text-dim uppercase">Projects</div>
+          {projectLinks.map((p) => (
+            <Link key={p.href} href={p.href} onClick={() => setOpen(false)} className="block rounded-lg px-2 py-2.5 text-muted hover:text-fg">
+              {p.name}
+            </Link>
+          ))}
           {links.map((l) => (
             <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="block rounded-lg px-2 py-2.5 text-muted hover:text-fg">
               {l.highlight ? <Highlighted label={l.label} /> : l.label}
