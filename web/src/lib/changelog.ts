@@ -2,6 +2,19 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.6.0",
+    notes: [
+      { type: "new", text: "React + Tailwind output for production: semantic markup (buttons, links, nav, headings), theme classes where they equal the design, design variables declared as CSS, Figma text styles as named class lists, and repeated items as data with .map()." },
+      { type: "new", text: "HTML + Tailwind output: the same markup as a static fragment for sites without React." },
+      { type: "new", text: "Desktop frames become web pages: bars and footers span the screen and the content stays in a centred column. page: false keeps the fixed artboard." },
+      { type: "new", text: "verify_code checks React and HTML: the generated code, or a component or page of your project, rendered and compared with Figma's render layer by layer." },
+      { type: "new", text: "Every tool has a title and annotations; the server has metadata, icons and ready-made prompts." },
+      { type: "improved", text: "React: assets go to your project's public folder with a short content hash, so frames never overwrite each other's images." },
+      { type: "improved", text: "React: fonts keep the axes Figma sets (optical size), and text keeps Figma's line boxes, wrapping and baselines." },
+      { type: "fixed", text: "React: a paint bound to a colour variable uses the variable's value, so a stale stored colour no longer turns a page black." },
+    ],
+  },
+  {
     version: "1.5.2",
     notes: [
       { type: "improved", text: "Clearer descriptions for remove_code_connect_map, get_variable_defs and import_design_export: what each one changes, when to use it, and what happens without the plugin." },

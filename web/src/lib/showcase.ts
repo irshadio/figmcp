@@ -2,7 +2,7 @@ import images from "./showcase-images.json";
 import type { ShowcaseKind } from "@/components/showcase-filter";
 
 export type ShowcaseImage = { src: string; width: number; height: number };
-export type ShowcaseScreen = ShowcaseImage & { name: string };
+export type ShowcaseScreen = ShowcaseImage & { name: string; thumb?: string };
 
 export type ShowcaseProject = {
   slug: keyof typeof images;

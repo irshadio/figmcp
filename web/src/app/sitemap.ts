@@ -4,7 +4,7 @@ import { docsNav, site } from "@/lib/site";
 export const dynamic = "force-static";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const pages = ["/", ...docsNav.flatMap((s) => s.items.map((i) => i.href)), "/showcase", "/privacy", "/terms"];
+  const pages = ["/", ...docsNav.flatMap((s) => s.items.map((i) => i.href)), "/showcase", "/projects/tekvo", "/privacy", "/terms"];
   const lastModified = new Date();
   return [...new Set(pages)].map((path) => ({
     url: `${site.url}${path === "/" ? "" : path}`,

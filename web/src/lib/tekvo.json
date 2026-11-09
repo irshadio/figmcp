@@ -1,0 +1,4584 @@
+{
+  "products": [
+    {
+      "key": "customer",
+      "flows": [
+        {
+          "key": "splash-and-onboarding",
+          "name": "Splash and onboarding",
+          "screens": [
+            {
+              "code": "01",
+              "name": "Splash · Intro",
+              "light": {
+                "src": "/showcase/tekvo/customer/01-splash-intro-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/01-splash-intro-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/01-splash-intro-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/01-splash-intro-dark.jpg"
+              }
+            },
+            {
+              "code": "02",
+              "name": "Splash · Reveal",
+              "light": {
+                "src": "/showcase/tekvo/customer/02-splash-reveal-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/02-splash-reveal-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/02-splash-reveal-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/02-splash-reveal-dark.jpg"
+              }
+            },
+            {
+              "code": "03",
+              "name": "Splash · Loading",
+              "light": {
+                "src": "/showcase/tekvo/customer/03-splash-loading-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/03-splash-loading-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/03-splash-loading-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/03-splash-loading-dark.jpg"
+              }
+            },
+            {
+              "code": "39",
+              "name": "Onboarding · Genuine",
+              "light": {
+                "src": "/showcase/tekvo/customer/39-onboarding-genuine-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39-onboarding-genuine-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/39-onboarding-genuine-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39-onboarding-genuine-dark.jpg"
+              }
+            },
+            {
+              "code": "39b",
+              "name": "Onboarding · Fast",
+              "light": {
+                "src": "/showcase/tekvo/customer/39b-onboarding-fast-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39b-onboarding-fast-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/39b-onboarding-fast-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39b-onboarding-fast-dark.jpg"
+              }
+            },
+            {
+              "code": "39c",
+              "name": "Onboarding · Pay",
+              "light": {
+                "src": "/showcase/tekvo/customer/39c-onboarding-pay-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39c-onboarding-pay-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/39c-onboarding-pay-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39c-onboarding-pay-dark.jpg"
+              }
+            },
+            {
+              "code": "39d",
+              "name": "Location permission",
+              "light": {
+                "src": "/showcase/tekvo/customer/39d-location-permission-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39d-location-permission-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/39d-location-permission-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39d-location-permission-dark.jpg"
+              }
+            },
+            {
+              "code": "39e",
+              "name": "Location · System prompt",
+              "light": {
+                "src": "/showcase/tekvo/customer/39e-location-system-prompt-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39e-location-system-prompt-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/39e-location-system-prompt-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39e-location-system-prompt-dark.jpg"
+              }
+            },
+            {
+              "code": "39f",
+              "name": "Notification permission",
+              "light": {
+                "src": "/showcase/tekvo/customer/39f-notification-permission-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39f-notification-permission-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/39f-notification-permission-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/39f-notification-permission-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "sign-in",
+          "name": "Sign in",
+          "screens": [
+            {
+              "code": "04",
+              "name": "Login",
+              "light": {
+                "src": "/showcase/tekvo/customer/04-login-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/04-login-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/04-login-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/04-login-dark.jpg"
+              }
+            },
+            {
+              "code": "04b",
+              "name": "Login · Number entered",
+              "light": {
+                "src": "/showcase/tekvo/customer/04b-login-number-entered-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/04b-login-number-entered-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/04b-login-number-entered-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/04b-login-number-entered-dark.jpg"
+              }
+            },
+            {
+              "code": "05",
+              "name": "Country picker",
+              "light": {
+                "src": "/showcase/tekvo/customer/05-country-picker-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/05-country-picker-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/05-country-picker-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/05-country-picker-dark.jpg"
+              }
+            },
+            {
+              "code": "05b",
+              "name": "Country picker · Search",
+              "light": {
+                "src": "/showcase/tekvo/customer/05b-country-picker-search-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/05b-country-picker-search-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/05b-country-picker-search-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/05b-country-picker-search-dark.jpg"
+              }
+            },
+            {
+              "code": "06",
+              "name": "Verify mobile · Social",
+              "light": {
+                "src": "/showcase/tekvo/customer/06-verify-mobile-social-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/06-verify-mobile-social-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/06-verify-mobile-social-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/06-verify-mobile-social-dark.jpg"
+              }
+            },
+            {
+              "code": "07",
+              "name": "OTP",
+              "light": {
+                "src": "/showcase/tekvo/customer/07-otp-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/07-otp-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/07-otp-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/07-otp-dark.jpg"
+              }
+            },
+            {
+              "code": "07b",
+              "name": "OTP · Social",
+              "light": {
+                "src": "/showcase/tekvo/customer/07b-otp-social-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/07b-otp-social-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/07b-otp-social-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/07b-otp-social-dark.jpg"
+              }
+            },
+            {
+              "code": "08",
+              "name": "Profile",
+              "light": {
+                "src": "/showcase/tekvo/customer/08-profile-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/08-profile-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/08-profile-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/08-profile-dark.jpg"
+              }
+            },
+            {
+              "code": "08b",
+              "name": "Profile · From Google",
+              "light": {
+                "src": "/showcase/tekvo/customer/08b-profile-from-google-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/08b-profile-from-google-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/08b-profile-from-google-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/08b-profile-from-google-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "home-and-browse",
+          "name": "Home and browse",
+          "screens": [
+            {
+              "code": "09",
+              "name": "Home",
+              "light": {
+                "src": "/showcase/tekvo/customer/09-home-light.jpg",
+                "width": 786,
+                "height": 7628,
+                "thumb": "/showcase/tekvo/thumbs/customer/09-home-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/09-home-dark.jpg",
+                "width": 786,
+                "height": 7628,
+                "thumb": "/showcase/tekvo/thumbs/customer/09-home-dark.jpg"
+              }
+            },
+            {
+              "code": "10",
+              "name": "Explore · Phones",
+              "light": {
+                "src": "/showcase/tekvo/customer/10-explore-phones-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/10-explore-phones-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/10-explore-phones-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/10-explore-phones-dark.jpg"
+              }
+            },
+            {
+              "code": "10",
+              "name": "Explore · Audio",
+              "light": {
+                "src": "/showcase/tekvo/customer/10-explore-audio-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/10-explore-audio-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/10-explore-audio-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/10-explore-audio-dark.jpg"
+              }
+            },
+            {
+              "code": "28",
+              "name": "Product list · Phones",
+              "light": {
+                "src": "/showcase/tekvo/customer/28-product-list-phones-light.jpg",
+                "width": 786,
+                "height": 3642,
+                "thumb": "/showcase/tekvo/thumbs/customer/28-product-list-phones-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/28-product-list-phones-dark.jpg",
+                "width": 786,
+                "height": 3642,
+                "thumb": "/showcase/tekvo/thumbs/customer/28-product-list-phones-dark.jpg"
+              }
+            },
+            {
+              "code": "42",
+              "name": "Compare",
+              "light": {
+                "src": "/showcase/tekvo/customer/42-compare-light.jpg",
+                "width": 786,
+                "height": 3638,
+                "thumb": "/showcase/tekvo/thumbs/customer/42-compare-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/42-compare-dark.jpg",
+                "width": 786,
+                "height": 3638,
+                "thumb": "/showcase/tekvo/thumbs/customer/42-compare-dark.jpg"
+              }
+            },
+            {
+              "code": "42b",
+              "name": "Product list · Compare",
+              "light": {
+                "src": "/showcase/tekvo/customer/42b-product-list-compare-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/42b-product-list-compare-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/42b-product-list-compare-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/42b-product-list-compare-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "search",
+          "name": "Search",
+          "screens": [
+            {
+              "code": "26",
+              "name": "Search",
+              "light": {
+                "src": "/showcase/tekvo/customer/26-search-light.jpg",
+                "width": 786,
+                "height": 2124,
+                "thumb": "/showcase/tekvo/thumbs/customer/26-search-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/26-search-dark.jpg",
+                "width": 786,
+                "height": 2124,
+                "thumb": "/showcase/tekvo/thumbs/customer/26-search-dark.jpg"
+              }
+            },
+            {
+              "code": "26b",
+              "name": "Search · Suggestions",
+              "light": {
+                "src": "/showcase/tekvo/customer/26b-search-suggestions-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/26b-search-suggestions-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/26b-search-suggestions-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/26b-search-suggestions-dark.jpg"
+              }
+            },
+            {
+              "code": "27",
+              "name": "Search results",
+              "light": {
+                "src": "/showcase/tekvo/customer/27-search-results-light.jpg",
+                "width": 786,
+                "height": 2442,
+                "thumb": "/showcase/tekvo/thumbs/customer/27-search-results-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/27-search-results-dark.jpg",
+                "width": 786,
+                "height": 2442,
+                "thumb": "/showcase/tekvo/thumbs/customer/27-search-results-dark.jpg"
+              }
+            },
+            {
+              "code": "27b",
+              "name": "Sort",
+              "light": {
+                "src": "/showcase/tekvo/customer/27b-sort-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/27b-sort-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/27b-sort-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/27b-sort-dark.jpg"
+              }
+            },
+            {
+              "code": "27c",
+              "name": "Filters",
+              "light": {
+                "src": "/showcase/tekvo/customer/27c-filters-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/27c-filters-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/27c-filters-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/27c-filters-dark.jpg"
+              }
+            },
+            {
+              "code": "27d",
+              "name": "Search results · Filtered",
+              "light": {
+                "src": "/showcase/tekvo/customer/27d-search-results-filtered-light.jpg",
+                "width": 786,
+                "height": 1752,
+                "thumb": "/showcase/tekvo/thumbs/customer/27d-search-results-filtered-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/27d-search-results-filtered-dark.jpg",
+                "width": 786,
+                "height": 1752,
+                "thumb": "/showcase/tekvo/thumbs/customer/27d-search-results-filtered-dark.jpg"
+              }
+            },
+            {
+              "code": "43",
+              "name": "Search by photo",
+              "light": {
+                "src": "/showcase/tekvo/customer/43-search-by-photo-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/43-search-by-photo-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/43-search-by-photo-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/43-search-by-photo-dark.jpg"
+              }
+            },
+            {
+              "code": "43b",
+              "name": "Photo results",
+              "light": {
+                "src": "/showcase/tekvo/customer/43b-photo-results-light.jpg",
+                "width": 786,
+                "height": 2322,
+                "thumb": "/showcase/tekvo/thumbs/customer/43b-photo-results-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/43b-photo-results-dark.jpg",
+                "width": 786,
+                "height": 2322,
+                "thumb": "/showcase/tekvo/thumbs/customer/43b-photo-results-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "product",
+          "name": "Product",
+          "screens": [
+            {
+              "code": "14",
+              "name": "Product details",
+              "light": {
+                "src": "/showcase/tekvo/customer/14-product-details-light.jpg",
+                "width": 786,
+                "height": 7862,
+                "thumb": "/showcase/tekvo/thumbs/customer/14-product-details-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/14-product-details-dark.jpg",
+                "width": 786,
+                "height": 7862,
+                "thumb": "/showcase/tekvo/thumbs/customer/14-product-details-dark.jpg"
+              }
+            },
+            {
+              "code": "14b",
+              "name": "Product details · Added",
+              "light": {
+                "src": "/showcase/tekvo/customer/14b-product-details-added-light.jpg",
+                "width": 786,
+                "height": 7862,
+                "thumb": "/showcase/tekvo/thumbs/customer/14b-product-details-added-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/14b-product-details-added-dark.jpg",
+                "width": 786,
+                "height": 7862,
+                "thumb": "/showcase/tekvo/thumbs/customer/14b-product-details-added-dark.jpg"
+              }
+            },
+            {
+              "code": "14c",
+              "name": "Product details · Out of stock",
+              "light": {
+                "src": "/showcase/tekvo/customer/14c-product-details-out-of-stock-light.jpg",
+                "width": 786,
+                "height": 8118,
+                "thumb": "/showcase/tekvo/thumbs/customer/14c-product-details-out-of-stock-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/14c-product-details-out-of-stock-dark.jpg",
+                "width": 786,
+                "height": 8118,
+                "thumb": "/showcase/tekvo/thumbs/customer/14c-product-details-out-of-stock-dark.jpg"
+              }
+            },
+            {
+              "code": "14d",
+              "name": "Product details · Pre-order",
+              "light": {
+                "src": "/showcase/tekvo/customer/14d-product-details-pre-order-light.jpg",
+                "width": 786,
+                "height": 5028,
+                "thumb": "/showcase/tekvo/thumbs/customer/14d-product-details-pre-order-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/14d-product-details-pre-order-dark.jpg",
+                "width": 786,
+                "height": 5028,
+                "thumb": "/showcase/tekvo/thumbs/customer/14d-product-details-pre-order-dark.jpg"
+              }
+            },
+            {
+              "code": "14e",
+              "name": "Questions & answers",
+              "light": {
+                "src": "/showcase/tekvo/customer/14e-questions-and-answers-light.jpg",
+                "width": 786,
+                "height": 3086,
+                "thumb": "/showcase/tekvo/thumbs/customer/14e-questions-and-answers-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/14e-questions-and-answers-dark.jpg",
+                "width": 786,
+                "height": 3086,
+                "thumb": "/showcase/tekvo/thumbs/customer/14e-questions-and-answers-dark.jpg"
+              }
+            },
+            {
+              "code": "14f",
+              "name": "Ask a question",
+              "light": {
+                "src": "/showcase/tekvo/customer/14f-ask-a-question-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/14f-ask-a-question-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/14f-ask-a-question-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/14f-ask-a-question-dark.jpg"
+              }
+            },
+            {
+              "code": "15",
+              "name": "Specifications",
+              "light": {
+                "src": "/showcase/tekvo/customer/15-specifications-light.jpg",
+                "width": 786,
+                "height": 5318,
+                "thumb": "/showcase/tekvo/thumbs/customer/15-specifications-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/15-specifications-dark.jpg",
+                "width": 786,
+                "height": 5318,
+                "thumb": "/showcase/tekvo/thumbs/customer/15-specifications-dark.jpg"
+              }
+            },
+            {
+              "code": "16",
+              "name": "Nova Store",
+              "light": {
+                "src": "/showcase/tekvo/customer/16-nova-store-light.jpg",
+                "width": 786,
+                "height": 4874,
+                "thumb": "/showcase/tekvo/thumbs/customer/16-nova-store-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/16-nova-store-dark.jpg",
+                "width": 786,
+                "height": 4874,
+                "thumb": "/showcase/tekvo/thumbs/customer/16-nova-store-dark.jpg"
+              }
+            },
+            {
+              "code": "31",
+              "name": "Reviews",
+              "light": {
+                "src": "/showcase/tekvo/customer/31-reviews-light.jpg",
+                "width": 786,
+                "height": 3538,
+                "thumb": "/showcase/tekvo/thumbs/customer/31-reviews-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/31-reviews-dark.jpg",
+                "width": 786,
+                "height": 3538,
+                "thumb": "/showcase/tekvo/thumbs/customer/31-reviews-dark.jpg"
+              }
+            },
+            {
+              "code": "31b",
+              "name": "Write a review",
+              "light": {
+                "src": "/showcase/tekvo/customer/31b-write-a-review-light.jpg",
+                "width": 786,
+                "height": 2266,
+                "thumb": "/showcase/tekvo/thumbs/customer/31b-write-a-review-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/31b-write-a-review-dark.jpg",
+                "width": 786,
+                "height": 2266,
+                "thumb": "/showcase/tekvo/thumbs/customer/31b-write-a-review-dark.jpg"
+              }
+            },
+            {
+              "code": "31c",
+              "name": "Review submitted",
+              "light": {
+                "src": "/showcase/tekvo/customer/31c-review-submitted-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/31c-review-submitted-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/31c-review-submitted-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/31c-review-submitted-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "cart-and-wishlist",
+          "name": "Cart and wishlist",
+          "screens": [
+            {
+              "code": "11",
+              "name": "Cart",
+              "light": {
+                "src": "/showcase/tekvo/customer/11-cart-light.jpg",
+                "width": 786,
+                "height": 3472,
+                "thumb": "/showcase/tekvo/thumbs/customer/11-cart-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/11-cart-dark.jpg",
+                "width": 786,
+                "height": 3472,
+                "thumb": "/showcase/tekvo/thumbs/customer/11-cart-dark.jpg"
+              }
+            },
+            {
+              "code": "11b",
+              "name": "Cart · Empty",
+              "light": {
+                "src": "/showcase/tekvo/customer/11b-cart-empty-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/11b-cart-empty-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/11b-cart-empty-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/11b-cart-empty-dark.jpg"
+              }
+            },
+            {
+              "code": "11c",
+              "name": "Cart · No address",
+              "light": {
+                "src": "/showcase/tekvo/customer/11c-cart-no-address-light.jpg",
+                "width": 786,
+                "height": 3224,
+                "thumb": "/showcase/tekvo/thumbs/customer/11c-cart-no-address-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/11c-cart-no-address-dark.jpg",
+                "width": 786,
+                "height": 3224,
+                "thumb": "/showcase/tekvo/thumbs/customer/11c-cart-no-address-dark.jpg"
+              }
+            },
+            {
+              "code": "11d",
+              "name": "Add address sheet",
+              "light": {
+                "src": "/showcase/tekvo/customer/11d-add-address-sheet-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/11d-add-address-sheet-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/11d-add-address-sheet-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/11d-add-address-sheet-dark.jpg"
+              }
+            },
+            {
+              "code": "11e",
+              "name": "Cart · Guest",
+              "light": {
+                "src": "/showcase/tekvo/customer/11e-cart-guest-light.jpg",
+                "width": 786,
+                "height": 3616,
+                "thumb": "/showcase/tekvo/thumbs/customer/11e-cart-guest-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/11e-cart-guest-dark.jpg",
+                "width": 786,
+                "height": 3616,
+                "thumb": "/showcase/tekvo/thumbs/customer/11e-cart-guest-dark.jpg"
+              }
+            },
+            {
+              "code": "11f",
+              "name": "Cart · Apple Pay",
+              "light": {
+                "src": "/showcase/tekvo/customer/11f-cart-apple-pay-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/11f-cart-apple-pay-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/11f-cart-apple-pay-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/11f-cart-apple-pay-dark.jpg"
+              }
+            },
+            {
+              "code": "12",
+              "name": "Wishlist",
+              "light": {
+                "src": "/showcase/tekvo/customer/12-wishlist-light.jpg",
+                "width": 786,
+                "height": 2970,
+                "thumb": "/showcase/tekvo/thumbs/customer/12-wishlist-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/12-wishlist-dark.jpg",
+                "width": 786,
+                "height": 2970,
+                "thumb": "/showcase/tekvo/thumbs/customer/12-wishlist-dark.jpg"
+              }
+            },
+            {
+              "code": "12b",
+              "name": "Wishlist · Empty",
+              "light": {
+                "src": "/showcase/tekvo/customer/12b-wishlist-empty-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/12b-wishlist-empty-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/12b-wishlist-empty-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/12b-wishlist-empty-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "checkout",
+          "name": "Checkout",
+          "screens": [
+            {
+              "code": "17",
+              "name": "Checkout · Address",
+              "light": {
+                "src": "/showcase/tekvo/customer/17-checkout-address-light.jpg",
+                "width": 786,
+                "height": 1880,
+                "thumb": "/showcase/tekvo/thumbs/customer/17-checkout-address-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/17-checkout-address-dark.jpg",
+                "width": 786,
+                "height": 1880,
+                "thumb": "/showcase/tekvo/thumbs/customer/17-checkout-address-dark.jpg"
+              }
+            },
+            {
+              "code": "17b",
+              "name": "Checkout · No address",
+              "light": {
+                "src": "/showcase/tekvo/customer/17b-checkout-no-address-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/17b-checkout-no-address-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/17b-checkout-no-address-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/17b-checkout-no-address-dark.jpg"
+              }
+            },
+            {
+              "code": "17c",
+              "name": "Checkout · Delivery",
+              "light": {
+                "src": "/showcase/tekvo/customer/17c-checkout-delivery-light.jpg",
+                "width": 786,
+                "height": 2318,
+                "thumb": "/showcase/tekvo/thumbs/customer/17c-checkout-delivery-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/17c-checkout-delivery-dark.jpg",
+                "width": 786,
+                "height": 2318,
+                "thumb": "/showcase/tekvo/thumbs/customer/17c-checkout-delivery-dark.jpg"
+              }
+            },
+            {
+              "code": "17d",
+              "name": "Checkout · Click & Collect",
+              "light": {
+                "src": "/showcase/tekvo/customer/17d-checkout-click-and-collect-light.jpg",
+                "width": 786,
+                "height": 1928,
+                "thumb": "/showcase/tekvo/thumbs/customer/17d-checkout-click-and-collect-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/17d-checkout-click-and-collect-dark.jpg",
+                "width": 786,
+                "height": 1928,
+                "thumb": "/showcase/tekvo/thumbs/customer/17d-checkout-click-and-collect-dark.jpg"
+              }
+            },
+            {
+              "code": "17e",
+              "name": "Checkout · Delivery · Plus member",
+              "light": {
+                "src": "/showcase/tekvo/customer/17e-checkout-delivery-plus-member-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/17e-checkout-delivery-plus-member-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/17e-checkout-delivery-plus-member-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/17e-checkout-delivery-plus-member-dark.jpg"
+              }
+            },
+            {
+              "code": "18",
+              "name": "Pick location",
+              "light": {
+                "src": "/showcase/tekvo/customer/18-pick-location-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/18-pick-location-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/18-pick-location-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/18-pick-location-dark.jpg"
+              }
+            },
+            {
+              "code": "18b",
+              "name": "Address details",
+              "light": {
+                "src": "/showcase/tekvo/customer/18b-address-details-light.jpg",
+                "width": 786,
+                "height": 2486,
+                "thumb": "/showcase/tekvo/thumbs/customer/18b-address-details-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/18b-address-details-dark.jpg",
+                "width": 786,
+                "height": 2486,
+                "thumb": "/showcase/tekvo/thumbs/customer/18b-address-details-dark.jpg"
+              }
+            },
+            {
+              "code": "19",
+              "name": "Payment & review",
+              "light": {
+                "src": "/showcase/tekvo/customer/19-payment-and-review-light.jpg",
+                "width": 786,
+                "height": 4080,
+                "thumb": "/showcase/tekvo/thumbs/customer/19-payment-and-review-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/19-payment-and-review-dark.jpg",
+                "width": 786,
+                "height": 4080,
+                "thumb": "/showcase/tekvo/thumbs/customer/19-payment-and-review-dark.jpg"
+              }
+            },
+            {
+              "code": "19c",
+              "name": "Apple Pay sheet",
+              "light": {
+                "src": "/showcase/tekvo/customer/19c-apple-pay-sheet-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/19c-apple-pay-sheet-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/19c-apple-pay-sheet-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/19c-apple-pay-sheet-dark.jpg"
+              }
+            },
+            {
+              "code": "20",
+              "name": "Order placed",
+              "light": {
+                "src": "/showcase/tekvo/customer/20-order-placed-light.jpg",
+                "width": 786,
+                "height": 2070,
+                "thumb": "/showcase/tekvo/thumbs/customer/20-order-placed-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/20-order-placed-dark.jpg",
+                "width": 786,
+                "height": 2070,
+                "thumb": "/showcase/tekvo/thumbs/customer/20-order-placed-dark.jpg"
+              }
+            },
+            {
+              "code": "20b",
+              "name": "Payment failed",
+              "light": {
+                "src": "/showcase/tekvo/customer/20b-payment-failed-light.jpg",
+                "width": 786,
+                "height": 2026,
+                "thumb": "/showcase/tekvo/thumbs/customer/20b-payment-failed-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/20b-payment-failed-dark.jpg",
+                "width": 786,
+                "height": 2026,
+                "thumb": "/showcase/tekvo/thumbs/customer/20b-payment-failed-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "guest-checkout",
+          "name": "Guest checkout",
+          "screens": [
+            {
+              "code": "38",
+              "name": "Checkout · Sign in or guest",
+              "light": {
+                "src": "/showcase/tekvo/customer/38-checkout-sign-in-or-guest-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/38-checkout-sign-in-or-guest-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/38-checkout-sign-in-or-guest-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/38-checkout-sign-in-or-guest-dark.jpg"
+              }
+            },
+            {
+              "code": "38b",
+              "name": "Guest details",
+              "light": {
+                "src": "/showcase/tekvo/customer/38b-guest-details-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/38b-guest-details-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/38b-guest-details-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/38b-guest-details-dark.jpg"
+              }
+            },
+            {
+              "code": "38c",
+              "name": "Guest payment",
+              "light": {
+                "src": "/showcase/tekvo/customer/38c-guest-payment-light.jpg",
+                "width": 786,
+                "height": 3908,
+                "thumb": "/showcase/tekvo/thumbs/customer/38c-guest-payment-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/38c-guest-payment-dark.jpg",
+                "width": 786,
+                "height": 3908,
+                "thumb": "/showcase/tekvo/thumbs/customer/38c-guest-payment-dark.jpg"
+              }
+            },
+            {
+              "code": "38d",
+              "name": "Guest order placed",
+              "light": {
+                "src": "/showcase/tekvo/customer/38d-guest-order-placed-light.jpg",
+                "width": 786,
+                "height": 2142,
+                "thumb": "/showcase/tekvo/thumbs/customer/38d-guest-order-placed-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/38d-guest-order-placed-dark.jpg",
+                "width": 786,
+                "height": 2142,
+                "thumb": "/showcase/tekvo/thumbs/customer/38d-guest-order-placed-dark.jpg"
+              }
+            },
+            {
+              "code": "38e",
+              "name": "Track guest order",
+              "light": {
+                "src": "/showcase/tekvo/customer/38e-track-guest-order-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/38e-track-guest-order-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/38e-track-guest-order-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/38e-track-guest-order-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "orders-and-returns",
+          "name": "Orders and returns",
+          "screens": [
+            {
+              "code": "21",
+              "name": "My orders",
+              "light": {
+                "src": "/showcase/tekvo/customer/21-my-orders-light.jpg",
+                "width": 786,
+                "height": 2466,
+                "thumb": "/showcase/tekvo/thumbs/customer/21-my-orders-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/21-my-orders-dark.jpg",
+                "width": 786,
+                "height": 2466,
+                "thumb": "/showcase/tekvo/thumbs/customer/21-my-orders-dark.jpg"
+              }
+            },
+            {
+              "code": "22",
+              "name": "Track order",
+              "light": {
+                "src": "/showcase/tekvo/customer/22-track-order-light.jpg",
+                "width": 786,
+                "height": 3012,
+                "thumb": "/showcase/tekvo/thumbs/customer/22-track-order-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/22-track-order-dark.jpg",
+                "width": 786,
+                "height": 3012,
+                "thumb": "/showcase/tekvo/thumbs/customer/22-track-order-dark.jpg"
+              }
+            },
+            {
+              "code": "22b",
+              "name": "Order details",
+              "light": {
+                "src": "/showcase/tekvo/customer/22b-order-details-light.jpg",
+                "width": 786,
+                "height": 2816,
+                "thumb": "/showcase/tekvo/thumbs/customer/22b-order-details-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/22b-order-details-dark.jpg",
+                "width": 786,
+                "height": 2816,
+                "thumb": "/showcase/tekvo/thumbs/customer/22b-order-details-dark.jpg"
+              }
+            },
+            {
+              "code": "23",
+              "name": "Cancel order · Reason",
+              "light": {
+                "src": "/showcase/tekvo/customer/23-cancel-order-reason-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/23-cancel-order-reason-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/23-cancel-order-reason-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/23-cancel-order-reason-dark.jpg"
+              }
+            },
+            {
+              "code": "23b",
+              "name": "Order cancelled",
+              "light": {
+                "src": "/showcase/tekvo/customer/23b-order-cancelled-light.jpg",
+                "width": 786,
+                "height": 1714,
+                "thumb": "/showcase/tekvo/thumbs/customer/23b-order-cancelled-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/23b-order-cancelled-dark.jpg",
+                "width": 786,
+                "height": 1714,
+                "thumb": "/showcase/tekvo/thumbs/customer/23b-order-cancelled-dark.jpg"
+              }
+            },
+            {
+              "code": "24",
+              "name": "Return request",
+              "light": {
+                "src": "/showcase/tekvo/customer/24-return-request-light.jpg",
+                "width": 786,
+                "height": 2950,
+                "thumb": "/showcase/tekvo/thumbs/customer/24-return-request-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/24-return-request-dark.jpg",
+                "width": 786,
+                "height": 2950,
+                "thumb": "/showcase/tekvo/thumbs/customer/24-return-request-dark.jpg"
+              }
+            },
+            {
+              "code": "24b",
+              "name": "Return reason sheet",
+              "light": {
+                "src": "/showcase/tekvo/customer/24b-return-reason-sheet-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/24b-return-reason-sheet-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/24b-return-reason-sheet-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/24b-return-reason-sheet-dark.jpg"
+              }
+            },
+            {
+              "code": "24c",
+              "name": "Return requested",
+              "light": {
+                "src": "/showcase/tekvo/customer/24c-return-requested-light.jpg",
+                "width": 786,
+                "height": 1888,
+                "thumb": "/showcase/tekvo/thumbs/customer/24c-return-requested-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/24c-return-requested-dark.jpg",
+                "width": 786,
+                "height": 1888,
+                "thumb": "/showcase/tekvo/thumbs/customer/24c-return-requested-dark.jpg"
+              }
+            },
+            {
+              "code": "24d",
+              "name": "Return status",
+              "light": {
+                "src": "/showcase/tekvo/customer/24d-return-status-light.jpg",
+                "width": 786,
+                "height": 2246,
+                "thumb": "/showcase/tekvo/thumbs/customer/24d-return-status-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/24d-return-status-dark.jpg",
+                "width": 786,
+                "height": 2246,
+                "thumb": "/showcase/tekvo/thumbs/customer/24d-return-status-dark.jpg"
+              }
+            },
+            {
+              "code": "25",
+              "name": "Order help",
+              "light": {
+                "src": "/showcase/tekvo/customer/25-order-help-light.jpg",
+                "width": 786,
+                "height": 2496,
+                "thumb": "/showcase/tekvo/thumbs/customer/25-order-help-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/25-order-help-dark.jpg",
+                "width": 786,
+                "height": 2496,
+                "thumb": "/showcase/tekvo/thumbs/customer/25-order-help-dark.jpg"
+              }
+            },
+            {
+              "code": "45",
+              "name": "Delivered · Proof",
+              "light": {
+                "src": "/showcase/tekvo/customer/45-delivered-proof-light.jpg",
+                "width": 786,
+                "height": 2678,
+                "thumb": "/showcase/tekvo/thumbs/customer/45-delivered-proof-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/45-delivered-proof-dark.jpg",
+                "width": 786,
+                "height": 2678,
+                "thumb": "/showcase/tekvo/thumbs/customer/45-delivered-proof-dark.jpg"
+              }
+            },
+            {
+              "code": "45b",
+              "name": "Report delivery problem",
+              "light": {
+                "src": "/showcase/tekvo/customer/45b-report-delivery-problem-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/45b-report-delivery-problem-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/45b-report-delivery-problem-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/45b-report-delivery-problem-dark.jpg"
+              }
+            },
+            {
+              "code": "46",
+              "name": "Tax invoice",
+              "light": {
+                "src": "/showcase/tekvo/customer/46-tax-invoice-light.jpg",
+                "width": 786,
+                "height": 2656,
+                "thumb": "/showcase/tekvo/thumbs/customer/46-tax-invoice-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/46-tax-invoice-dark.jpg",
+                "width": 786,
+                "height": 2656,
+                "thumb": "/showcase/tekvo/thumbs/customer/46-tax-invoice-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "account",
+          "name": "Account",
+          "screens": [
+            {
+              "code": "13",
+              "name": "Account",
+              "light": {
+                "src": "/showcase/tekvo/customer/13-account-light.jpg",
+                "width": 786,
+                "height": 3324,
+                "thumb": "/showcase/tekvo/thumbs/customer/13-account-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/13-account-dark.jpg",
+                "width": 786,
+                "height": 3324,
+                "thumb": "/showcase/tekvo/thumbs/customer/13-account-dark.jpg"
+              }
+            },
+            {
+              "code": "13b",
+              "name": "Account · Guest",
+              "light": {
+                "src": "/showcase/tekvo/customer/13b-account-guest-light.jpg",
+                "width": 786,
+                "height": 2044,
+                "thumb": "/showcase/tekvo/thumbs/customer/13b-account-guest-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/13b-account-guest-dark.jpg",
+                "width": 786,
+                "height": 2044,
+                "thumb": "/showcase/tekvo/thumbs/customer/13b-account-guest-dark.jpg"
+              }
+            },
+            {
+              "code": "29",
+              "name": "Notifications",
+              "light": {
+                "src": "/showcase/tekvo/customer/29-notifications-light.jpg",
+                "width": 786,
+                "height": 2672,
+                "thumb": "/showcase/tekvo/thumbs/customer/29-notifications-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/29-notifications-dark.jpg",
+                "width": 786,
+                "height": 2672,
+                "thumb": "/showcase/tekvo/thumbs/customer/29-notifications-dark.jpg"
+              }
+            },
+            {
+              "code": "29b",
+              "name": "Notifications · Empty",
+              "light": {
+                "src": "/showcase/tekvo/customer/29b-notifications-empty-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/29b-notifications-empty-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/29b-notifications-empty-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/29b-notifications-empty-dark.jpg"
+              }
+            },
+            {
+              "code": "30",
+              "name": "Coupons",
+              "light": {
+                "src": "/showcase/tekvo/customer/30-coupons-light.jpg",
+                "width": 786,
+                "height": 2060,
+                "thumb": "/showcase/tekvo/thumbs/customer/30-coupons-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/30-coupons-dark.jpg",
+                "width": 786,
+                "height": 2060,
+                "thumb": "/showcase/tekvo/thumbs/customer/30-coupons-dark.jpg"
+              }
+            },
+            {
+              "code": "30b",
+              "name": "Coupon details",
+              "light": {
+                "src": "/showcase/tekvo/customer/30b-coupon-details-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/30b-coupon-details-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/30b-coupon-details-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/30b-coupon-details-dark.jpg"
+              }
+            },
+            {
+              "code": "32",
+              "name": "Personal details",
+              "light": {
+                "src": "/showcase/tekvo/customer/32-personal-details-light.jpg",
+                "width": 786,
+                "height": 2732,
+                "thumb": "/showcase/tekvo/thumbs/customer/32-personal-details-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/32-personal-details-dark.jpg",
+                "width": 786,
+                "height": 2732,
+                "thumb": "/showcase/tekvo/thumbs/customer/32-personal-details-dark.jpg"
+              }
+            },
+            {
+              "code": "33",
+              "name": "Saved addresses",
+              "light": {
+                "src": "/showcase/tekvo/customer/33-saved-addresses-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/33-saved-addresses-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/33-saved-addresses-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/33-saved-addresses-dark.jpg"
+              }
+            },
+            {
+              "code": "33b",
+              "name": "Delete address",
+              "light": {
+                "src": "/showcase/tekvo/customer/33b-delete-address-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/33b-delete-address-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/33b-delete-address-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/33b-delete-address-dark.jpg"
+              }
+            },
+            {
+              "code": "34",
+              "name": "Payment methods",
+              "light": {
+                "src": "/showcase/tekvo/customer/34-payment-methods-light.jpg",
+                "width": 786,
+                "height": 1970,
+                "thumb": "/showcase/tekvo/thumbs/customer/34-payment-methods-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/34-payment-methods-dark.jpg",
+                "width": 786,
+                "height": 1970,
+                "thumb": "/showcase/tekvo/thumbs/customer/34-payment-methods-dark.jpg"
+              }
+            },
+            {
+              "code": "34b",
+              "name": "Add card",
+              "light": {
+                "src": "/showcase/tekvo/customer/34b-add-card-light.jpg",
+                "width": 786,
+                "height": 1878,
+                "thumb": "/showcase/tekvo/thumbs/customer/34b-add-card-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/34b-add-card-dark.jpg",
+                "width": 786,
+                "height": 1878,
+                "thumb": "/showcase/tekvo/thumbs/customer/34b-add-card-dark.jpg"
+              }
+            },
+            {
+              "code": "34c",
+              "name": "Card verification",
+              "light": {
+                "src": "/showcase/tekvo/customer/34c-card-verification-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/34c-card-verification-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/34c-card-verification-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/34c-card-verification-dark.jpg"
+              }
+            },
+            {
+              "code": "35",
+              "name": "Tekvo Rewards",
+              "light": {
+                "src": "/showcase/tekvo/customer/35-tekvo-rewards-light.jpg",
+                "width": 786,
+                "height": 3566,
+                "thumb": "/showcase/tekvo/thumbs/customer/35-tekvo-rewards-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/35-tekvo-rewards-dark.jpg",
+                "width": 786,
+                "height": 3566,
+                "thumb": "/showcase/tekvo/thumbs/customer/35-tekvo-rewards-dark.jpg"
+              }
+            },
+            {
+              "code": "35b",
+              "name": "Redeem points",
+              "light": {
+                "src": "/showcase/tekvo/customer/35b-redeem-points-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/35b-redeem-points-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/35b-redeem-points-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/35b-redeem-points-dark.jpg"
+              }
+            },
+            {
+              "code": "36",
+              "name": "Settings",
+              "light": {
+                "src": "/showcase/tekvo/customer/36-settings-light.jpg",
+                "width": 786,
+                "height": 2658,
+                "thumb": "/showcase/tekvo/thumbs/customer/36-settings-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/36-settings-dark.jpg",
+                "width": 786,
+                "height": 2658,
+                "thumb": "/showcase/tekvo/thumbs/customer/36-settings-dark.jpg"
+              }
+            },
+            {
+              "code": "36b",
+              "name": "Language",
+              "light": {
+                "src": "/showcase/tekvo/customer/36b-language-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/36b-language-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/36b-language-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/36b-language-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "tekvo-plus",
+          "name": "Tekvo Plus",
+          "screens": [
+            {
+              "code": "47",
+              "name": "Tekvo Plus",
+              "light": {
+                "src": "/showcase/tekvo/customer/47-tekvo-plus-light.jpg",
+                "width": 786,
+                "height": 2722,
+                "thumb": "/showcase/tekvo/thumbs/customer/47-tekvo-plus-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/47-tekvo-plus-dark.jpg",
+                "width": 786,
+                "height": 2722,
+                "thumb": "/showcase/tekvo/thumbs/customer/47-tekvo-plus-dark.jpg"
+              }
+            },
+            {
+              "code": "47b",
+              "name": "Join Plus",
+              "light": {
+                "src": "/showcase/tekvo/customer/47b-join-plus-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/47b-join-plus-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/47b-join-plus-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/47b-join-plus-dark.jpg"
+              }
+            },
+            {
+              "code": "47c",
+              "name": "Welcome to Plus",
+              "light": {
+                "src": "/showcase/tekvo/customer/47c-welcome-to-plus-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/47c-welcome-to-plus-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/47c-welcome-to-plus-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/47c-welcome-to-plus-dark.jpg"
+              }
+            },
+            {
+              "code": "47d",
+              "name": "Manage Plus",
+              "light": {
+                "src": "/showcase/tekvo/customer/47d-manage-plus-light.jpg",
+                "width": 786,
+                "height": 2150,
+                "thumb": "/showcase/tekvo/thumbs/customer/47d-manage-plus-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/47d-manage-plus-dark.jpg",
+                "width": 786,
+                "height": 2150,
+                "thumb": "/showcase/tekvo/thumbs/customer/47d-manage-plus-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "support-chat",
+          "name": "Support chat",
+          "screens": [
+            {
+              "code": "44",
+              "name": "Support chat",
+              "light": {
+                "src": "/showcase/tekvo/customer/44-support-chat-light.jpg",
+                "width": 786,
+                "height": 2040,
+                "thumb": "/showcase/tekvo/thumbs/customer/44-support-chat-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/44-support-chat-dark.jpg",
+                "width": 786,
+                "height": 2040,
+                "thumb": "/showcase/tekvo/thumbs/customer/44-support-chat-dark.jpg"
+              }
+            },
+            {
+              "code": "44b",
+              "name": "Chat ended",
+              "light": {
+                "src": "/showcase/tekvo/customer/44b-chat-ended-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/44b-chat-ended-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/44b-chat-ended-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/44b-chat-ended-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "empty-loading-and-system-states",
+          "name": "Empty, loading and system states",
+          "screens": [
+            {
+              "code": "37",
+              "name": "Search · No results",
+              "light": {
+                "src": "/showcase/tekvo/customer/37-search-no-results-light.jpg",
+                "width": 786,
+                "height": 2102,
+                "thumb": "/showcase/tekvo/thumbs/customer/37-search-no-results-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37-search-no-results-dark.jpg",
+                "width": 786,
+                "height": 2102,
+                "thumb": "/showcase/tekvo/thumbs/customer/37-search-no-results-dark.jpg"
+              }
+            },
+            {
+              "code": "37b",
+              "name": "Filters · No match",
+              "light": {
+                "src": "/showcase/tekvo/customer/37b-filters-no-match-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37b-filters-no-match-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37b-filters-no-match-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37b-filters-no-match-dark.jpg"
+              }
+            },
+            {
+              "code": "37c",
+              "name": "No internet",
+              "light": {
+                "src": "/showcase/tekvo/customer/37c-no-internet-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37c-no-internet-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37c-no-internet-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37c-no-internet-dark.jpg"
+              }
+            },
+            {
+              "code": "37d",
+              "name": "Server error",
+              "light": {
+                "src": "/showcase/tekvo/customer/37d-server-error-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37d-server-error-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37d-server-error-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37d-server-error-dark.jpg"
+              }
+            },
+            {
+              "code": "37e",
+              "name": "Product unavailable",
+              "light": {
+                "src": "/showcase/tekvo/customer/37e-product-unavailable-light.jpg",
+                "width": 786,
+                "height": 1902,
+                "thumb": "/showcase/tekvo/thumbs/customer/37e-product-unavailable-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37e-product-unavailable-dark.jpg",
+                "width": 786,
+                "height": 1902,
+                "thumb": "/showcase/tekvo/thumbs/customer/37e-product-unavailable-dark.jpg"
+              }
+            },
+            {
+              "code": "37f",
+              "name": "No orders",
+              "light": {
+                "src": "/showcase/tekvo/customer/37f-no-orders-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37f-no-orders-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37f-no-orders-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37f-no-orders-dark.jpg"
+              }
+            },
+            {
+              "code": "37g",
+              "name": "No coupons",
+              "light": {
+                "src": "/showcase/tekvo/customer/37g-no-coupons-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37g-no-coupons-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37g-no-coupons-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37g-no-coupons-dark.jpg"
+              }
+            },
+            {
+              "code": "37h",
+              "name": "No addresses",
+              "light": {
+                "src": "/showcase/tekvo/customer/37h-no-addresses-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37h-no-addresses-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37h-no-addresses-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37h-no-addresses-dark.jpg"
+              }
+            },
+            {
+              "code": "37i",
+              "name": "No payment methods",
+              "light": {
+                "src": "/showcase/tekvo/customer/37i-no-payment-methods-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37i-no-payment-methods-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37i-no-payment-methods-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37i-no-payment-methods-dark.jpg"
+              }
+            },
+            {
+              "code": "37j",
+              "name": "No reviews",
+              "light": {
+                "src": "/showcase/tekvo/customer/37j-no-reviews-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37j-no-reviews-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/37j-no-reviews-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/37j-no-reviews-dark.jpg"
+              }
+            },
+            {
+              "code": "40",
+              "name": "Home · Loading",
+              "light": {
+                "src": "/showcase/tekvo/customer/40-home-loading-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/40-home-loading-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/40-home-loading-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/40-home-loading-dark.jpg"
+              }
+            },
+            {
+              "code": "40b",
+              "name": "Product details · Loading",
+              "light": {
+                "src": "/showcase/tekvo/customer/40b-product-details-loading-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/40b-product-details-loading-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/40b-product-details-loading-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/40b-product-details-loading-dark.jpg"
+              }
+            },
+            {
+              "code": "41",
+              "name": "Force update",
+              "light": {
+                "src": "/showcase/tekvo/customer/41-force-update-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/41-force-update-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/41-force-update-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/41-force-update-dark.jpg"
+              }
+            },
+            {
+              "code": "41b",
+              "name": "Session expired",
+              "light": {
+                "src": "/showcase/tekvo/customer/41b-session-expired-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/41b-session-expired-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/41b-session-expired-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/41b-session-expired-dark.jpg"
+              }
+            },
+            {
+              "code": "41c",
+              "name": "Maintenance",
+              "light": {
+                "src": "/showcase/tekvo/customer/41c-maintenance-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/41c-maintenance-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/customer/41c-maintenance-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/customer/41c-maintenance-dark.jpg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "rider",
+      "flows": [
+        {
+          "key": "onboarding",
+          "name": "Onboarding",
+          "screens": [
+            {
+              "code": "R29",
+              "name": "Sign in",
+              "light": {
+                "src": "/showcase/tekvo/rider/r29-sign-in-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r29-sign-in-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r29-sign-in-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r29-sign-in-dark.jpg"
+              }
+            },
+            {
+              "code": "R30",
+              "name": "Verify code",
+              "light": {
+                "src": "/showcase/tekvo/rider/r30-verify-code-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r30-verify-code-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r30-verify-code-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r30-verify-code-dark.jpg"
+              }
+            },
+            {
+              "code": "R31",
+              "name": "Permissions",
+              "light": {
+                "src": "/showcase/tekvo/rider/r31-permissions-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r31-permissions-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r31-permissions-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r31-permissions-dark.jpg"
+              }
+            },
+            {
+              "code": "R32",
+              "name": "Documents",
+              "light": {
+                "src": "/showcase/tekvo/rider/r32-documents-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r32-documents-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r32-documents-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r32-documents-dark.jpg"
+              }
+            },
+            {
+              "code": "R33",
+              "name": "Upload document",
+              "light": {
+                "src": "/showcase/tekvo/rider/r33-upload-document-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r33-upload-document-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r33-upload-document-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r33-upload-document-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "shift-and-pickup",
+          "name": "Shift and pickup",
+          "screens": [
+            {
+              "code": "R01",
+              "name": "Home · Off shift",
+              "light": {
+                "src": "/showcase/tekvo/rider/r01-home-off-shift-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r01-home-off-shift-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r01-home-off-shift-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r01-home-off-shift-dark.jpg"
+              }
+            },
+            {
+              "code": "R02",
+              "name": "Home · On shift",
+              "light": {
+                "src": "/showcase/tekvo/rider/r02-home-on-shift-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r02-home-on-shift-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r02-home-on-shift-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r02-home-on-shift-dark.jpg"
+              }
+            },
+            {
+              "code": "R03",
+              "name": "Run assigned · Express",
+              "light": {
+                "src": "/showcase/tekvo/rider/r03-run-assigned-express-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r03-run-assigned-express-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r03-run-assigned-express-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r03-run-assigned-express-dark.jpg"
+              }
+            },
+            {
+              "code": "R04",
+              "name": "Run assigned · Normal",
+              "light": {
+                "src": "/showcase/tekvo/rider/r04-run-assigned-normal-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r04-run-assigned-normal-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r04-run-assigned-normal-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r04-run-assigned-normal-dark.jpg"
+              }
+            },
+            {
+              "code": "R05",
+              "name": "Run overview",
+              "light": {
+                "src": "/showcase/tekvo/rider/r05-run-overview-light.jpg",
+                "width": 786,
+                "height": 3030,
+                "thumb": "/showcase/tekvo/thumbs/rider/r05-run-overview-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r05-run-overview-dark.jpg",
+                "width": 786,
+                "height": 3030,
+                "thumb": "/showcase/tekvo/thumbs/rider/r05-run-overview-dark.jpg"
+              }
+            },
+            {
+              "code": "R06",
+              "name": "Navigate with",
+              "light": {
+                "src": "/showcase/tekvo/rider/r06-navigate-with-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r06-navigate-with-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r06-navigate-with-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r06-navigate-with-dark.jpg"
+              }
+            },
+            {
+              "code": "R07",
+              "name": "Navigation · to P1",
+              "light": {
+                "src": "/showcase/tekvo/rider/r07-navigation-to-p1-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r07-navigation-to-p1-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r07-navigation-to-p1-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r07-navigation-to-p1-dark.jpg"
+              }
+            },
+            {
+              "code": "R08",
+              "name": "Pickup · P1 arrived",
+              "light": {
+                "src": "/showcase/tekvo/rider/r08-pickup-p1-arrived-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r08-pickup-p1-arrived-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r08-pickup-p1-arrived-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r08-pickup-p1-arrived-dark.jpg"
+              }
+            },
+            {
+              "code": "R09",
+              "name": "Scan parcels",
+              "light": {
+                "src": "/showcase/tekvo/rider/r09-scan-parcels-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r09-scan-parcels-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r09-scan-parcels-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r09-scan-parcels-dark.jpg"
+              }
+            },
+            {
+              "code": "R10",
+              "name": "Pickup · P1 ready",
+              "light": {
+                "src": "/showcase/tekvo/rider/r10-pickup-p1-ready-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r10-pickup-p1-ready-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r10-pickup-p1-ready-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r10-pickup-p1-ready-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "drop-off",
+          "name": "Drop-off",
+          "screens": [
+            {
+              "code": "R11",
+              "name": "Drop 1 · Arrived",
+              "light": {
+                "src": "/showcase/tekvo/rider/r11-drop-1-arrived-light.jpg",
+                "width": 786,
+                "height": 1718,
+                "thumb": "/showcase/tekvo/thumbs/rider/r11-drop-1-arrived-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r11-drop-1-arrived-dark.jpg",
+                "width": 786,
+                "height": 1718,
+                "thumb": "/showcase/tekvo/thumbs/rider/r11-drop-1-arrived-dark.jpg"
+              }
+            },
+            {
+              "code": "R12",
+              "name": "Delivery code",
+              "light": {
+                "src": "/showcase/tekvo/rider/r12-delivery-code-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r12-delivery-code-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r12-delivery-code-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r12-delivery-code-dark.jpg"
+              }
+            },
+            {
+              "code": "R13",
+              "name": "Photo proof",
+              "light": {
+                "src": "/showcase/tekvo/rider/r13-photo-proof-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r13-photo-proof-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r13-photo-proof-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r13-photo-proof-dark.jpg"
+              }
+            },
+            {
+              "code": "R14",
+              "name": "Collect payment",
+              "light": {
+                "src": "/showcase/tekvo/rider/r14-collect-payment-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r14-collect-payment-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r14-collect-payment-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r14-collect-payment-dark.jpg"
+              }
+            },
+            {
+              "code": "R15",
+              "name": "Delivered",
+              "light": {
+                "src": "/showcase/tekvo/rider/r15-delivered-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r15-delivered-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r15-delivered-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r15-delivered-dark.jpg"
+              }
+            },
+            {
+              "code": "R16",
+              "name": "Customer chat",
+              "light": {
+                "src": "/showcase/tekvo/rider/r16-customer-chat-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r16-customer-chat-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r16-customer-chat-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r16-customer-chat-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "exceptions",
+          "name": "Exceptions",
+          "screens": [
+            {
+              "code": "R17",
+              "name": "Can’t deliver · reason",
+              "light": {
+                "src": "/showcase/tekvo/rider/r17-can-t-deliver-reason-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r17-can-t-deliver-reason-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r17-can-t-deliver-reason-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r17-can-t-deliver-reason-dark.jpg"
+              }
+            },
+            {
+              "code": "R18",
+              "name": "Customer not responding",
+              "light": {
+                "src": "/showcase/tekvo/rider/r18-customer-not-responding-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r18-customer-not-responding-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r18-customer-not-responding-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r18-customer-not-responding-dark.jpg"
+              }
+            },
+            {
+              "code": "R19",
+              "name": "Reschedule delivery",
+              "light": {
+                "src": "/showcase/tekvo/rider/r19-reschedule-delivery-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r19-reschedule-delivery-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r19-reschedule-delivery-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r19-reschedule-delivery-dark.jpg"
+              }
+            },
+            {
+              "code": "R20",
+              "name": "Order cancelled alert",
+              "light": {
+                "src": "/showcase/tekvo/rider/r20-order-cancelled-alert-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r20-order-cancelled-alert-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r20-order-cancelled-alert-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r20-order-cancelled-alert-dark.jpg"
+              }
+            },
+            {
+              "code": "R21",
+              "name": "Return pickup",
+              "light": {
+                "src": "/showcase/tekvo/rider/r21-return-pickup-light.jpg",
+                "width": 786,
+                "height": 1770,
+                "thumb": "/showcase/tekvo/thumbs/rider/r21-return-pickup-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r21-return-pickup-dark.jpg",
+                "width": 786,
+                "height": 1770,
+                "thumb": "/showcase/tekvo/thumbs/rider/r21-return-pickup-dark.jpg"
+              }
+            },
+            {
+              "code": "R22",
+              "name": "Delivery attempt failed",
+              "light": {
+                "src": "/showcase/tekvo/rider/r22-delivery-attempt-failed-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r22-delivery-attempt-failed-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r22-delivery-attempt-failed-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r22-delivery-attempt-failed-dark.jpg"
+              }
+            },
+            {
+              "code": "R23",
+              "name": "Hand back stops",
+              "light": {
+                "src": "/showcase/tekvo/rider/r23-hand-back-stops-light.jpg",
+                "width": 786,
+                "height": 1762,
+                "thumb": "/showcase/tekvo/thumbs/rider/r23-hand-back-stops-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r23-hand-back-stops-dark.jpg",
+                "width": 786,
+                "height": 1762,
+                "thumb": "/showcase/tekvo/thumbs/rider/r23-hand-back-stops-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "truck-and-installation",
+          "name": "Truck and installation",
+          "screens": [
+            {
+              "code": "R53",
+              "name": "Install run · Assigned",
+              "light": {
+                "src": "/showcase/tekvo/rider/r53-install-run-assigned-light.jpg",
+                "width": 786,
+                "height": 1874,
+                "thumb": "/showcase/tekvo/thumbs/rider/r53-install-run-assigned-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r53-install-run-assigned-dark.jpg",
+                "width": 786,
+                "height": 1874,
+                "thumb": "/showcase/tekvo/thumbs/rider/r53-install-run-assigned-dark.jpg"
+              }
+            },
+            {
+              "code": "R54",
+              "name": "Load and secure",
+              "light": {
+                "src": "/showcase/tekvo/rider/r54-load-and-secure-light.jpg",
+                "width": 786,
+                "height": 1874,
+                "thumb": "/showcase/tekvo/thumbs/rider/r54-load-and-secure-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r54-load-and-secure-dark.jpg",
+                "width": 786,
+                "height": 1874,
+                "thumb": "/showcase/tekvo/thumbs/rider/r54-load-and-secure-dark.jpg"
+              }
+            },
+            {
+              "code": "R55",
+              "name": "Site check",
+              "light": {
+                "src": "/showcase/tekvo/rider/r55-site-check-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r55-site-check-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r55-site-check-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r55-site-check-dark.jpg"
+              }
+            },
+            {
+              "code": "R56",
+              "name": "Installation",
+              "light": {
+                "src": "/showcase/tekvo/rider/r56-installation-light.jpg",
+                "width": 786,
+                "height": 1790,
+                "thumb": "/showcase/tekvo/thumbs/rider/r56-installation-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r56-installation-dark.jpg",
+                "width": 786,
+                "height": 1790,
+                "thumb": "/showcase/tekvo/thumbs/rider/r56-installation-dark.jpg"
+              }
+            },
+            {
+              "code": "R57",
+              "name": "Customer sign-off",
+              "light": {
+                "src": "/showcase/tekvo/rider/r57-customer-sign-off-light.jpg",
+                "width": 786,
+                "height": 1898,
+                "thumb": "/showcase/tekvo/thumbs/rider/r57-customer-sign-off-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r57-customer-sign-off-dark.jpg",
+                "width": 786,
+                "height": 1898,
+                "thumb": "/showcase/tekvo/thumbs/rider/r57-customer-sign-off-dark.jpg"
+              }
+            },
+            {
+              "code": "R58",
+              "name": "Can’t install",
+              "light": {
+                "src": "/showcase/tekvo/rider/r58-can-t-install-light.jpg",
+                "width": 786,
+                "height": 2174,
+                "thumb": "/showcase/tekvo/thumbs/rider/r58-can-t-install-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r58-can-t-install-dark.jpg",
+                "width": 786,
+                "height": 2174,
+                "thumb": "/showcase/tekvo/thumbs/rider/r58-can-t-install-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "end-of-run",
+          "name": "End of run",
+          "screens": [
+            {
+              "code": "R24",
+              "name": "Run complete",
+              "light": {
+                "src": "/showcase/tekvo/rider/r24-run-complete-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r24-run-complete-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r24-run-complete-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r24-run-complete-dark.jpg"
+              }
+            },
+            {
+              "code": "R25",
+              "name": "Hub hand-over",
+              "light": {
+                "src": "/showcase/tekvo/rider/r25-hub-hand-over-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r25-hub-hand-over-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r25-hub-hand-over-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r25-hub-hand-over-dark.jpg"
+              }
+            },
+            {
+              "code": "R26",
+              "name": "End shift",
+              "light": {
+                "src": "/showcase/tekvo/rider/r26-end-shift-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r26-end-shift-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r26-end-shift-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r26-end-shift-dark.jpg"
+              }
+            },
+            {
+              "code": "R27",
+              "name": "History",
+              "light": {
+                "src": "/showcase/tekvo/rider/r27-history-light.jpg",
+                "width": 786,
+                "height": 2028,
+                "thumb": "/showcase/tekvo/thumbs/rider/r27-history-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r27-history-dark.jpg",
+                "width": 786,
+                "height": 2028,
+                "thumb": "/showcase/tekvo/thumbs/rider/r27-history-dark.jpg"
+              }
+            },
+            {
+              "code": "R28",
+              "name": "Run detail",
+              "light": {
+                "src": "/showcase/tekvo/rider/r28-run-detail-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r28-run-detail-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r28-run-detail-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r28-run-detail-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "runs-and-history",
+          "name": "Runs and history",
+          "screens": [
+            {
+              "code": "R41",
+              "name": "Runs",
+              "light": {
+                "src": "/showcase/tekvo/rider/r41-runs-light.jpg",
+                "width": 786,
+                "height": 1840,
+                "thumb": "/showcase/tekvo/thumbs/rider/r41-runs-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r41-runs-dark.jpg",
+                "width": 786,
+                "height": 1840,
+                "thumb": "/showcase/tekvo/thumbs/rider/r41-runs-dark.jpg"
+              }
+            },
+            {
+              "code": "R42",
+              "name": "Queued run",
+              "light": {
+                "src": "/showcase/tekvo/rider/r42-queued-run-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r42-queued-run-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r42-queued-run-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r42-queued-run-dark.jpg"
+              }
+            },
+            {
+              "code": "R43",
+              "name": "History filters",
+              "light": {
+                "src": "/showcase/tekvo/rider/r43-history-filters-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r43-history-filters-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r43-history-filters-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r43-history-filters-dark.jpg"
+              }
+            },
+            {
+              "code": "R44",
+              "name": "Cash & receipts",
+              "light": {
+                "src": "/showcase/tekvo/rider/r44-cash-and-receipts-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r44-cash-and-receipts-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r44-cash-and-receipts-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r44-cash-and-receipts-dark.jpg"
+              }
+            },
+            {
+              "code": "R45",
+              "name": "Proof of delivery",
+              "light": {
+                "src": "/showcase/tekvo/rider/r45-proof-of-delivery-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r45-proof-of-delivery-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r45-proof-of-delivery-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r45-proof-of-delivery-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "vehicle-check",
+          "name": "Vehicle check",
+          "screens": [
+            {
+              "code": "R59",
+              "name": "Daily vehicle check",
+              "light": {
+                "src": "/showcase/tekvo/rider/r59-daily-vehicle-check-light.jpg",
+                "width": 786,
+                "height": 2110,
+                "thumb": "/showcase/tekvo/thumbs/rider/r59-daily-vehicle-check-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r59-daily-vehicle-check-dark.jpg",
+                "width": 786,
+                "height": 2110,
+                "thumb": "/showcase/tekvo/thumbs/rider/r59-daily-vehicle-check-dark.jpg"
+              }
+            },
+            {
+              "code": "R60",
+              "name": "Report vehicle problem",
+              "light": {
+                "src": "/showcase/tekvo/rider/r60-report-vehicle-problem-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r60-report-vehicle-problem-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r60-report-vehicle-problem-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r60-report-vehicle-problem-dark.jpg"
+              }
+            },
+            {
+              "code": "R61",
+              "name": "Vehicle off road",
+              "light": {
+                "src": "/showcase/tekvo/rider/r61-vehicle-off-road-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r61-vehicle-off-road-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r61-vehicle-off-road-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r61-vehicle-off-road-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "account-and-safety",
+          "name": "Account and safety",
+          "screens": [
+            {
+              "code": "R34",
+              "name": "Account",
+              "light": {
+                "src": "/showcase/tekvo/rider/r34-account-light.jpg",
+                "width": 786,
+                "height": 2660,
+                "thumb": "/showcase/tekvo/thumbs/rider/r34-account-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r34-account-dark.jpg",
+                "width": 786,
+                "height": 2660,
+                "thumb": "/showcase/tekvo/thumbs/rider/r34-account-dark.jpg"
+              }
+            },
+            {
+              "code": "R35",
+              "name": "SOS",
+              "light": {
+                "src": "/showcase/tekvo/rider/r35-sos-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r35-sos-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r35-sos-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r35-sos-dark.jpg"
+              }
+            },
+            {
+              "code": "R36",
+              "name": "Shift schedule",
+              "light": {
+                "src": "/showcase/tekvo/rider/r36-shift-schedule-light.jpg",
+                "width": 786,
+                "height": 1780,
+                "thumb": "/showcase/tekvo/thumbs/rider/r36-shift-schedule-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r36-shift-schedule-dark.jpg",
+                "width": 786,
+                "height": 1780,
+                "thumb": "/showcase/tekvo/thumbs/rider/r36-shift-schedule-dark.jpg"
+              }
+            },
+            {
+              "code": "R37",
+              "name": "Location off",
+              "light": {
+                "src": "/showcase/tekvo/rider/r37-location-off-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r37-location-off-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r37-location-off-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r37-location-off-dark.jpg"
+              }
+            },
+            {
+              "code": "R38",
+              "name": "Offline mode",
+              "light": {
+                "src": "/showcase/tekvo/rider/r38-offline-mode-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r38-offline-mode-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r38-offline-mode-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r38-offline-mode-dark.jpg"
+              }
+            },
+            {
+              "code": "R39",
+              "name": "Low battery",
+              "light": {
+                "src": "/showcase/tekvo/rider/r39-low-battery-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r39-low-battery-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r39-low-battery-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r39-low-battery-dark.jpg"
+              }
+            },
+            {
+              "code": "R40",
+              "name": "Shift blocked",
+              "light": {
+                "src": "/showcase/tekvo/rider/r40-shift-blocked-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r40-shift-blocked-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r40-shift-blocked-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r40-shift-blocked-dark.jpg"
+              }
+            },
+            {
+              "code": "R46",
+              "name": "Personal details",
+              "light": {
+                "src": "/showcase/tekvo/rider/r46-personal-details-light.jpg",
+                "width": 786,
+                "height": 1824,
+                "thumb": "/showcase/tekvo/thumbs/rider/r46-personal-details-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r46-personal-details-dark.jpg",
+                "width": 786,
+                "height": 1824,
+                "thumb": "/showcase/tekvo/thumbs/rider/r46-personal-details-dark.jpg"
+              }
+            },
+            {
+              "code": "R47",
+              "name": "Vehicle",
+              "light": {
+                "src": "/showcase/tekvo/rider/r47-vehicle-light.jpg",
+                "width": 786,
+                "height": 1722,
+                "thumb": "/showcase/tekvo/thumbs/rider/r47-vehicle-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r47-vehicle-dark.jpg",
+                "width": 786,
+                "height": 1722,
+                "thumb": "/showcase/tekvo/thumbs/rider/r47-vehicle-dark.jpg"
+              }
+            },
+            {
+              "code": "R48",
+              "name": "App settings",
+              "light": {
+                "src": "/showcase/tekvo/rider/r48-app-settings-light.jpg",
+                "width": 786,
+                "height": 1724,
+                "thumb": "/showcase/tekvo/thumbs/rider/r48-app-settings-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r48-app-settings-dark.jpg",
+                "width": 786,
+                "height": 1724,
+                "thumb": "/showcase/tekvo/thumbs/rider/r48-app-settings-dark.jpg"
+              }
+            },
+            {
+              "code": "R49",
+              "name": "Language",
+              "light": {
+                "src": "/showcase/tekvo/rider/r49-language-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r49-language-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r49-language-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r49-language-dark.jpg"
+              }
+            },
+            {
+              "code": "R50",
+              "name": "Guides & training",
+              "light": {
+                "src": "/showcase/tekvo/rider/r50-guides-and-training-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r50-guides-and-training-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r50-guides-and-training-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r50-guides-and-training-dark.jpg"
+              }
+            },
+            {
+              "code": "R51",
+              "name": "Report an incident",
+              "light": {
+                "src": "/showcase/tekvo/rider/r51-report-an-incident-light.jpg",
+                "width": 786,
+                "height": 1794,
+                "thumb": "/showcase/tekvo/thumbs/rider/r51-report-an-incident-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r51-report-an-incident-dark.jpg",
+                "width": 786,
+                "height": 1794,
+                "thumb": "/showcase/tekvo/thumbs/rider/r51-report-an-incident-dark.jpg"
+              }
+            },
+            {
+              "code": "R52",
+              "name": "Notifications",
+              "light": {
+                "src": "/showcase/tekvo/rider/r52-notifications-light.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r52-notifications-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/rider/r52-notifications-dark.jpg",
+                "width": 786,
+                "height": 1704,
+                "thumb": "/showcase/tekvo/thumbs/rider/r52-notifications-dark.jpg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "admin",
+      "flows": [
+        {
+          "key": "sign-in",
+          "name": "Sign in",
+          "screens": [
+            {
+              "code": "D00",
+              "name": "Sign in",
+              "light": {
+                "src": "/showcase/tekvo/admin/d00-sign-in-light.jpg",
+                "width": 1440,
+                "height": 900,
+                "thumb": "/showcase/tekvo/thumbs/admin/d00-sign-in-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d00-sign-in-dark.jpg",
+                "width": 1440,
+                "height": 900,
+                "thumb": "/showcase/tekvo/thumbs/admin/d00-sign-in-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "overview-and-live-operations",
+          "name": "Overview and live operations",
+          "screens": [
+            {
+              "code": "D07",
+              "name": "Overview",
+              "light": {
+                "src": "/showcase/tekvo/admin/d07-overview-light.jpg",
+                "width": 1440,
+                "height": 1164,
+                "thumb": "/showcase/tekvo/thumbs/admin/d07-overview-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d07-overview-dark.jpg",
+                "width": 1440,
+                "height": 1164,
+                "thumb": "/showcase/tekvo/thumbs/admin/d07-overview-dark.jpg"
+              }
+            },
+            {
+              "code": "D01",
+              "name": "Live operations",
+              "light": {
+                "src": "/showcase/tekvo/admin/d01-live-operations-light.jpg",
+                "width": 1440,
+                "height": 1346,
+                "thumb": "/showcase/tekvo/thumbs/admin/d01-live-operations-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d01-live-operations-dark.jpg",
+                "width": 1440,
+                "height": 1346,
+                "thumb": "/showcase/tekvo/thumbs/admin/d01-live-operations-dark.jpg"
+              }
+            },
+            {
+              "code": "D02",
+              "name": "Assign orders",
+              "light": {
+                "src": "/showcase/tekvo/admin/d02-assign-orders-light.jpg",
+                "width": 1440,
+                "height": 1346,
+                "thumb": "/showcase/tekvo/thumbs/admin/d02-assign-orders-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d02-assign-orders-dark.jpg",
+                "width": 1440,
+                "height": 1346,
+                "thumb": "/showcase/tekvo/thumbs/admin/d02-assign-orders-dark.jpg"
+              }
+            },
+            {
+              "code": "D17",
+              "name": "Order board",
+              "light": {
+                "src": "/showcase/tekvo/admin/d17-order-board-light.jpg",
+                "width": 1600,
+                "height": 858,
+                "thumb": "/showcase/tekvo/thumbs/admin/d17-order-board-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d17-order-board-dark.jpg",
+                "width": 1600,
+                "height": 858,
+                "thumb": "/showcase/tekvo/thumbs/admin/d17-order-board-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "orders",
+          "name": "Orders",
+          "screens": [
+            {
+              "code": "D03",
+              "name": "Orders",
+              "light": {
+                "src": "/showcase/tekvo/admin/d03-orders-light.jpg",
+                "width": 1440,
+                "height": 1036,
+                "thumb": "/showcase/tekvo/thumbs/admin/d03-orders-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d03-orders-dark.jpg",
+                "width": 1440,
+                "height": 1036,
+                "thumb": "/showcase/tekvo/thumbs/admin/d03-orders-dark.jpg"
+              }
+            },
+            {
+              "code": "D08",
+              "name": "Order detail",
+              "light": {
+                "src": "/showcase/tekvo/admin/d08-order-detail-light.jpg",
+                "width": 1440,
+                "height": 1108,
+                "thumb": "/showcase/tekvo/thumbs/admin/d08-order-detail-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d08-order-detail-dark.jpg",
+                "width": 1440,
+                "height": 1108,
+                "thumb": "/showcase/tekvo/thumbs/admin/d08-order-detail-dark.jpg"
+              }
+            },
+            {
+              "code": "D38",
+              "name": "Create order",
+              "light": {
+                "src": "/showcase/tekvo/admin/d38-create-order-light.jpg",
+                "width": 1440,
+                "height": 1200,
+                "thumb": "/showcase/tekvo/thumbs/admin/d38-create-order-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d38-create-order-dark.jpg",
+                "width": 1440,
+                "height": 1200,
+                "thumb": "/showcase/tekvo/thumbs/admin/d38-create-order-dark.jpg"
+              }
+            },
+            {
+              "code": "D42",
+              "name": "Cancel order",
+              "light": {
+                "src": "/showcase/tekvo/admin/d42-cancel-order-light.jpg",
+                "width": 1440,
+                "height": 1108,
+                "thumb": "/showcase/tekvo/thumbs/admin/d42-cancel-order-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d42-cancel-order-dark.jpg",
+                "width": 1440,
+                "height": 1108,
+                "thumb": "/showcase/tekvo/thumbs/admin/d42-cancel-order-dark.jpg"
+              }
+            },
+            {
+              "code": "D44",
+              "name": "Orders · Loading",
+              "light": {
+                "src": "/showcase/tekvo/admin/d44-orders-loading-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d44-orders-loading-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d44-orders-loading-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d44-orders-loading-dark.jpg"
+              }
+            },
+            {
+              "code": "D45",
+              "name": "Orders · No results",
+              "light": {
+                "src": "/showcase/tekvo/admin/d45-orders-no-results-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d45-orders-no-results-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d45-orders-no-results-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d45-orders-no-results-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "routing-and-riders",
+          "name": "Routing and riders",
+          "screens": [
+            {
+              "code": "D46",
+              "name": "Routing",
+              "light": {
+                "src": "/showcase/tekvo/admin/d46-routing-light.jpg",
+                "width": 1440,
+                "height": 1044,
+                "thumb": "/showcase/tekvo/thumbs/admin/d46-routing-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d46-routing-dark.jpg",
+                "width": 1440,
+                "height": 1044,
+                "thumb": "/showcase/tekvo/thumbs/admin/d46-routing-dark.jpg"
+              }
+            },
+            {
+              "code": "D48",
+              "name": "Routing rules",
+              "light": {
+                "src": "/showcase/tekvo/admin/d48-routing-rules-light.jpg",
+                "width": 1440,
+                "height": 1403,
+                "thumb": "/showcase/tekvo/thumbs/admin/d48-routing-rules-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d48-routing-rules-dark.jpg",
+                "width": 1440,
+                "height": 1403,
+                "thumb": "/showcase/tekvo/thumbs/admin/d48-routing-rules-dark.jpg"
+              }
+            },
+            {
+              "code": "D04",
+              "name": "Riders",
+              "light": {
+                "src": "/showcase/tekvo/admin/d04-riders-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d04-riders-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d04-riders-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d04-riders-dark.jpg"
+              }
+            },
+            {
+              "code": "D09",
+              "name": "Rider detail",
+              "light": {
+                "src": "/showcase/tekvo/admin/d09-rider-detail-light.jpg",
+                "width": 1440,
+                "height": 1051,
+                "thumb": "/showcase/tekvo/thumbs/admin/d09-rider-detail-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d09-rider-detail-dark.jpg",
+                "width": 1440,
+                "height": 1051,
+                "thumb": "/showcase/tekvo/thumbs/admin/d09-rider-detail-dark.jpg"
+              }
+            },
+            {
+              "code": "D14",
+              "name": "Hubs",
+              "light": {
+                "src": "/showcase/tekvo/admin/d14-hubs-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d14-hubs-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d14-hubs-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d14-hubs-dark.jpg"
+              }
+            },
+            {
+              "code": "D39",
+              "name": "Hub Marina",
+              "light": {
+                "src": "/showcase/tekvo/admin/d39-hub-marina-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d39-hub-marina-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d39-hub-marina-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d39-hub-marina-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "catalog-and-stock",
+          "name": "Catalog and stock",
+          "screens": [
+            {
+              "code": "D10",
+              "name": "Products",
+              "light": {
+                "src": "/showcase/tekvo/admin/d10-products-light.jpg",
+                "width": 1440,
+                "height": 1040,
+                "thumb": "/showcase/tekvo/thumbs/admin/d10-products-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d10-products-dark.jpg",
+                "width": 1440,
+                "height": 1040,
+                "thumb": "/showcase/tekvo/thumbs/admin/d10-products-dark.jpg"
+              }
+            },
+            {
+              "code": "D18",
+              "name": "Add product",
+              "light": {
+                "src": "/showcase/tekvo/admin/d18-add-product-light.jpg",
+                "width": 1440,
+                "height": 1706,
+                "thumb": "/showcase/tekvo/thumbs/admin/d18-add-product-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d18-add-product-dark.jpg",
+                "width": 1440,
+                "height": 1706,
+                "thumb": "/showcase/tekvo/thumbs/admin/d18-add-product-dark.jpg"
+              }
+            },
+            {
+              "code": "D22",
+              "name": "Categories",
+              "light": {
+                "src": "/showcase/tekvo/admin/d22-categories-light.jpg",
+                "width": 1440,
+                "height": 1040,
+                "thumb": "/showcase/tekvo/thumbs/admin/d22-categories-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d22-categories-dark.jpg",
+                "width": 1440,
+                "height": 1040,
+                "thumb": "/showcase/tekvo/thumbs/admin/d22-categories-dark.jpg"
+              }
+            },
+            {
+              "code": "D43",
+              "name": "Import products",
+              "light": {
+                "src": "/showcase/tekvo/admin/d43-import-products-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d43-import-products-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d43-import-products-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d43-import-products-dark.jpg"
+              }
+            },
+            {
+              "code": "D11",
+              "name": "Inventory",
+              "light": {
+                "src": "/showcase/tekvo/admin/d11-inventory-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d11-inventory-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d11-inventory-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d11-inventory-dark.jpg"
+              }
+            },
+            {
+              "code": "D41",
+              "name": "Transfer stock",
+              "light": {
+                "src": "/showcase/tekvo/admin/d41-transfer-stock-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d41-transfer-stock-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d41-transfer-stock-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d41-transfer-stock-dark.jpg"
+              }
+            },
+            {
+              "code": "D25",
+              "name": "Purchase orders",
+              "light": {
+                "src": "/showcase/tekvo/admin/d25-purchase-orders-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d25-purchase-orders-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d25-purchase-orders-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d25-purchase-orders-dark.jpg"
+              }
+            },
+            {
+              "code": "D40",
+              "name": "PO-26-0398",
+              "light": {
+                "src": "/showcase/tekvo/admin/d40-po-26-0398-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d40-po-26-0398-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d40-po-26-0398-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d40-po-26-0398-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "customers-and-marketing",
+          "name": "Customers and marketing",
+          "screens": [
+            {
+              "code": "D12",
+              "name": "Customers",
+              "light": {
+                "src": "/showcase/tekvo/admin/d12-customers-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d12-customers-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d12-customers-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d12-customers-dark.jpg"
+              }
+            },
+            {
+              "code": "D35",
+              "name": "Customer Omar Haddad",
+              "light": {
+                "src": "/showcase/tekvo/admin/d35-customer-omar-haddad-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d35-customer-omar-haddad-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d35-customer-omar-haddad-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d35-customer-omar-haddad-dark.jpg"
+              }
+            },
+            {
+              "code": "D13",
+              "name": "Promotions",
+              "light": {
+                "src": "/showcase/tekvo/admin/d13-promotions-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d13-promotions-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d13-promotions-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d13-promotions-dark.jpg"
+              }
+            },
+            {
+              "code": "D36",
+              "name": "Create promotion",
+              "light": {
+                "src": "/showcase/tekvo/admin/d36-create-promotion-light.jpg",
+                "width": 1440,
+                "height": 1311,
+                "thumb": "/showcase/tekvo/thumbs/admin/d36-create-promotion-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d36-create-promotion-dark.jpg",
+                "width": 1440,
+                "height": 1311,
+                "thumb": "/showcase/tekvo/thumbs/admin/d36-create-promotion-dark.jpg"
+              }
+            },
+            {
+              "code": "D23",
+              "name": "Abandoned carts",
+              "light": {
+                "src": "/showcase/tekvo/admin/d23-abandoned-carts-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d23-abandoned-carts-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d23-abandoned-carts-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d23-abandoned-carts-dark.jpg"
+              }
+            },
+            {
+              "code": "D24",
+              "name": "Reviews & Q&A",
+              "light": {
+                "src": "/showcase/tekvo/admin/d24-reviews-and-qanda-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d24-reviews-and-qanda-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d24-reviews-and-qanda-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d24-reviews-and-qanda-dark.jpg"
+              }
+            },
+            {
+              "code": "D27",
+              "name": "Banners & content",
+              "light": {
+                "src": "/showcase/tekvo/admin/d27-banners-and-content-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d27-banners-and-content-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d27-banners-and-content-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d27-banners-and-content-dark.jpg"
+              }
+            },
+            {
+              "code": "D28",
+              "name": "Tekvo Plus",
+              "light": {
+                "src": "/showcase/tekvo/admin/d28-tekvo-plus-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d28-tekvo-plus-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d28-tekvo-plus-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d28-tekvo-plus-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "returns-and-money",
+          "name": "Returns and money",
+          "screens": [
+            {
+              "code": "D05",
+              "name": "Returns",
+              "light": {
+                "src": "/showcase/tekvo/admin/d05-returns-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d05-returns-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d05-returns-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d05-returns-dark.jpg"
+              }
+            },
+            {
+              "code": "D34",
+              "name": "Return RET-30288",
+              "light": {
+                "src": "/showcase/tekvo/admin/d34-return-ret-30288-light.jpg",
+                "width": 1440,
+                "height": 1220,
+                "thumb": "/showcase/tekvo/thumbs/admin/d34-return-ret-30288-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d34-return-ret-30288-dark.jpg",
+                "width": 1440,
+                "height": 1220,
+                "thumb": "/showcase/tekvo/thumbs/admin/d34-return-ret-30288-dark.jpg"
+              }
+            },
+            {
+              "code": "D37",
+              "name": "Refund dialog",
+              "light": {
+                "src": "/showcase/tekvo/admin/d37-refund-dialog-light.jpg",
+                "width": 1440,
+                "height": 1108,
+                "thumb": "/showcase/tekvo/thumbs/admin/d37-refund-dialog-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d37-refund-dialog-dark.jpg",
+                "width": 1440,
+                "height": 1108,
+                "thumb": "/showcase/tekvo/thumbs/admin/d37-refund-dialog-dark.jpg"
+              }
+            },
+            {
+              "code": "D06",
+              "name": "Cash reconciliation",
+              "light": {
+                "src": "/showcase/tekvo/admin/d06-cash-reconciliation-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d06-cash-reconciliation-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d06-cash-reconciliation-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d06-cash-reconciliation-dark.jpg"
+              }
+            },
+            {
+              "code": "D47",
+              "name": "Remittances",
+              "light": {
+                "src": "/showcase/tekvo/admin/d47-remittances-light.jpg",
+                "width": 1440,
+                "height": 1009,
+                "thumb": "/showcase/tekvo/thumbs/admin/d47-remittances-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d47-remittances-dark.jpg",
+                "width": 1440,
+                "height": 1009,
+                "thumb": "/showcase/tekvo/thumbs/admin/d47-remittances-dark.jpg"
+              }
+            },
+            {
+              "code": "D49",
+              "name": "Remittance case",
+              "light": {
+                "src": "/showcase/tekvo/admin/d49-remittance-case-light.jpg",
+                "width": 1440,
+                "height": 1213,
+                "thumb": "/showcase/tekvo/thumbs/admin/d49-remittance-case-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d49-remittance-case-dark.jpg",
+                "width": 1440,
+                "height": 1213,
+                "thumb": "/showcase/tekvo/thumbs/admin/d49-remittance-case-dark.jpg"
+              }
+            },
+            {
+              "code": "D15",
+              "name": "Invoices & VAT",
+              "light": {
+                "src": "/showcase/tekvo/admin/d15-invoices-and-vat-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d15-invoices-and-vat-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d15-invoices-and-vat-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d15-invoices-and-vat-dark.jpg"
+              }
+            },
+            {
+              "code": "D26",
+              "name": "Payments & payouts",
+              "light": {
+                "src": "/showcase/tekvo/admin/d26-payments-and-payouts-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d26-payments-and-payouts-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d26-payments-and-payouts-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d26-payments-and-payouts-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "reports",
+          "name": "Reports",
+          "screens": [
+            {
+              "code": "D29",
+              "name": "Reports",
+              "light": {
+                "src": "/showcase/tekvo/admin/d29-reports-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d29-reports-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d29-reports-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d29-reports-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "settings",
+          "name": "Settings",
+          "screens": [
+            {
+              "code": "D16",
+              "name": "Settings",
+              "light": {
+                "src": "/showcase/tekvo/admin/d16-settings-light.jpg",
+                "width": 1440,
+                "height": 1444,
+                "thumb": "/showcase/tekvo/thumbs/admin/d16-settings-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d16-settings-dark.jpg",
+                "width": 1440,
+                "height": 1444,
+                "thumb": "/showcase/tekvo/thumbs/admin/d16-settings-dark.jpg"
+              }
+            },
+            {
+              "code": "D19",
+              "name": "Settings · Taxes",
+              "light": {
+                "src": "/showcase/tekvo/admin/d19-settings-taxes-light.jpg",
+                "width": 1440,
+                "height": 1359,
+                "thumb": "/showcase/tekvo/thumbs/admin/d19-settings-taxes-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d19-settings-taxes-dark.jpg",
+                "width": 1440,
+                "height": 1359,
+                "thumb": "/showcase/tekvo/thumbs/admin/d19-settings-taxes-dark.jpg"
+              }
+            },
+            {
+              "code": "D20",
+              "name": "Settings · Delivery & slots",
+              "light": {
+                "src": "/showcase/tekvo/admin/d20-settings-delivery-and-slots-light.jpg",
+                "width": 1440,
+                "height": 1570,
+                "thumb": "/showcase/tekvo/thumbs/admin/d20-settings-delivery-and-slots-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d20-settings-delivery-and-slots-dark.jpg",
+                "width": 1440,
+                "height": 1570,
+                "thumb": "/showcase/tekvo/thumbs/admin/d20-settings-delivery-and-slots-dark.jpg"
+              }
+            },
+            {
+              "code": "D21",
+              "name": "Settings · Payments",
+              "light": {
+                "src": "/showcase/tekvo/admin/d21-settings-payments-light.jpg",
+                "width": 1440,
+                "height": 1290,
+                "thumb": "/showcase/tekvo/thumbs/admin/d21-settings-payments-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d21-settings-payments-dark.jpg",
+                "width": 1440,
+                "height": 1290,
+                "thumb": "/showcase/tekvo/thumbs/admin/d21-settings-payments-dark.jpg"
+              }
+            },
+            {
+              "code": "D30",
+              "name": "Settings · General",
+              "light": {
+                "src": "/showcase/tekvo/admin/d30-settings-general-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d30-settings-general-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d30-settings-general-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d30-settings-general-dark.jpg"
+              }
+            },
+            {
+              "code": "D31",
+              "name": "Settings · Notifications",
+              "light": {
+                "src": "/showcase/tekvo/admin/d31-settings-notifications-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d31-settings-notifications-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d31-settings-notifications-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d31-settings-notifications-dark.jpg"
+              }
+            },
+            {
+              "code": "D32",
+              "name": "Settings · Integrations",
+              "light": {
+                "src": "/showcase/tekvo/admin/d32-settings-integrations-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d32-settings-integrations-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d32-settings-integrations-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d32-settings-integrations-dark.jpg"
+              }
+            },
+            {
+              "code": "D33",
+              "name": "Settings · Audit log",
+              "light": {
+                "src": "/showcase/tekvo/admin/d33-settings-audit-log-light.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d33-settings-audit-log-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/admin/d33-settings-audit-log-dark.jpg",
+                "width": 1440,
+                "height": 1030,
+                "thumb": "/showcase/tekvo/thumbs/admin/d33-settings-audit-log-dark.jpg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "hub",
+      "flows": [
+        {
+          "key": "overview-and-orders",
+          "name": "Overview and orders",
+          "screens": [
+            {
+              "code": "S00",
+              "name": "Overview",
+              "light": {
+                "src": "/showcase/tekvo/hub/s00-overview-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s00-overview-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s00-overview-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s00-overview-dark.jpg"
+              }
+            },
+            {
+              "code": "S01",
+              "name": "Incoming orders",
+              "light": {
+                "src": "/showcase/tekvo/hub/s01-incoming-orders-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s01-incoming-orders-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s01-incoming-orders-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s01-incoming-orders-dark.jpg"
+              }
+            },
+            {
+              "code": "S02",
+              "name": "Reject order",
+              "light": {
+                "src": "/showcase/tekvo/hub/s02-reject-order-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s02-reject-order-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s02-reject-order-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s02-reject-order-dark.jpg"
+              }
+            },
+            {
+              "code": "S03",
+              "name": "Orders board",
+              "light": {
+                "src": "/showcase/tekvo/hub/s03-orders-board-light.jpg",
+                "width": 1600,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/s03-orders-board-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s03-orders-board-dark.jpg",
+                "width": 1600,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/s03-orders-board-dark.jpg"
+              }
+            },
+            {
+              "code": "S04",
+              "name": "Assign driver",
+              "light": {
+                "src": "/showcase/tekvo/hub/s04-assign-driver-light.jpg",
+                "width": 1600,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/s04-assign-driver-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s04-assign-driver-dark.jpg",
+                "width": 1600,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/s04-assign-driver-dark.jpg"
+              }
+            },
+            {
+              "code": "S10",
+              "name": "Store · Incoming orders",
+              "light": {
+                "src": "/showcase/tekvo/hub/s10-store-incoming-orders-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s10-store-incoming-orders-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s10-store-incoming-orders-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s10-store-incoming-orders-dark.jpg"
+              }
+            },
+            {
+              "code": "S14",
+              "name": "All orders",
+              "light": {
+                "src": "/showcase/tekvo/hub/s14-all-orders-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s14-all-orders-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s14-all-orders-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s14-all-orders-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "drivers-vehicles-and-custody",
+          "name": "Drivers, vehicles and custody",
+          "screens": [
+            {
+              "code": "S05",
+              "name": "Drivers",
+              "light": {
+                "src": "/showcase/tekvo/hub/s05-drivers-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s05-drivers-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s05-drivers-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s05-drivers-dark.jpg"
+              }
+            },
+            {
+              "code": "S06",
+              "name": "Vehicles",
+              "light": {
+                "src": "/showcase/tekvo/hub/s06-vehicles-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s06-vehicles-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s06-vehicles-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s06-vehicles-dark.jpg"
+              }
+            },
+            {
+              "code": "S07",
+              "name": "Parcel custody",
+              "light": {
+                "src": "/showcase/tekvo/hub/s07-parcel-custody-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s07-parcel-custody-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s07-parcel-custody-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s07-parcel-custody-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "driver-cash-and-remittance",
+          "name": "Driver cash and remittance",
+          "screens": [
+            {
+              "code": "S08",
+              "name": "Driver cash",
+              "light": {
+                "src": "/showcase/tekvo/hub/s08-driver-cash-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s08-driver-cash-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s08-driver-cash-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s08-driver-cash-dark.jpg"
+              }
+            },
+            {
+              "code": "S09",
+              "name": "Remittance",
+              "light": {
+                "src": "/showcase/tekvo/hub/s09-remittance-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s09-remittance-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s09-remittance-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s09-remittance-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "stock-transfers-and-returns",
+          "name": "Stock, transfers and returns",
+          "screens": [
+            {
+              "code": "S11",
+              "name": "Inventory",
+              "light": {
+                "src": "/showcase/tekvo/hub/s11-inventory-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s11-inventory-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s11-inventory-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s11-inventory-dark.jpg"
+              }
+            },
+            {
+              "code": "S12",
+              "name": "Transfers",
+              "light": {
+                "src": "/showcase/tekvo/hub/s12-transfers-light.jpg",
+                "width": 1440,
+                "height": 1082,
+                "thumb": "/showcase/tekvo/thumbs/hub/s12-transfers-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s12-transfers-dark.jpg",
+                "width": 1440,
+                "height": 1082,
+                "thumb": "/showcase/tekvo/thumbs/hub/s12-transfers-dark.jpg"
+              }
+            },
+            {
+              "code": "S13",
+              "name": "Returns intake",
+              "light": {
+                "src": "/showcase/tekvo/hub/s13-returns-intake-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s13-returns-intake-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s13-returns-intake-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s13-returns-intake-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "team-and-settings",
+          "name": "Team and settings",
+          "screens": [
+            {
+              "code": "S15",
+              "name": "Team",
+              "light": {
+                "src": "/showcase/tekvo/hub/s15-team-light.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s15-team-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s15-team-dark.jpg",
+                "width": 1440,
+                "height": 1001,
+                "thumb": "/showcase/tekvo/thumbs/hub/s15-team-dark.jpg"
+              }
+            },
+            {
+              "code": "S16",
+              "name": "Settings",
+              "light": {
+                "src": "/showcase/tekvo/hub/s16-settings-light.jpg",
+                "width": 1440,
+                "height": 1120,
+                "thumb": "/showcase/tekvo/thumbs/hub/s16-settings-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/s16-settings-dark.jpg",
+                "width": 1440,
+                "height": 1120,
+                "thumb": "/showcase/tekvo/thumbs/hub/s16-settings-dark.jpg"
+              }
+            }
+          ]
+        },
+        {
+          "key": "hub-tablet",
+          "name": "Hub tablet",
+          "screens": [
+            {
+              "code": "H01",
+              "name": "Hub tablet · Board",
+              "light": {
+                "src": "/showcase/tekvo/hub/h01-hub-tablet-board-light.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h01-hub-tablet-board-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/h01-hub-tablet-board-dark.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h01-hub-tablet-board-dark.jpg"
+              }
+            },
+            {
+              "code": "H02",
+              "name": "Hub tablet · Picking",
+              "light": {
+                "src": "/showcase/tekvo/hub/h02-hub-tablet-picking-light.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h02-hub-tablet-picking-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/h02-hub-tablet-picking-dark.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h02-hub-tablet-picking-dark.jpg"
+              }
+            },
+            {
+              "code": "H03",
+              "name": "Hub tablet · Packing",
+              "light": {
+                "src": "/showcase/tekvo/hub/h03-hub-tablet-packing-light.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h03-hub-tablet-packing-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/h03-hub-tablet-packing-dark.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h03-hub-tablet-packing-dark.jpg"
+              }
+            },
+            {
+              "code": "H04",
+              "name": "Hub tablet · Handoff",
+              "light": {
+                "src": "/showcase/tekvo/hub/h04-hub-tablet-handoff-light.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h04-hub-tablet-handoff-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/h04-hub-tablet-handoff-dark.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h04-hub-tablet-handoff-dark.jpg"
+              }
+            },
+            {
+              "code": "H05",
+              "name": "Hub tablet · Returns",
+              "light": {
+                "src": "/showcase/tekvo/hub/h05-hub-tablet-returns-light.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h05-hub-tablet-returns-light.jpg"
+              },
+              "dark": {
+                "src": "/showcase/tekvo/hub/h05-hub-tablet-returns-dark.jpg",
+                "width": 1194,
+                "height": 834,
+                "thumb": "/showcase/tekvo/thumbs/hub/h05-hub-tablet-returns-dark.jpg"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "blueprint": {
+    "name": "B01 Order & money flow — blueprint",
+    "src": "/showcase/tekvo/hub/b01-order-and-money-flow-blueprint.jpg",
+    "width": 1600,
+    "height": 1060
+  },
+  "covers": [
+    {
+      "name": "Cover",
+      "src": "/showcase/tekvo/cover/cover.jpg",
+      "width": 1600,
+      "height": 800
+    },
+    {
+      "name": "Rider cover",
+      "src": "/showcase/tekvo/cover/rider-cover.jpg",
+      "width": 1600,
+      "height": 800
+    }
+  ],
+  "system": [
+    {
+      "name": "Foundations",
+      "images": [
+        {
+          "name": "00 Cover",
+          "src": "/showcase/tekvo/system/foundations/00-cover.jpg",
+          "width": 1440,
+          "height": 1248,
+          "thumb": "/showcase/tekvo/thumbs/system/foundations/00-cover.jpg"
+        },
+        {
+          "name": "01 Color primitives",
+          "src": "/showcase/tekvo/system/foundations/01-color-primitives.jpg",
+          "width": 1440,
+          "height": 1672,
+          "thumb": "/showcase/tekvo/thumbs/system/foundations/01-color-primitives.jpg"
+        },
+        {
+          "name": "02 Color roles",
+          "src": "/showcase/tekvo/system/foundations/02-color-roles.jpg",
+          "width": 1440,
+          "height": 2042,
+          "thumb": "/showcase/tekvo/thumbs/system/foundations/02-color-roles.jpg"
+        },
+        {
+          "name": "03 Typography",
+          "src": "/showcase/tekvo/system/foundations/03-typography.jpg",
+          "width": 1440,
+          "height": 1555,
+          "thumb": "/showcase/tekvo/thumbs/system/foundations/03-typography.jpg"
+        },
+        {
+          "name": "04 Spacing & sizing",
+          "src": "/showcase/tekvo/system/foundations/04-spacing-and-sizing.jpg",
+          "width": 1440,
+          "height": 1260,
+          "thumb": "/showcase/tekvo/thumbs/system/foundations/04-spacing-and-sizing.jpg"
+        },
+        {
+          "name": "05 Shape, elevation & states",
+          "src": "/showcase/tekvo/system/foundations/05-shape-elevation-and-states.jpg",
+          "width": 1440,
+          "height": 1744,
+          "thumb": "/showcase/tekvo/thumbs/system/foundations/05-shape-elevation-and-states.jpg"
+        },
+        {
+          "name": "06 Layout & breakpoints",
+          "src": "/showcase/tekvo/system/foundations/06-layout-and-breakpoints.jpg",
+          "width": 1440,
+          "height": 1016,
+          "thumb": "/showcase/tekvo/thumbs/system/foundations/06-layout-and-breakpoints.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Components",
+      "images": [
+        {
+          "name": "C1 Icons",
+          "src": "/showcase/tekvo/system/components/c1-icons.jpg",
+          "width": 1440,
+          "height": 462,
+          "thumb": "/showcase/tekvo/thumbs/system/components/c1-icons.jpg"
+        },
+        {
+          "name": "C2 Actions",
+          "src": "/showcase/tekvo/system/components/c2-actions.jpg",
+          "width": 1440,
+          "height": 1458,
+          "thumb": "/showcase/tekvo/thumbs/system/components/c2-actions.jpg"
+        },
+        {
+          "name": "C3 Inputs",
+          "src": "/showcase/tekvo/system/components/c3-inputs.jpg",
+          "width": 1440,
+          "height": 1174,
+          "thumb": "/showcase/tekvo/thumbs/system/components/c3-inputs.jpg"
+        },
+        {
+          "name": "C4 Display",
+          "src": "/showcase/tekvo/system/components/c4-display.jpg",
+          "width": 1440,
+          "height": 1042,
+          "thumb": "/showcase/tekvo/thumbs/system/components/c4-display.jpg"
+        },
+        {
+          "name": "C5 Navigation",
+          "src": "/showcase/tekvo/system/components/c5-navigation.jpg",
+          "width": 1440,
+          "height": 884,
+          "thumb": "/showcase/tekvo/thumbs/system/components/c5-navigation.jpg"
+        },
+        {
+          "name": "C6 Theming",
+          "src": "/showcase/tekvo/system/components/c6-theming.jpg",
+          "width": 1440,
+          "height": 1188,
+          "thumb": "/showcase/tekvo/thumbs/system/components/c6-theming.jpg"
+        }
+      ]
+    },
+    {
+      "name": "App widget library",
+      "images": [
+        {
+          "name": "L1 Brand & icons",
+          "src": "/showcase/tekvo/system/widgets/l1-brand-and-icons.jpg",
+          "width": 1440,
+          "height": 852,
+          "thumb": "/showcase/tekvo/thumbs/system/widgets/l1-brand-and-icons.jpg"
+        },
+        {
+          "name": "L2 Actions",
+          "src": "/showcase/tekvo/system/widgets/l2-actions.jpg",
+          "width": 1440,
+          "height": 1652,
+          "thumb": "/showcase/tekvo/thumbs/system/widgets/l2-actions.jpg"
+        },
+        {
+          "name": "L3 Commerce",
+          "src": "/showcase/tekvo/system/widgets/l3-commerce.jpg",
+          "width": 1440,
+          "height": 2358,
+          "thumb": "/showcase/tekvo/thumbs/system/widgets/l3-commerce.jpg"
+        },
+        {
+          "name": "L4 Navigation & forms",
+          "src": "/showcase/tekvo/system/widgets/l4-navigation-and-forms.jpg",
+          "width": 1440,
+          "height": 3137,
+          "thumb": "/showcase/tekvo/thumbs/system/widgets/l4-navigation-and-forms.jpg"
+        },
+        {
+          "name": "L5 Authentication",
+          "src": "/showcase/tekvo/system/widgets/l5-authentication.jpg",
+          "width": 1440,
+          "height": 1214,
+          "thumb": "/showcase/tekvo/thumbs/system/widgets/l5-authentication.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Web components",
+      "images": [
+        {
+          "name": "Library header",
+          "src": "/showcase/tekvo/system/web/library-header.jpg",
+          "width": 1600,
+          "height": 158,
+          "thumb": "/showcase/tekvo/thumbs/system/web/library-header.jpg"
+        },
+        {
+          "name": "Button",
+          "src": "/showcase/tekvo/system/web/button.jpg",
+          "width": 1600,
+          "height": 358,
+          "thumb": "/showcase/tekvo/thumbs/system/web/button.jpg"
+        },
+        {
+          "name": "Badge",
+          "src": "/showcase/tekvo/system/web/badge.jpg",
+          "width": 1600,
+          "height": 231,
+          "thumb": "/showcase/tekvo/thumbs/system/web/badge.jpg"
+        },
+        {
+          "name": "Form controls",
+          "src": "/showcase/tekvo/system/web/form-controls.jpg",
+          "width": 1600,
+          "height": 760,
+          "thumb": "/showcase/tekvo/thumbs/system/web/form-controls.jpg"
+        },
+        {
+          "name": "Navigation",
+          "src": "/showcase/tekvo/system/web/navigation.jpg",
+          "width": 1600,
+          "height": 463,
+          "thumb": "/showcase/tekvo/thumbs/system/web/navigation.jpg"
+        },
+        {
+          "name": "Data display",
+          "src": "/showcase/tekvo/system/web/data-display.jpg",
+          "width": 1600,
+          "height": 672,
+          "thumb": "/showcase/tekvo/thumbs/system/web/data-display.jpg"
+        },
+        {
+          "name": "Feedback and overlays",
+          "src": "/showcase/tekvo/system/web/feedback-and-overlays.jpg",
+          "width": 1600,
+          "height": 877,
+          "thumb": "/showcase/tekvo/thumbs/system/web/feedback-and-overlays.jpg"
+        },
+        {
+          "name": "Preview — Dark",
+          "src": "/showcase/tekvo/system/web/preview-dark.jpg",
+          "width": 1600,
+          "height": 1702,
+          "thumb": "/showcase/tekvo/thumbs/system/web/preview-dark.jpg"
+        }
+      ]
+    }
+  ],
+  "store": [
+    {
+      "name": "Icon previews",
+      "src": "/showcase/tekvo/store/icon-previews.jpg",
+      "width": 1600,
+      "height": 538,
+      "thumb": "/showcase/tekvo/thumbs/store/icon-previews.jpg"
+    },
+    {
+      "name": "App Store · 6.9in · 01",
+      "src": "/showcase/tekvo/store/app-store-6-9in-01.jpg",
+      "width": 860,
+      "height": 1864,
+      "thumb": "/showcase/tekvo/thumbs/store/app-store-6-9in-01.jpg"
+    },
+    {
+      "name": "App Store · 6.9in · 02",
+      "src": "/showcase/tekvo/store/app-store-6-9in-02.jpg",
+      "width": 860,
+      "height": 1864,
+      "thumb": "/showcase/tekvo/thumbs/store/app-store-6-9in-02.jpg"
+    },
+    {
+      "name": "App Store · 6.9in · 03",
+      "src": "/showcase/tekvo/store/app-store-6-9in-03.jpg",
+      "width": 860,
+      "height": 1864,
+      "thumb": "/showcase/tekvo/thumbs/store/app-store-6-9in-03.jpg"
+    },
+    {
+      "name": "App Store · 6.9in · 04",
+      "src": "/showcase/tekvo/store/app-store-6-9in-04.jpg",
+      "width": 860,
+      "height": 1864,
+      "thumb": "/showcase/tekvo/thumbs/store/app-store-6-9in-04.jpg"
+    },
+    {
+      "name": "App Store · 6.9in · 05",
+      "src": "/showcase/tekvo/store/app-store-6-9in-05.jpg",
+      "width": 860,
+      "height": 1864,
+      "thumb": "/showcase/tekvo/thumbs/store/app-store-6-9in-05.jpg"
+    },
+    {
+      "name": "App Store · 6.9in · 06",
+      "src": "/showcase/tekvo/store/app-store-6-9in-06.jpg",
+      "width": 860,
+      "height": 1864,
+      "thumb": "/showcase/tekvo/thumbs/store/app-store-6-9in-06.jpg"
+    },
+    {
+      "name": "App Store · 6.9in · 07",
+      "src": "/showcase/tekvo/store/app-store-6-9in-07.jpg",
+      "width": 860,
+      "height": 1864,
+      "thumb": "/showcase/tekvo/thumbs/store/app-store-6-9in-07.jpg"
+    },
+    {
+      "name": "Google Play · Phone · 01",
+      "src": "/showcase/tekvo/store/google-play-phone-01.jpg",
+      "width": 860,
+      "height": 1529,
+      "thumb": "/showcase/tekvo/thumbs/store/google-play-phone-01.jpg"
+    },
+    {
+      "name": "Google Play · Phone · 02",
+      "src": "/showcase/tekvo/store/google-play-phone-02.jpg",
+      "width": 860,
+      "height": 1529,
+      "thumb": "/showcase/tekvo/thumbs/store/google-play-phone-02.jpg"
+    },
+    {
+      "name": "Google Play · Phone · 03",
+      "src": "/showcase/tekvo/store/google-play-phone-03.jpg",
+      "width": 860,
+      "height": 1529,
+      "thumb": "/showcase/tekvo/thumbs/store/google-play-phone-03.jpg"
+    },
+    {
+      "name": "Google Play · Phone · 04",
+      "src": "/showcase/tekvo/store/google-play-phone-04.jpg",
+      "width": 860,
+      "height": 1529,
+      "thumb": "/showcase/tekvo/thumbs/store/google-play-phone-04.jpg"
+    },
+    {
+      "name": "Google Play · Phone · 05",
+      "src": "/showcase/tekvo/store/google-play-phone-05.jpg",
+      "width": 860,
+      "height": 1529,
+      "thumb": "/showcase/tekvo/thumbs/store/google-play-phone-05.jpg"
+    },
+    {
+      "name": "Google Play · Phone · 06",
+      "src": "/showcase/tekvo/store/google-play-phone-06.jpg",
+      "width": 860,
+      "height": 1529,
+      "thumb": "/showcase/tekvo/thumbs/store/google-play-phone-06.jpg"
+    },
+    {
+      "name": "Google Play · Phone · 07",
+      "src": "/showcase/tekvo/store/google-play-phone-07.jpg",
+      "width": 860,
+      "height": 1529,
+      "thumb": "/showcase/tekvo/thumbs/store/google-play-phone-07.jpg"
+    },
+    {
+      "name": "Google Play · Feature graphic",
+      "src": "/showcase/tekvo/store/google-play-feature-graphic.jpg",
+      "width": 860,
+      "height": 420,
+      "thumb": "/showcase/tekvo/thumbs/store/google-play-feature-graphic.jpg"
+    }
+  ]
+}
