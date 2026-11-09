@@ -188,6 +188,46 @@ export default function Page() {
         the iOS simulator (Xcode needed), and the check can tap every button and render at other Dynamic Type sizes.
       </p>
       <Code code="check my component against the Figma frame with verify_code" title="Prompt" copy={false} />
+      <h3 id="coverage">What the check does not cover</h3>
+      <p>
+        A pixel match says the default state looks right. It does not say the button&apos;s pressed or disabled state,
+        its keyboard behaviour or its screen-reader name are right. So every <code>verify_code</code> result has a{" "}
+        <code>coverage</code> block:
+      </p>
+      <ul>
+        <li>
+          <strong>Checked:</strong> what the run did, such as the default state at the design size, the layer boxes, the
+          buttons it tapped or the keys it pressed.
+        </li>
+        <li>
+          <strong>Not checked, per control:</strong> each button, field, toggle or tab row with the states, keyboard and
+          screen-reader behaviour no check covered. A state the design draws (a <code>State=Disabled</code> variant) is
+          told apart from one it never drew, so the designer knows what to add.
+        </li>
+        <li>
+          <strong>Screen:</strong> dark mode, other widths and text sizes, right-to-left and reduced motion.
+        </li>
+      </ul>
+      <p>
+        React and HTML checks also press Tab through the page and report the Tab order, controls with no visible focus
+        indicator, buttons Enter or Space does not activate, controls without an accessible name and clickable elements
+        the keyboard cannot reach. The agent hands the not-checked list back with its implementation, so the next
+        reviewer knows what is left.
+      </p>
+      <Code
+        lang="json"
+        title="verify_code (part of the result)"
+        copy={false}
+        code={`"coverage": {
+  "checked": ["default state at 393x852, light mode: 0.8% of pixels differ", "keyboard: 4 elements reached with Tab, ..."],
+  "notChecked": [{
+    "element": "Pay now (button, 1:2)",
+    "checked": ["reached with Tab (stop 4)", "Enter/Space activates it", "accessible name \"Pay now\""],
+    "notChecked": ["disabled state (in the design as State=Disabled; not rendered)", "loading state (not in the design)", "no visible focus indicator"]
+  }],
+  "screen": ["dark mode", "widths other than 393", "browser zoom and larger text", "right-to-left languages"]
+}`}
+      />
 
       <h2>Large frames</h2>
       <p>

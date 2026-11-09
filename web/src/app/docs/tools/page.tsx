@@ -61,7 +61,7 @@ const groups: { title: string; tools: Tool[] }[] = [
       },
       {
         name: "verify_code",
-        desc: "Check Flutter, SwiftUI, React or HTML code against the design: renders it at 2x (Flutter with flutter test, SwiftUI in the iOS simulator, React and HTML in headless Chrome with Tailwind) and compares the render with Figma's own. Returns compiler, analyzer or runtime errors, broken images, the share of differing pixels and a diff image. With file, it checks your widget, view, component or page inside your project; without it, the generated reference code, layer by layer.",
+        desc: "Check Flutter, SwiftUI, React or HTML code against the design: renders it at 2x (Flutter with flutter test, SwiftUI in the iOS simulator, React and HTML in headless Chrome with Tailwind) and compares the render with Figma's own. Returns compiler, analyzer or runtime errors, broken images, the share of differing pixels and a diff image. With file, it checks your widget, view, component or page inside your project; without it, the generated reference code, layer by layer. Every result has a coverage block: what was checked, and per control the states, keyboard and screen-reader behaviour that were not. React and HTML runs also report the Tab order, missing focus indicators, keyboard activation and accessible names.",
         args: [
           node,
           ["framework", "flutter, swiftui, react or html (default: from the file, then the client and the project)."],

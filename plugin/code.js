@@ -456,8 +456,9 @@ async function textDetails(ctx, node, out) {
 }
 
 async function componentDetails(node, out) {
+  let main = null;
   try {
-    const main = await node.getMainComponentAsync();
+    main = await node.getMainComponentAsync();
     if (main) {
       out.mainComponent = main.name;
       out.componentKey = main.key;
@@ -472,6 +473,17 @@ async function componentDetails(node, out) {
       out.componentProperties = clean(node.componentProperties);
     }
   } catch (e) { /* unreadable properties */ }
+  // Every value a variant can take, so checks know which states the design draws.
+  try {
+    const set = main && main.parent && main.parent.type === 'COMPONENT_SET' ? main.parent : null;
+    const defs = set ? set.componentPropertyDefinitions : null;
+    if (defs && out.componentProperties) {
+      for (const key of Object.keys(out.componentProperties)) {
+        const def = defs[key];
+        if (def && def.type === 'VARIANT' && def.variantOptions) out.componentProperties[key].variantOptions = def.variantOptions.slice(0, 20);
+      }
+    }
+  } catch (e) { /* remote set not loaded */ }
 }
 
 async function reactions(ctx, node) {
