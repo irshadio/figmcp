@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { coverage, HANDOFF } from '../coverage.js';
 import { fitPng } from '../png.js';
 import { detectFramework, tailwindVersion } from '../project.js';
 import { DATA_DIR } from '../store.js';
@@ -239,6 +240,7 @@ async function verifySwiftUI({ id, exported, file, view, fonts, device, interact
     ...(report.generatorWarnings.length ? { generatorWarnings: brief(report.generatorWarnings) } : {}),
     files: report.files,
   };
+  const tree = exported.data.frames[0].tree;
   if (report.failedAt === 'render') {
     return [text({ ...summary, device: report.device }), text(`The code compiled, but rendering failed: ${report.renderError}`)];
   }
@@ -255,11 +257,16 @@ async function verifySwiftUI({ id, exported, file, view, fonts, device, interact
     ...(report.dynamicType ? { dynamicType: report.dynamicType } : {}),
     ...(report.interactions ? { interactions: { ...report.interactions, each: brief(report.interactions.each.map((t) =>
       `${t.label || '(no label)'}: ${t.hung ? 'hung' : [t.redrew ? 'redrew' : null, t.action ? `asked the owner ${t.action}` : null].filter(Boolean).join(', ') || 'no visible effect'}`), 40) } } : {}),
+    coverage: coverage(tree, {
+      framework: 'swiftui', pixels: report.pixels, checkedLayers: report.checkedBoxes, dynamicType: report.dynamicType,
+      interactions: report.interactions, project: Boolean(file),
+    }),
   });
   return [
     text(summary),
     text('Diff (the design in grey, differing pixels in red, system UI left out in blue):'),
     image(fitPng(fs.readFileSync(report.files.diff), DIFF_MAX)),
+    text(HANDOFF),
   ];
 }
 
@@ -297,7 +304,13 @@ export function registerVerifyTools(server, bridge, source) {
       'in a fallback font, and emoji have no colour font in the Flutter test, ' +
       'so text after them shifts. The design\'s status bar and home indicator ' +
       'belong to the phone and are left out of the SwiftUI comparison. A run ' +
-      'takes from 20 seconds to a few minutes.',
+      'takes from 20 seconds to a few minutes.\n\n' +
+      'Every result has a coverage block: what the run checked, and for each interactive element (from its role and ' +
+      'the states its Figma component defines) the states, keyboard and screen-reader behaviour it did not check, ' +
+      'plus screen-wide items (dark mode, other widths and text sizes, right-to-left). React and HTML runs also ' +
+      'press Tab through the page: the Tab order, missing focus indicators, controls Enter or Space does not ' +
+      'activate, missing accessible names and clickable elements the keyboard cannot reach. Hand the not-checked ' +
+      'list back with the implementation.',
     inputSchema: {
       nodeId: nodeIdSchema.optional(),
       fileKey: fileKeySchema,
@@ -370,12 +383,17 @@ export function registerVerifyTools(server, bridge, source) {
       runtimeErrors: report.runtimeErrors,
       renderedSize: report.renderedSize,
     };
+    const tree = exported.data.frames[0].tree;
     if (report.viewport) {
-      Object.assign(summary, { viewport: report.viewport, offscreenLayers: brief(report.offscreenLayers), files: report.files });
+      Object.assign(summary, {
+        viewport: report.viewport, offscreenLayers: brief(report.offscreenLayers), files: report.files,
+        coverage: coverage(tree, { framework: 'flutter', viewport: report.viewport, project: Boolean(file) }),
+      });
       return [
         text(summary),
         text(`Rendered at ${report.viewport.width}x${report.viewport.height}:`),
         image(fitPng(fs.readFileSync(report.files.rendered), DIFF_MAX)),
+        text(HANDOFF),
       ];
     }
     Object.assign(summary, {
@@ -389,13 +407,35 @@ export function registerVerifyTools(server, bridge, source) {
       fontsNotFound: report.fontsNotBundled,
       ...(report.generatorWarnings && report.generatorWarnings.length ? { generatorWarnings: brief(report.generatorWarnings) } : {}),
       files: report.files,
+      coverage: coverage(tree, { framework: 'flutter', pixels: report.pixels, checkedLayers: report.checkedBoxes, project: Boolean(file) }),
     });
     return [
       text(summary),
       text('Diff (the design in grey, differing pixels in red):'),
       image(fitPng(fs.readFileSync(report.files.diff), DIFF_MAX)),
+      text(HANDOFF),
     ];
   }));
+}
+
+/** The keyboard findings worth acting on: problems first, then the Tab order. */
+function keyboardSummary(k) {
+  if (!k) return {};
+  if (k.error) return { keyboard: { error: k.error } };
+  const label = (e) => `${e.name || '(no name)'} <${e.tag}${e.role ? ` role=${e.role}` : ''}>`;
+  const pick = (f) => brief(k.elements.filter(f).map(label), 10);
+  const problems = {
+    notReachable: pick((e) => e.tabIndex < 0 && !e.disabled),
+    noFocusIndicator: pick((e) => e.tabIndex >= 0 && e.focusVisible === false),
+    notActivatedByKeyboard: pick((e) => e.activates === false),
+    noAccessibleName: pick((e) => !e.name),
+  };
+  return {
+    keyboard: {
+      tabOrder: brief(k.tabOrder, 30),
+      ...Object.fromEntries(Object.entries(problems).filter(([, v]) => v.length)),
+    },
+  };
 }
 
 async function verifyReact(source, { nodeId, file, viewport, fonts = [], css, tailwind, html = false }) {
@@ -442,11 +482,14 @@ async function verifyReact(source, { nodeId, file, viewport, fonts = [], css, ta
     Object.assign(summary, {
       viewport: report.viewport, pageSize: report.pageSize, horizontalOverflow: report.horizontalOverflow,
       offscreenLayers: brief(report.offscreenLayers), files: report.files,
+      ...keyboardSummary(report.keyboard),
+      coverage: coverage(frame.tree, { framework: html ? 'html' : 'react', viewport: report.viewport, keyboard: report.keyboard, project: Boolean(file) }),
     });
     return [
       text(summary),
       text(`Rendered at ${report.viewport.width}x${report.viewport.height}:`),
       image(fs.readFileSync(report.files.rendered)),
+      text(HANDOFF),
     ];
   }
   Object.assign(summary, {
@@ -460,10 +503,15 @@ async function verifyReact(source, { nodeId, file, viewport, fonts = [], css, ta
     fontsNotFound: report.fontsNotBundled,
     ...(report.generatorWarnings && report.generatorWarnings.length ? { generatorWarnings: brief(report.generatorWarnings) } : {}),
     files: report.files,
+    ...keyboardSummary(report.keyboard),
+    coverage: coverage(frame.tree, {
+      framework: html ? 'html' : 'react', pixels: report.pixels, checkedLayers: report.checkedBoxes, keyboard: report.keyboard, project: Boolean(file),
+    }),
   });
   return [
     text(summary),
     text('Diff (the design in grey, differing pixels in red):'),
     image(fs.readFileSync(report.files.diff)),
+    text(HANDOFF),
   ];
 }

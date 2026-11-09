@@ -57,6 +57,11 @@ const FLUTTER_GUIDANCE =
   'as system UI belong to the phone, not the app: leave them out and keep ' +
   'their room with SafeArea. Compare the result with the screenshot.';
 
+// The design shows one state of each control; the rest needs checking.
+const VERIFY_HANDOFF =
+  'The design shows one state of each control: after implementing, run verify_code and hand back its coverage ' +
+  'list (pressed, disabled, focus, keyboard and screen-reader behaviour it did not check) with your result.';
+
 const SWIFTUI_GUIDANCE =
   'IMPORTANT: the code above is reference SwiftUI, written the way a production screen is built: adapt it to the ' +
   'project (its design system, models, navigation and state) and keep what it does. Values are exact, in points: ' +
@@ -492,8 +497,8 @@ export function registerDesignTools(server, bridge, source) {
     if (vars && vars.source === 'live' && Object.keys(vars.defs).length) {
       out.push(text(`These variables and styles are used in the design:\n${JSON.stringify(vars.defs, null, 2)}`));
     }
-    out.push(text({ flutter: FLUTTER_GUIDANCE, swiftui: SWIFTUI_GUIDANCE }[framework]
-      || guidance({ tailwind: tailwindVersion(), html: framework === 'html' })));
+    out.push(text(`${{ flutter: FLUTTER_GUIDANCE, swiftui: SWIFTUI_GUIDANCE }[framework]
+      || guidance({ tailwind: tailwindVersion(), html: framework === 'html' })} ${VERIFY_HANDOFF}`));
     out = withinBudget(out, RESPONSE_CHARS);
     // A node too large to render still gets its code.
     const shot = shotRead && await shotRead;

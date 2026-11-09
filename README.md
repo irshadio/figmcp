@@ -145,7 +145,7 @@ Step-by-step for each client, on macOS and Windows: [figmcp.web.app/docs/configu
 | `get_screenshot` | PNG of a node or the selection. |
 | `get_variable_defs` | Variables and styles used by a node, resolved for its mode. |
 | `download_assets` | Exported renders, original image fills and vector SVGs. |
-| `verify_code` | Render Flutter code with `flutter test`, or React or HTML + Tailwind in headless Chrome, and compare it with Figma's render: errors, layout mismatches, differing pixels and a diff image. |
+| `verify_code` | Render Flutter code with `flutter test`, SwiftUI in the iOS simulator, or React or HTML + Tailwind in headless Chrome, and compare it with Figma's render: errors, layout mismatches, differing pixels and a diff image. Every result lists what the check did not cover (states, keyboard and screen-reader behaviour per control) for the agent to hand back. |
 | `use_figma` | Run Figma plugin API scripts to create and edit designs. |
 | `search_design_system` | Components (with properties and variants), styles and variables of the open file, to reuse while designing. |
 | `place_image` | Put a local PNG, JPG, GIF or SVG into the open file, as a new layer or a layer's fill. |
