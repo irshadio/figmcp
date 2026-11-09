@@ -4,16 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { projectLinks } from "@/lib/projects";
-import { site } from "@/lib/site";
+import { products, site } from "@/lib/site";
 import { GitHubIcon, MenuIcon, NpmIcon } from "./icons";
-import { Logo } from "./logo";
+import { Logo, LogoMark } from "./logo";
 import { Search } from "./search";
+import { StackMark } from "./stack-logo";
 
 const links = [
   { href: "/#features", label: "Features" },
   { href: "/#how", label: "How it works" },
   { href: "/#tools", label: "Tools" },
-  { href: "/showcase", label: "Showcase", highlight: true },
   { href: "/docs", label: "Docs" },
 ];
 
@@ -44,11 +44,41 @@ export function Nav() {
           <Logo height={24} />
         </Link>
         <nav className="hidden items-center gap-1 md:flex">
+          <div className="group/products relative">
+            <button
+              type="button"
+              aria-haspopup="true"
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition hover:text-fg ${pathname === "/stack" ? "text-fg" : "text-muted"}`}
+            >
+              Products
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className="transition group-hover/products:rotate-180 group-focus-within/products:rotate-180">
+                <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <div className="invisible absolute top-full left-0 pt-2 opacity-0 transition group-focus-within/products:visible group-focus-within/products:opacity-100 group-hover/products:visible group-hover/products:opacity-100">
+              <div className="w-[340px] rounded-2xl border border-line-2 bg-panel/95 p-2 shadow-2xl backdrop-blur-xl">
+                {products.map((p) => (
+                  <Link key={p.href} href={p.href} className="flex items-center gap-3.5 rounded-xl px-3 py-3 transition hover:bg-white/6">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 bg-bg">
+                      {p.mark === "stack" ? <StackMark size={20} className="text-fg" /> : <LogoMark size={20} />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2 text-sm font-medium text-fg">
+                        {p.name}
+                        {p.mark === "stack" && <span className="rounded-full bg-blue/15 px-1.5 py-px font-mono text-[10px] text-blue">New</span>}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted">{p.kind}</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="group relative">
             <button
               type="button"
               aria-haspopup="true"
-              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition hover:text-fg ${pathname.startsWith("/projects") ? "text-fg" : "text-muted"}`}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition hover:text-fg ${pathname.startsWith("/projects") || pathname === "/showcase" ? "text-fg" : "text-muted"}`}
             >
               Projects
               <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className="transition group-hover:rotate-180 group-focus-within:rotate-180">
@@ -59,7 +89,7 @@ export function Nav() {
               <div className="w-72 rounded-xl border border-line-2 bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl">
                 {projectLinks.map((p) => (
                   <Link key={p.href} href={p.href} className="block rounded-lg px-3 py-2.5 transition hover:bg-white/6">
-                    <div className="text-sm text-fg">{p.name}</div>
+                    <div className="text-sm text-fg">{p.href === "/showcase" ? <Highlighted label={p.name} /> : p.name}</div>
                     <div className="mt-0.5 text-xs text-muted">{p.kind}</div>
                   </Link>
                 ))}
@@ -71,10 +101,10 @@ export function Nav() {
               key={l.href}
               href={l.href}
               className={`rounded-lg px-3 py-1.5 text-sm transition hover:text-fg ${
-                (pathname.startsWith("/docs") && l.href === "/docs") || (pathname === "/showcase" && l.href === "/showcase") ? "text-fg" : "text-muted"
+                (pathname.startsWith("/docs") && l.href === "/docs") || pathname === l.href ? "text-fg" : "text-muted"
               }`}
             >
-              {l.highlight ? <Highlighted label={l.label} /> : l.label}
+              {l.label}
             </Link>
           ))}
         </nav>
@@ -123,15 +153,23 @@ export function Nav() {
       </div>
       {open && (
         <nav className="border-t border-line px-4 pt-2 pb-4 md:hidden">
+          <div className="px-2 pt-2.5 pb-1 font-mono text-xs tracking-wider text-dim uppercase">Products</div>
+          {products.map((p) => (
+            <Link key={p.href} href={p.href} onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-lg px-2 py-2.5 text-muted hover:text-fg">
+              {p.mark === "stack" ? <StackMark size={16} className="text-fg" /> : <LogoMark size={16} />}
+              {p.name}
+              {p.mark === "stack" && <span className="rounded-full bg-blue/15 px-1.5 py-px font-mono text-[10px] text-blue">New</span>}
+            </Link>
+          ))}
           <div className="px-2 pt-2.5 pb-1 font-mono text-xs tracking-wider text-dim uppercase">Projects</div>
           {projectLinks.map((p) => (
             <Link key={p.href} href={p.href} onClick={() => setOpen(false)} className="block rounded-lg px-2 py-2.5 text-muted hover:text-fg">
-              {p.name}
+              {p.href === "/showcase" ? <Highlighted label={p.name} /> : p.name}
             </Link>
           ))}
           {links.map((l) => (
             <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="block rounded-lg px-2 py-2.5 text-muted hover:text-fg">
-              {l.highlight ? <Highlighted label={l.label} /> : l.label}
+              {l.label}
             </Link>
           ))}
           <a href={site.github} target="_blank" rel="noreferrer" className="block rounded-lg px-2 py-2.5 text-muted hover:text-fg">

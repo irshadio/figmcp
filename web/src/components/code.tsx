@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { CopyButton } from "./copy-command";
 
-export type Lang = "bash" | "json" | "dart" | "swift" | "tsx" | "js" | "text";
+export type Lang = "bash" | "json" | "yaml" | "dart" | "swift" | "tsx" | "js" | "text";
 
 const KEYWORDS: Record<string, string[]> = {
   dart: ["import", "class", "extends", "final", "const", "return", "override", "Widget", "build", "void", "new", "required", "this", "super", "static"],
@@ -26,7 +26,7 @@ function highlight(src: string, lang: Lang): ReactNode[] {
     const [t, comment, str, num, tag, word] = m;
     const next = src[re.lastIndex];
     let cls = "";
-    if (comment && (lang === "bash" ? comment.startsWith("#") : comment.startsWith("//"))) cls = "text-dim italic";
+    if (comment && (lang === "bash" || lang === "yaml" ? comment.startsWith("#") : comment.startsWith("//"))) cls = "text-dim italic";
     else if (comment) {
       re.lastIndex = m.index + 1;
       out.push(t[0]);

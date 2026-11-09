@@ -11,6 +11,16 @@ export const site = {
     "A local Figma MCP server for Claude Code, Cursor and any MCP client. Turn Figma frames into Flutter, SwiftUI and React code, or design in Figma. No API limits.",
 };
 
+export const stack = {
+  name: "Stack",
+  install: "npx -y @irshad.io/figma-local-mcp@latest add stack",
+};
+
+export const products = [
+  { href: "/", name: "figmcp", kind: "Design to code, locally", mark: "figmcp" },
+  { href: "/stack", name: "Stack", kind: "Backend, infra and deploy from your design", mark: "stack" },
+] as const;
+
 export const docsNav = [
   {
     title: "Get started",
