@@ -2,6 +2,18 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.8.2",
+    notes: [
+      { type: "improved", text: "Coverage says when the code draws a control as a plain element: a button, tab row or field the design has but the code renders as a div, which keyboard and screen-reader users cannot use." },
+      { type: "improved", text: "Coverage reads like a review: controls are named by their text when layer names are generic, repeated controls are grouped (\"Add ×4\"), section headers are no longer listed as controls, and a selection the design draws counts as checked." },
+      { type: "fixed", text: "A focus indicator turned off with outline-none was reported as visible; the check now compares only what shows." },
+      { type: "fixed", text: "The keyboard check walks past scrolling areas Chrome makes focusable, so controls after a scrolling row are checked." },
+      { type: "fixed", text: "Hostile handlers no longer break the keyboard check: dialogs are dismissed, navigation away is blocked, controls that vanish are skipped, and a handler that hangs is reported on its control while the rest of the results stand." },
+      { type: "fixed", text: "A key handler on a div with role=button counts as activating it, and long pages say when the Tab walk stopped at 120 stops." },
+      { type: "fixed", text: "SwiftUI: a button whose tap does nothing is listed as not working rather than checked, and a Dynamic Type run explains why its pixels differ from the design." },
+    ],
+  },
+  {
     version: "1.8.1",
     notes: [
       { type: "fixed", text: "Security updates: the MCP SDK, zod, body-parser, qs, fast-uri and ip-address move to patched versions, and the package now requires them, so installs cannot pick a vulnerable release." },
