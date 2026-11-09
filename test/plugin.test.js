@@ -241,3 +241,31 @@ test('a paint bound to a variable carries the variable\'s value for the layer, n
   assert.deepEqual(tree.fills[0].color, { r: 0.96, g: 0.965, b: 0.97 });
   assert.equal(tree.fills[0].opacity, 1);
 });
+
+test('an instance exports every value its variant can take, and a set it cannot read leaves the rest intact', async () => {
+  const set = {
+    type: 'COMPONENT_SET', name: 'Button', key: 'set-key',
+    componentPropertyDefinitions: {
+      State: { type: 'VARIANT', defaultValue: 'Default', variantOptions: ['Default', 'Hover', 'Pressed', 'Disabled'] },
+      'Label#1:0': { type: 'TEXT', defaultValue: 'Button' },
+    },
+  };
+  const main = { name: 'State=Default', key: 'main-key', parent: set };
+  const broken = { type: 'COMPONENT_SET', name: 'Remote', key: 'remote', get componentPropertyDefinitions() { throw new Error('not loaded'); } };
+  const root = makeNode({
+    id: '1:1', type: 'FRAME', name: 'Screen', box: [0, 0, 200, 200], children: [
+      { id: '1:2', type: 'INSTANCE', name: 'Pay', box: [0, 0, 100, 40], getMainComponentAsync: async () => main,
+        componentProperties: { State: { type: 'VARIANT', value: 'Default' }, 'Label#1:0': { type: 'TEXT', value: 'Pay' } } },
+      { id: '1:3', type: 'INSTANCE', name: 'Other', box: [0, 50, 100, 40], getMainComponentAsync: async () => ({ name: 'x', key: 'k', parent: broken }),
+        componentProperties: { State: { type: 'VARIANT', value: 'Default' } } },
+    ],
+  });
+  const { request } = loadPlugin(root);
+  const { tree } = await request('node', { id: '1:1' });
+  const [pay, other] = tree.children;
+  assert.deepEqual(pay.componentProperties.State.variantOptions, ['Default', 'Hover', 'Pressed', 'Disabled']);
+  assert.equal(pay.componentProperties['Label#1:0'].variantOptions, undefined);
+  assert.equal(pay.componentSet, 'Button');
+  assert.equal(other.componentProperties.State.value, 'Default');
+  assert.equal(other.componentProperties.State.variantOptions, undefined);
+});
