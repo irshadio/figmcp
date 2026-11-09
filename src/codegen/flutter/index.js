@@ -6,9 +6,9 @@ import { linearTransform, rotationOf } from '../geometry.js';
 import { inFlow, isAutoLayout, isGrid, sizingOf } from '../layout.js';
 import { drawnAsSvg, isTurned, straightLine, visibleChildren } from '../nodes.js';
 import {
-  isPhoneScreen, minPageHeight, pinnedChildren, scrollsOnScreen, stretchesOnScreen,
+  isPhoneScreen, minPageHeight, pinnedChildren, scrollsOnScreen, stretchesOnScreen, TALL_SCREEN, WRAPPING_PARENTS,
 } from '../page.js';
-import { autoLineRatios, segmentsOf } from '../text.js';
+import { autoLineRatios, fontWeight, segmentsOf } from '../text.js';
 import { visiblePaints } from '../util.js';
 import {
   call, dColor, dFileName, dIdent, dNum, dType, isConst, lambda, list, method, print, raw, str,
@@ -17,9 +17,8 @@ import {
   alignment, blendMode, blurSigma, blurs, border, borderRadius, boxShadows, composite, gradient, HELPERS,
 } from './paint.js';
 import { screenUtil } from './scale.js';
-import { fontWeight, runGradient, textWidget } from './text.js';
+import { runGradient, textWidget } from './text.js';
 
-const WRAPPING_PARENTS = new Set(['GROUP', 'BOOLEAN_OPERATION']);
 const MAIN_ALIGN = { CENTER: 'center', MAX: 'end', SPACE_BETWEEN: 'spaceBetween' };
 const CROSS_ALIGN = { MIN: 'start', CENTER: 'center', MAX: 'end', BASELINE: 'baseline' };
 const WRAP_ALIGN = { MIN: 'start', CENTER: 'center', MAX: 'end', SPACE_BETWEEN: 'spaceBetween' };

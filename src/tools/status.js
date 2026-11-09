@@ -30,6 +30,18 @@ function isExport(file) {
   }
 }
 
+// Status lists the newest saved snapshots; get_metadata without a node lists them all.
+const SNAPSHOT_LIST = 5;
+
+function snapshots() {
+  const all = snapshotSummary().filter((s) => !s.snapshot.startsWith('live_'))
+    .sort((a, b) => String(b.exportedAt).localeCompare(String(a.exportedAt)));
+  return {
+    snapshots: all.slice(0, SNAPSHOT_LIST).map((s) => ({ snapshot: s.snapshot, exportedAt: s.exportedAt, frames: s.frames.map((f) => `${f.id} ${f.name}`) })),
+    ...(all.length > SNAPSHOT_LIST ? { moreSnapshots: `${all.length - SNAPSHOT_LIST} older; get_metadata without a nodeId lists them all` } : {}),
+  };
+}
+
 export function registerStatusTools(server, bridge, source) {
   server.registerTool('whoami', {
     title: 'Connection Status',
@@ -56,7 +68,10 @@ export function registerStatusTools(server, bridge, source) {
       project: process.cwd(),
       codeConnect: { file: connectFile(), mappings: listMappings().length },
       dataDir: DATA_DIR,
-      snapshots: snapshotSummary().map((s) => ({ snapshot: s.snapshot, exportedAt: s.exportedAt, frames: s.frames })),
+      ...(bridge.owner && bridge.sockets.length > 1 ? {
+        pluginWindows: `${bridge.sockets.length} plugin windows are connected; requests go to the newest. Close the others.`,
+      } : {}),
+      ...snapshots(),
     })];
   }));
 

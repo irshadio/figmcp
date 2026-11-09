@@ -70,6 +70,11 @@ export function fakePlugin(port, { origin, code, truncated = false } = {}) {
       const p = msg.params;
       const reply = (result) => ws.send(JSON.stringify({ type: 'response', id: msg.id, result }));
       const tree = data.frames[0].tree;
+      // Like the plugin, an id the file does not have is an error.
+      const id = p && (p.id || (p.ids && p.ids[0]));
+      if (id && ['node', 'pageMeta', 'export', 'snapshot', 'variables'].includes(msg.method) && !findNode(tree, id)) {
+        return ws.send(JSON.stringify({ type: 'response', id: msg.id, error: `Node not found in the open file: ${id}` }));
+      }
       switch (msg.method) {
         case 'info':
           return reply({

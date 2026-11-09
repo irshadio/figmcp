@@ -8,14 +8,14 @@ export const metadata: Metadata = pageMeta({
   title: "Design to code",
   path: "/docs/design-to-code",
   description:
-    "Turn Figma frames into Flutter widgets, React + Tailwind components or HTML + Tailwind pages with your coding agent, with assets saved to your project and a screenshot to compare against.",
+    "Turn Figma frames into Flutter widgets, SwiftUI views, React + Tailwind components or HTML + Tailwind pages with your coding agent, with assets saved to your project and a screenshot to compare against.",
 });
 
 export default function Page() {
   return (
     <>
       <h1>Design to code</h1>
-      <p className="text-lg text-muted">Turn a frame into Flutter, React + Tailwind or HTML + Tailwind code.</p>
+      <p className="text-lg text-muted">Turn a frame into Flutter, SwiftUI, React + Tailwind or HTML + Tailwind code.</p>
 
       <h2>Pick a frame</h2>
       <p>Select a frame in Figma and ask your agent:</p>
@@ -41,17 +41,18 @@ export default function Page() {
         and your conventions.
       </Callout>
 
-      <h2 id="framework">Flutter, React or HTML</h2>
+      <h2 id="framework">Flutter, SwiftUI, React or HTML</h2>
       <p>The framework is chosen in this order:</p>
       <ol>
         <li>
-          The <code>framework</code> argument, when the agent passes one (<code>flutter</code>, <code>react</code> or{" "}
-          <code>html</code>).
+          The <code>framework</code> argument, when the agent passes one (<code>flutter</code>, <code>swiftui</code>,{" "}
+          <code>react</code> or <code>html</code>).
         </li>
-        <li>The client&apos;s languages and frameworks (for example <code>dart</code> or <code>html</code>).</li>
+        <li>The client&apos;s languages and frameworks (for example <code>dart</code>, <code>swift</code> or <code>html</code>).</li>
         <li>The <code>FIGMA_LOCAL_MCP_FRAMEWORK</code> environment variable.</li>
         <li>
-          The working directory: a <code>pubspec.yaml</code> means Flutter, and an <code>index.html</code> without a{" "}
+          The working directory: a <code>pubspec.yaml</code> means Flutter, a <code>Package.swift</code>,{" "}
+          <code>.xcodeproj</code> or <code>.xcworkspace</code> means SwiftUI, and an <code>index.html</code> without a{" "}
           <code>package.json</code> means a static HTML site. Anything else gets React + Tailwind.
         </li>
       </ol>
@@ -84,6 +85,47 @@ export default function Page() {
     - assets/images/`}
       />
       <Code code="implement the selected Figma frame as a Flutter screen" title="Prompt" copy={false} />
+
+      <h2 id="swiftui">SwiftUI</h2>
+      <p>
+        Start your agent in a Swift package or an Xcode project (the folder with <code>Package.swift</code>, an{" "}
+        <code>.xcodeproj</code> or an <code>.xcworkspace</code>) and SwiftUI is picked automatically. The view is written
+        the way a production screen is built, not as a stack of fixed boxes.
+      </p>
+      <ul>
+        <li>
+          <strong>Real controls.</strong> Buttons with a press style, selection with a sliding indicator and haptics,
+          Toggles, ProgressViews, calendars, snapping carousels, <code>LazyVGrid</code> grids, and pinned bars in{" "}
+          <code>safeAreaInset</code>.
+        </li>
+        <li>
+          <strong>Exact values.</strong> Sizes are in points, fonts are named by PostScript face and scale with Dynamic
+          Type, and text keeps Figma&apos;s line boxes. Rows and grids stack at accessibility sizes.
+        </li>
+        <li>
+          <strong>Design tokens.</strong> The design&apos;s variables become <code>DesignTokens</code> in a shared{" "}
+          <code>DesignSystem.swift</code>, with <code>Color(hex:)</code> and the button style. Merge it into the target
+          once; later screens add only what it lacks.
+        </li>
+        <li>
+          <strong>Ready to wire up.</strong> Selection is <code>@State</code> set to the design, and the screen asks its
+          owner to act through a nested <code>Action</code> enum, so moving state to a view model and adding navigation is
+          straightforward.
+        </li>
+        <li>
+          <strong>A Structure block.</strong> The response names what each part is, how sure the detection is and why,
+          and the SwiftUI pattern the code uses. A layer name tag such as <code>Pay [button]</code> or{" "}
+          <code>[no-role]</code> sets or clears a role.
+        </li>
+      </ul>
+      <h3 id="swiftui-assets">Assets</h3>
+      <p>
+        Images go into the project&apos;s asset catalog as image sets: the app&apos;s own <code>*.xcassets</code>, else{" "}
+        <code>Assets.xcassets</code>. The agent can name another catalog with <code>assetsDir</code>. In a Swift package,
+        put the catalog under the target&apos;s resources and load images with{" "}
+        <code>Image(&quot;name&quot;, bundle: .module)</code>.
+      </p>
+      <Code code="implement the selected Figma frame as a SwiftUI view" title="Prompt" copy={false} />
 
       <h2 id="react">React + Tailwind</h2>
       <p>
@@ -140,6 +182,10 @@ export default function Page() {
         frame: layout mismatches, differing pixels and a diff image. It checks the generated code, a component or page
         from your project with its stylesheet, or a layout on a phone-sized screen. It needs Chrome, and loads React and
         Tailwind from a CDN.
+      </p>
+      <p>
+        Flutter code is analyzed and rendered with <code>flutter test</code>. SwiftUI code is compiled and rendered in
+        the iOS simulator (Xcode needed), and the check can tap every button and render at other Dynamic Type sizes.
       </p>
       <Code code="check my component against the Figma frame with verify_code" title="Prompt" copy={false} />
 

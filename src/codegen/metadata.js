@@ -11,6 +11,32 @@ function tag(node) {
 }
 
 export function toMetadataXml(root) {
+  return outline(root, Infinity);
+}
+
+/**
+ * The outline of [root] in at most [maxChars]: deep layers are left out
+ * until it fits, a cut layer giving its child count. { xml, depth }, with
+ * the depth the outline reaches (Infinity when whole).
+ */
+export function boundedMetadataXml(root, maxChars) {
+  let xml = outline(root, Infinity);
+  let depth = Infinity;
+  if (xml.length > maxChars) {
+    for (depth = maxDepthOf(root) - 1; depth > 1; depth--) {
+      xml = outline(root, depth);
+      if (xml.length <= maxChars) break;
+    }
+    if (xml.length > maxChars) xml = `${xml.slice(0, maxChars).replace(/\n[^\n]*$/, '')}\n<!-- cut: too many layers even one level deep -->`;
+  }
+  return { xml, depth };
+}
+
+function maxDepthOf(node) {
+  return 1 + Math.max(0, ...(node.children || []).map(maxDepthOf));
+}
+
+function outline(root, maxDepth) {
   const lines = [];
   const walk = (node, parent, depth) => {
     const pad = '  '.repeat(depth);
@@ -22,8 +48,9 @@ export function toMetadataXml(root) {
         `width="${num(node.width)}"`, `height="${num(node.height)}"`);
     }
     if (node.visible === false) attrs.push('hidden="true"');
-    if (node.childCount) attrs.push(`child-count="${node.childCount}"`);
-    const children = node.children || [];
+    const cut = depth + 1 >= maxDepth && (node.children || []).length;
+    if (node.childCount || cut) attrs.push(`child-count="${node.childCount || node.children.length}"`);
+    const children = cut ? [] : node.children || [];
     const name = tag(node);
     if (children.length === 0) {
       lines.push(`${pad}<${name} ${attrs.join(' ')} />`);

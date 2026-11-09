@@ -7,6 +7,11 @@ import { findSnapshotNode, knownImages, rememberImages, savedImages, saveSnapsho
 
 export class NotFound extends Error {}
 
+// Reads that a saved snapshot can answer when the plugin cannot read the node.
+const READ_FALLBACK = new Set(['node', 'pageMeta', 'export', 'variables', 'snapshot']);
+// Figma's answers for an id the open file does not resolve.
+const NODE_ERROR = /not found|Unable to establish connection to Figma|does not exist|invalid node id/i;
+
 /** Hashes of the image fills under [node]. */
 function imageHashes(node, out = new Set()) {
   for (const p of [...(Array.isArray(node.fills) ? node.fills : []), ...(Array.isArray(node.strokes) ? node.strokes : [])]) {
@@ -24,15 +29,27 @@ export function normalizeId(id) {
 export class DesignSource {
   constructor(bridge) {
     this.bridge = bridge;
+    // Node id -> why the plugin could not read it.
+    this.unread = new Map();
   }
 
-  /** Calls the plugin; null when the plugin is not reachable. */
+  /**
+   * Calls the plugin; null when the plugin is not reachable, or when it could
+   * not read [params.id] and a saved snapshot may hold it (the error is kept
+   * for the message when none does).
+   */
   async live(method, params, timeout) {
+    const id = params && (params.id || (params.ids && params.ids[0]));
     try {
-      return await this.bridge.call(method, params, timeout);
+      const result = await this.bridge.call(method, params, timeout);
+      if (id) this.unread.delete(id);
+      return result;
     } catch (e) {
       if (e instanceof PluginUnavailable) return null;
-      throw e;
+      if (!READ_FALLBACK.has(method) || !id || !NODE_ERROR.test(e.message)) throw e;
+      // Kept by node, as reads of one node run side by side.
+      this.unread.set(id, e);
+      return null;
     }
   }
 
@@ -58,6 +75,12 @@ export class DesignSource {
   snapshot(id, options) {
     const hit = findSnapshotNode(id, options);
     if (!hit || !hit.node) {
+      const error = this.unread.get(id);
+      if (error) {
+        throw new NotFound(`Figma could not read node ${id} in the open file, and no saved snapshot contains it. ` +
+          'Node ids belong to one file: check the id comes from the file open in Figma (its URL\'s node-id), and that ' +
+          `the layer was not deleted. Figma said: "${error.message}"`);
+      }
       throw new NotFound(`Node ${id} is not available: the Figma plugin is ` +
         'not connected and no saved snapshot contains it.');
     }
@@ -81,6 +104,7 @@ export class DesignSource {
       result.images = { ...savedImages(missing), ...(result.images || {}) };
     }
     const extra = result ? {
+      ...(result.variableModes ? { variableModes: result.variableModes } : {}),
       ...(result.truncated ? { truncated: true } : {}),
       ...(result.failures && result.failures.length ? { failures: result.failures } : {}),
     } : {};
@@ -95,6 +119,7 @@ export class DesignSource {
         page: result.page ? result.page.name : null,
         frames: [{ id: result.tree.id, name: result.tree.name, previewPng2x: null, tree: result.tree }],
         images: images ? {} : result.images || {},
+        ...(result.variableModes ? { variableModes: result.variableModes } : {}),
       };
       setImmediate(() => {
         try {
@@ -107,6 +132,7 @@ export class DesignSource {
     return {
       tree: rebase(hit.node),
       images: { ...savedImages(imageHashes(hit.node)), ...(hit.data.images || {}) },
+      ...(hit.data.variableModes ? { variableModes: hit.data.variableModes } : {}),
       source: 'snapshot',
       exportedAt: hit.exportedAt,
       snapshot: hit.snapshot,
@@ -122,8 +148,8 @@ export class DesignSource {
   }
 
   /** PNG buffer with its rendered and natural sizes. */
-  async screenshot(id, { maxDimension = 1024, contentsOnly } = {}) {
-    const result = await this.live('export', {
+  async screenshot(id, { maxDimension = 1024, contentsOnly, snapshot = null } = {}) {
+    const result = snapshot ? null : await this.live('export', {
       id, format: 'PNG', maxDimension, contentsOnly,
     });
     if (result) {
@@ -133,8 +159,8 @@ export class DesignSource {
         originalHeight: result.height, source: 'live',
       };
     }
-    this.snapshot(id);
-    const hit = findSnapshotNode(id, { preview: true });
+    if (!snapshot) this.snapshot(id);
+    const hit = snapshot || findSnapshotNode(id, { preview: true });
     if (!hit) {
       throw new NotFound(`No saved snapshot of ${id} has a preview image. ` +
         'Connect the plugin, or save the frame with "Save selection as snapshot".');
@@ -173,10 +199,12 @@ export class DesignSource {
       } catch { /* caching is best effort */ }
       return { data: result, source: 'live' };
     }
-    const hit = this.snapshot(id);
+    // The tree and its preview come from one snapshot, so they agree.
+    const withPreview = findSnapshotNode(id, { preview: true });
+    const hit = withPreview && withPreview.node ? withPreview : this.snapshot(id);
     let preview = null;
     try {
-      preview = (await this.screenshot(id, { maxDimension: 65536 })).png.toString('base64');
+      preview = (await this.screenshot(id, { maxDimension: 65536, snapshot: hit })).png.toString('base64');
     } catch { /* no preview saved */ }
     return {
       data: {

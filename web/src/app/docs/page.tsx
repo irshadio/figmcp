@@ -8,12 +8,12 @@ export const metadata: Metadata = pageMeta({
   title: "Introduction",
   path: "/docs",
   description:
-    "figmcp gives Claude Code, Cursor and other coding agents the Figma file open in Figma Desktop: Figma to Flutter and React code, no API limits.",
+    "figmcp gives Claude Code, Cursor and other coding agents the Figma file open in Figma Desktop: Figma to Flutter, SwiftUI and React code, no API limits.",
 });
 
 const cards = [
   { href: "/docs/installation", title: "Installation", text: "Set up the server and the Figma plugin in a few minutes." },
-  { href: "/docs/design-to-code", title: "Design to code", text: "Turn frames into Flutter or React + Tailwind." },
+  { href: "/docs/design-to-code", title: "Design to code", text: "Turn frames into Flutter, SwiftUI or React + Tailwind." },
   { href: "/docs/design-in-figma", title: "Design in Figma", text: "Let your agent build screens on the canvas." },
   { href: "/docs/tools", title: "Tools reference", text: "Every tool the server exposes and its options." },
 ];
@@ -30,7 +30,7 @@ export default function Page() {
       <p>With it, your agent can:</p>
       <ul>
         <li>
-          <strong>Turn frames into code.</strong> Flutter widgets for Flutter projects, React + Tailwind for everything else,
+          <strong>Turn frames into code.</strong> Flutter widgets for Flutter projects, SwiftUI views for Swift projects, React + Tailwind for everything else,
           with the assets and a screenshot to compare against.
         </li>
         <li>

@@ -22,8 +22,8 @@ const ICONS = [
 ];
 
 const DESCRIPTION =
-  'Local Figma MCP server: turns frames selected in Figma Desktop into Flutter ' +
-  'or React + Tailwind code, and creates and edits designs in the open file. ' +
+  'Local Figma MCP server: turns frames selected in Figma Desktop into Flutter, ' +
+  'SwiftUI or React + Tailwind code, and creates and edits designs in the open file. ' +
   'A development plugin streams the file over localhost, so it never calls the ' +
   'Figma API and has no rate limits.';
 

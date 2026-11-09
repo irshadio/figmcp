@@ -169,3 +169,37 @@ test('images the server saved are not sent again', async () => {
   plugin.stop();
   await transport.close();
 });
+
+test('a long call reports progress when the client asks for it', async (t) => {
+  const { guard } = await import('../src/tools/common.js');
+  t.mock.timers.enable(['setInterval']);
+  const sent = [];
+  let finish;
+  const call = guard(() => new Promise((resolve) => { finish = resolve; }))({}, {
+    _meta: { progressToken: 'p1' }, sendNotification: async (n) => sent.push(n),
+  });
+  t.mock.timers.tick(10000);
+  t.mock.timers.tick(10000);
+  finish([{ type: 'text', text: 'done' }]);
+  const result = await call;
+  t.mock.timers.tick(30000);
+  assert.equal(result.content[0].text, 'done');
+  assert.equal(sent.length, 2);
+  assert.deepEqual(sent.map((n) => [n.method, n.params.progressToken, n.params.progress]),
+    [['notifications/progress', 'p1', 1], ['notifications/progress', 'p1', 2]]);
+});
+
+test('a design context response is cut to its budget from its most expendable blocks', async () => {
+  const { withinBudget } = await import('../src/tools/design.js');
+  const block = (t) => ({ type: 'text', text: t });
+  const code = block(`import SwiftUI\n${'x'.repeat(5000)}`);
+  const vars = block(`These variables and styles are used in the design:\n${'{"a": 1}\n'.repeat(2000)}`);
+  const structure = block(`Structure (what each part is):\n${'- 1:2 "Row": card\n'.repeat(400)}`);
+  const out = withinBudget([code, structure, vars, block('IMPORTANT: guidance')], 9000);
+  const total = out.reduce((n, b) => n + b.text.length, 0);
+  assert.ok(total <= 9000, String(total));
+  assert.equal(out[0], code);
+  assert.match(out[2].text, /get_variable_defs/);
+  assert.match(out[1].text, /^Structure \(/);
+  assert.equal(out[3].text, 'IMPORTANT: guidance');
+});

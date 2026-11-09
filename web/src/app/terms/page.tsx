@@ -48,7 +48,7 @@ export default function Page() {
 
         <h2>Trademarks</h2>
         <p>
-          Figma is a trademark of Figma, Inc. Claude, Cursor, Flutter, React and other names are trademarks of their
+          Figma is a trademark of Figma, Inc. Claude, Cursor, Flutter, SwiftUI, React and other names are trademarks of their
           owners and are used only to describe compatibility. figmcp is not affiliated with or endorsed by any of them.
         </p>
 

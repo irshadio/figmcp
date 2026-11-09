@@ -15,6 +15,12 @@ const MIME = {
 };
 const SECRET_HEADER = 'x-figma-local-secret';
 const MAX_BODY = 64 * 1024 * 1024;
+// A plugin reply (a snapshot with image fills) can be far larger than a request.
+const MAX_REPLY = 512 * 1024 * 1024;
+const TOO_LARGE = 1009;
+// Plugin methods that only read, which can be asked again when the instance
+// holding the plugin goes away mid-call.
+const READS = new Set(['info', 'node', 'pageMeta', 'export', 'images', 'variables', 'snapshot']);
 const PAIRING_REJECTED = 4401;
 const PAIRING_LOCKED = 4429;
 const MAX_FAILURES = 20;
@@ -122,7 +128,7 @@ export class Bridge {
           res.end();
         });
       });
-      const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_BODY });
+      const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_REPLY });
       server.on('upgrade', (req, socket, head) => {
         // Plugin iframes have an opaque origin ("null"); a web page would
         // send its own origin, so it is refused.
@@ -182,7 +188,8 @@ export class Bridge {
 
   attach(ws) {
     this.sockets.push(ws);
-    this.log('plugin connected');
+    // Requests go to the newest plugin window; whoami reports more than one.
+    this.log(this.sockets.length > 1 ? `plugin connected (${this.sockets.length} windows; the newest is used)` : 'plugin connected');
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     const beat = setInterval(() => {
@@ -191,16 +198,20 @@ export class Bridge {
       ws.ping();
     }, 15000);
     ws.on('message', (raw) => this.onMessage(ws, raw));
-    ws.on('close', () => {
+    ws.on('close', (code) => {
       clearInterval(beat);
       this.sockets = this.sockets.filter((s) => s !== ws);
       for (const [id, p] of this.pending) {
         if (p.ws === ws) {
-          p.reject(new PluginUnavailable('The Figma plugin disconnected'));
+          clearTimeout(p.timer);
+          p.reject(code === TOO_LARGE
+            ? new Error(`The plugin's reply was larger than ${MAX_REPLY / 1024 / 1024} MB, so the connection closed; ` +
+              'read a smaller node (a section of the frame), or one with fewer images.')
+            : new PluginUnavailable('The Figma plugin disconnected'));
           this.pending.delete(id);
         }
       }
-      this.log('plugin disconnected');
+      this.log(code === TOO_LARGE ? 'plugin reply too large; the plugin reconnects' : 'plugin disconnected');
     });
     for (const wake of this.waiters.splice(0)) wake();
   }
@@ -244,8 +255,16 @@ export class Bridge {
         return;
       }
       const ext = file.split('.').pop();
-      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
-      fs.createReadStream(file).pipe(res);
+      const stream = fs.createReadStream(file);
+      // A file removed after the check ends the response instead of the process.
+      stream.on('error', () => {
+        if (!res.headersSent) res.writeHead(404);
+        res.end();
+      });
+      stream.once('open', () => {
+        res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+        stream.pipe(res);
+      });
       return;
     }
     if (req.method === 'GET' && url.pathname === '/health') {
@@ -323,8 +342,9 @@ export class Bridge {
     let reply;
     try {
       reply = JSON.parse(await res.text());
-    } catch {
-      throw notOurs;
+    } catch (e) {
+      // Our server answered, then stopped before the reply was complete.
+      throw Object.assign(new Error('The server instance holding the plugin connection stopped during the call'), { ownerGone: true, cause: e });
     }
     if (reply.error) {
       throw reply.unavailable
@@ -348,10 +368,16 @@ export class Bridge {
       return await this.proxy(method, params, timeout);
     } catch (e) {
       const refused = e.cause && e.cause.code === 'ECONNREFUSED';
-      if (!refused) throw e;
+      // The owner exiting mid-call resets the connection or cuts the reply.
+      const gone = e.ownerGone || (e.cause && ['ECONNRESET', 'UND_ERR_SOCKET', 'EPIPE'].includes(e.cause.code));
+      if (!refused && !gone) throw e;
+      if (gone && !READS.has(method)) {
+        throw new Error('The server instance holding the plugin connection stopped during the call, so it is not known ' +
+          'whether the script ran. Check the file (get_metadata or get_screenshot) before running it again.');
+      }
     }
     if (await this.tryOwn()) {
-      return this.callPlugin(method, params, timeout, this.graceWait());
+      return this.callPlugin(method, params, timeout, this.graceWait() || 6000);
     }
     return this.proxy(method, params, timeout);
   }

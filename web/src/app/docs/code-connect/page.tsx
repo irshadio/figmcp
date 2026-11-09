@@ -7,7 +7,7 @@ export const metadata: Metadata = pageMeta({
   title: "Code Connect",
   path: "/docs/code-connect",
   description:
-    "Map Figma components to your Flutter or React components so generated code reuses them. Mappings live in your project, on any Figma plan.",
+    "Map Figma components to your Flutter, SwiftUI or React components so generated code reuses them. Mappings live in your project, on any Figma plan.",
 });
 
 export default function Page() {

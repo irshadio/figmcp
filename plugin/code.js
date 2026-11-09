@@ -28,7 +28,7 @@ const PROPS = [
   'layoutSizingHorizontal', 'layoutSizingVertical', 'layoutAlign',
   'layoutGrow', 'layoutPositioning', 'constraints',
   'minWidth', 'maxWidth', 'minHeight', 'maxHeight',
-  'overflowDirection', 'numberOfFixedChildren',
+  'overflowDirection', 'numberOfFixedChildren', 'scrollBehavior',
   'maxLines', 'textTruncation', 'paragraphSpacing', 'paragraphIndent',
   'listSpacing', 'leadingTrim', 'arcData',
 ];
@@ -48,7 +48,7 @@ const DEFAULTS = {
   layoutMode: 'NONE', layoutWrap: 'NO_WRAP', itemReverseZIndex: false,
   counterAxisAlignContent: 'AUTO', layoutAlign: 'INHERIT', layoutGrow: 0,
   layoutPositioning: 'AUTO', overflowDirection: 'NONE',
-  numberOfFixedChildren: 0, textTruncation: 'DISABLED', leadingTrim: 'NONE',
+  numberOfFixedChildren: 0, scrollBehavior: 'SCROLLS', textTruncation: 'DISABLED', leadingTrim: 'NONE',
   paragraphSpacing: 0, paragraphIndent: 0, listSpacing: 0,
 };
 const SEGMENT_FIELDS = [
@@ -130,6 +130,8 @@ function newContext(options) {
     truncated: false,
     failures: [],
     variables: new Map(),
+    // Colour variables of collections with more than one mode: name -> { mode name: colour }.
+    variableModes: {},
     styles: new Map(),
     nodeNames: new Map(),
   };
@@ -142,9 +144,34 @@ async function variableName(ctx, alias) {
   try {
     const variable = await figma.variables.getVariableByIdAsync(alias.id);
     name = variable ? variable.name : null;
+    if (variable && variable.resolvedType === 'COLOR') {
+      const modes = await colourModes(variable);
+      if (modes) ctx.variableModes[name] = modes;
+    }
   } catch (e) { /* remote or deleted variable */ }
   ctx.variables.set(alias.id, name);
   return name;
+}
+
+// A colour variable's value in each mode of its collection ({ Light: {r, g,
+// b, a}, Dark: ... }), following aliases into the same-named mode; null
+// when the collection has one mode.
+async function colourModes(variable) {
+  const collection = await figma.variables.getVariableCollectionByIdAsync(variable.variableCollectionId);
+  if (!collection || collection.modes.length < 2) return null;
+  const out = {};
+  for (const mode of collection.modes) {
+    let value = variable.valuesByMode[mode.modeId];
+    for (let hops = 0; value && value.type === 'VARIABLE_ALIAS' && hops < 10; hops++) {
+      const target = await figma.variables.getVariableByIdAsync(value.id);
+      if (!target) break;
+      const owner = await figma.variables.getVariableCollectionByIdAsync(target.variableCollectionId);
+      const same = owner && owner.modes.find(function (m) { return m.name === mode.name; });
+      value = target.valuesByMode[same ? same.modeId : owner ? owner.defaultModeId : Object.keys(target.valuesByMode)[0]];
+    }
+    if (value && typeof value.r === 'number') out[mode.name] = { r: value.r, g: value.g, b: value.b, a: value.a === undefined ? 1 : value.a };
+  }
+  return Object.keys(out).length > 1 ? out : null;
 }
 
 // A paint bound to a colour variable is drawn in the variable's value for
@@ -260,6 +287,28 @@ function isIcon(node) {
   return onlyShapes(node) && hasVector(node);
 }
 
+// A container of shapes alone with this many vector layers is an
+// illustration (a map, a scene): one SVG export instead of one per layer.
+const ILLUSTRATION_MIN = 40;
+
+function vectorCount(node, limit) {
+  if (node.visible === false) return 0;
+  if (needsSvg(node)) return 1;
+  let n = 0;
+  if ('children' in node) {
+    for (const c of node.children) {
+      n += vectorCount(c, limit - n);
+      if (n >= limit) break;
+    }
+  }
+  return n;
+}
+
+function isIllustration(node) {
+  if (!('children' in node) || node.children.length === 0) return false;
+  return onlyShapes(node) && vectorCount(node, ILLUSTRATION_MIN) >= ILLUSTRATION_MIN;
+}
+
 function nonSolidStroke(node) {
   return Array.isArray(node.strokes) && node.strokes.some(function (p) {
     return p.visible !== false && p.type !== 'SOLID';
@@ -322,11 +371,42 @@ function renderBoundsOf(node, origin) {
   };
 }
 
+// [node] exported with [settings]. Layers clipped out of view (scroll
+// content below a screen's fold) have no render bounds and Figma refuses to
+// export them: a copy of the layer outside the frame is exported instead,
+// and [onBounds] gets its render bounds relative to the layer's box.
+async function exportOf(node, settings, onBounds) {
+  try {
+    return await node.exportAsync(settings);
+  } catch (e) {
+    if (node.absoluteRenderBounds || !('clone' in node) || !node.absoluteBoundingBox) throw e;
+    const copy = node.clone();
+    try {
+      const value = await copy.exportAsync(settings);
+      const box = copy.absoluteBoundingBox;
+      const rb = copy.absoluteRenderBounds;
+      if (onBounds && box && rb) onBounds({ dx: rb.x - box.x, dy: rb.y - box.y, width: rb.width, height: rb.height });
+      return value;
+    } finally {
+      copy.remove();
+    }
+  }
+}
+
+// Render bounds [b] of a copy of [node], placed at the layer's own box.
+function movedBounds(node, origin, b) {
+  const box = node.absoluteBoundingBox;
+  return {
+    x: round(box.x + b.dx - origin.x), y: round(box.y + b.dy - origin.y),
+    width: round(b.width), height: round(b.height),
+  };
+}
+
 // A 2x render of the layer with its shadows and blurs (the render bounds).
-async function renderPng(node) {
-  const bytes = await node.exportAsync({
+async function renderPng(node, onBounds) {
+  const bytes = await exportOf(node, {
     format: 'PNG', constraint: { type: 'SCALE', value: 2 },
-  });
+  }, onBounds);
   return { format: 'png', scale: 2, base64: figma.base64Encode(bytes) };
 }
 
@@ -560,7 +640,8 @@ async function serialize(node, origin, ctx, depth) {
     if (interactions) out.reactions = interactions;
 
     const visible = node.visible !== false && !ctx.hidden;
-    const vectorLike = isIcon(node) || needsSvg(node);
+    const whole = isIcon(node) || isIllustration(node);
+    const vectorLike = whole || needsSvg(node);
     const imageFilled = hasImageFill(node);
     const exportsSvg = ctx.svg && visible && vectorLike && !imageFilled;
     if (exportsSvg) {
@@ -569,10 +650,12 @@ async function serialize(node, origin, ctx, depth) {
       // draw; started together they share the wait (see settle()).
       const bounds = box ? renderBoundsOf(node, origin) : null;
       if (bounds) out.svgBounds = bounds;
-      track(ctx, node, node.exportAsync({ format: 'SVG_STRING' }), function (svg) {
+      track(ctx, node, exportOf(node, { format: 'SVG_STRING' }, function (b) {
+        if (!out.svgBounds && box) out.svgBounds = movedBounds(node, origin, b);
+      }), function (svg) {
         out.svg = svg;
       }, function () { delete out.svgBounds; });
-      if (isIcon(node)) return out;
+      if (whole) return out;
     }
     // Masked groups, rotated or mirrored containers and image-filled vectors
     // cannot be rebuilt exactly from boxes: ship their render and stop.
@@ -585,7 +668,9 @@ async function serialize(node, origin, ctx, depth) {
       out.rasterized = reason;
       const bounds = box ? renderBoundsOf(node, origin) : null;
       if (bounds) out.renderBounds = bounds;
-      track(ctx, node, renderPng(node), function (render) {
+      track(ctx, node, renderPng(node, function (b) {
+        if (!out.renderBounds && box) out.renderBounds = movedBounds(node, origin, b);
+      }), function (render) {
         out.render = render;
       }, function () {
         delete out.rasterized;
@@ -693,6 +778,7 @@ async function node(params) {
   };
   if (ctx.truncated) result.truncated = true;
   if (ctx.failures.length) result.failures = ctx.failures;
+  if (Object.keys(ctx.variableModes).length) result.variableModes = ctx.variableModes;
   if (params.images) {
     result.images = await timed(ctx, 'images', function () { return imageBytes(ctx.imageHashes, params.knownImages); });
   }
@@ -709,7 +795,7 @@ async function exportNode(params) {
   const format = (params.format || 'PNG').toUpperCase();
   const box = target.absoluteBoundingBox;
   if (format === 'SVG') {
-    const svg = await target.exportAsync({ format: 'SVG_STRING' });
+    const svg = await exportOf(target, { format: 'SVG_STRING' });
     return { format: 'svg', text: svg, width: box && box.width,
       height: box && box.height };
   }
@@ -726,7 +812,7 @@ async function exportNode(params) {
     }
     if (params.absoluteBounds) settings.useAbsoluteBounds = true;
   }
-  const bytes = await target.exportAsync(settings);
+  const bytes = await exportOf(target, settings);
   return {
     format: format.toLowerCase(),
     base64: figma.base64Encode(bytes),
@@ -893,13 +979,15 @@ async function snapshot(params) {
     } catch (e) { /* too large to render */ }
     frames.push({ id: n.id, name: n.name, previewPng2x: preview, tree: tree });
   }
-  return {
+  const result = {
     exportedAt: new Date().toISOString(),
     fileName: figma.root.name,
     page: figma.currentPage.name,
     frames: frames,
     images: await imageBytes(ctx.imageHashes),
   };
+  if (Object.keys(ctx.variableModes).length) result.variableModes = ctx.variableModes;
+  return result;
 }
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;

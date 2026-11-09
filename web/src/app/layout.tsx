@@ -23,6 +23,7 @@ export const metadata: Metadata = {
     "figma mcp",
     "figma mcp server",
     "figma to flutter",
+    "figma to swiftui",
     "figma to code",
     "figma to react",
     "figma to tailwind",

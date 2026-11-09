@@ -9,7 +9,7 @@ export const TALL_SCREEN = 1000;
 // each other on a shorter screen, as a share of the smaller one's height.
 const EXTRA_OVERLAP = 0.15;
 const SCREEN_TYPES = new Set(['FRAME', 'COMPONENT', 'INSTANCE']);
-const WRAPPING_PARENTS = new Set(['GROUP', 'BOOLEAN_OPERATION']);
+export const WRAPPING_PARENTS = new Set(['GROUP', 'BOOLEAN_OPERATION']);
 
 /** A portrait frame of a phone's width, drawn as a screen. */
 export function isPhoneScreen(node) {

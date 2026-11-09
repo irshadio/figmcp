@@ -289,3 +289,31 @@ export function verticalAlign(node) {
   if (node.textAlignVertical === 'BOTTOM') return 'justify-end';
   return null;
 }
+
+/** Font weight 100..900 of a text run. */
+export function fontWeight(seg) {
+  if (typeof seg.fontWeight === 'number') return Math.min(900, Math.max(100, Math.round(seg.fontWeight / 100) * 100));
+  return styleWeight(seg.fontName && seg.fontName.style);
+}
+
+function titleCase(text) {
+  return text.replace(/(^|[\s\-–—/(])(\p{L})/gu, (m, before, letter) => before + letter.toUpperCase());
+}
+
+/** The characters of every run with its text case applied, as Figma draws them. */
+export function casedRuns(node) {
+  const segs = segmentsOf(node);
+  const full = segs.map((s) => (typeof s.characters === 'string' ? s.characters : '')).join('');
+  let at = 0;
+  return segs.map((seg) => {
+    const own = typeof seg.characters === 'string' ? seg.characters : '';
+    const start = at;
+    at += own.length;
+    switch (seg.textCase) {
+      case 'UPPER': return own.toUpperCase();
+      case 'LOWER': return own.toLowerCase();
+      case 'TITLE': return titleCase(full).slice(start, start + own.length);
+      default: return own;
+    }
+  });
+}
