@@ -6,6 +6,7 @@ const rows: [string, string, string, boolean?][] = [
   ["Read limits", "None", "Daily and per-minute limits on Dev and Full seats; about 20 calls a month on Starter, View or Collab", true],
   ["Plan needed", "Any plan, including free", "A paid Dev or Full seat for regular use", true],
   ["Flutter", "Native Flutter widgets, assets saved to your pubspec folders", "React + Tailwind reference by default", true],
+  ["SwiftUI", "SwiftUI views checked in the iOS simulator, images in your asset catalog", "React + Tailwind reference by default", true],
   ["React + Tailwind", "Yes", "Yes"],
   ["Design in Figma", "Yes, with use_figma", "Yes"],
   ["Reads with Figma closed", "Yes, from saved snapshots", "No", true],

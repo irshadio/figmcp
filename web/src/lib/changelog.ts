@@ -2,6 +2,16 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.7.0",
+    notes: [
+      { type: "new", text: "SwiftUI output: projects with a Package.swift, .xcodeproj or .xcworkspace get SwiftUI views built the way a production screen is: press-style Buttons, selection with a sliding indicator, snapping carousels, LazyVGrid, pinned bars, Toggles, ProgressViews, calendars and loading placeholders." },
+      { type: "new", text: "SwiftUI: fonts are named by PostScript face and scale with Dynamic Type, text keeps Figma's line boxes, and the design's variables become DesignTokens in a shared DesignSystem.swift." },
+      { type: "new", text: "SwiftUI: images go into the project's asset catalog as image sets, and a Structure block names what each part is, how sure the detection is and the pattern the code uses." },
+      { type: "new", text: "verify_code checks SwiftUI: the generated code, or a view of your project, compiled and rendered in the iOS simulator and compared with Figma's render. It can tap every button and render at other Dynamic Type sizes." },
+      { type: "improved", text: "The plugin exports layers clipped out of their frame, so frames that hide part of their content convert faithfully." },
+    ],
+  },
+  {
     version: "1.6.0",
     notes: [
       { type: "new", text: "React + Tailwind output for production: semantic markup (buttons, links, nav, headings), theme classes where they equal the design, design variables declared as CSS, Figma text styles as named class lists, and repeated items as data with .map()." },

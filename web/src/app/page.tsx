@@ -59,6 +59,23 @@ class OnboardingScreen extends StatelessWidget {
   }
 }`;
 
+const swiftSample = `
+struct OnboardingScreen: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 32) {
+      Image("hero")
+        .resizable()
+        .scaledToFit()
+        .frame(height: 256)
+      Text("Design and code, locally")
+        .font(.custom("Inter-Bold", size: 28, relativeTo: .title))
+        .foregroundStyle(Color(hex: 0x0A1F44))
+    }
+    .padding(.horizontal, 24)
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}`;
+
 const reactSample = `
 export default function Onboarding() {
   return (
@@ -100,7 +117,7 @@ const tools = [
   { group: "Read", name: "get_screenshot", text: "PNG of a node or the selection, up to 2x its size." },
   { group: "Read", name: "get_variable_defs", text: "Variables and styles used by a node, resolved for its mode." },
   { group: "Read", name: "download_assets", text: "Renders, original image fills and vector SVGs." },
-  { group: "Read", name: "verify_code", text: "Render Flutter code and compare it with the design." },
+  { group: "Read", name: "verify_code", text: "Render Flutter, SwiftUI or React code and compare it with the design." },
   { group: "Write", name: "use_figma", text: "Run plugin API scripts to create and edit designs." },
   { group: "Write", name: "search_design_system", text: "Components, styles and variables to reuse." },
   { group: "Write", name: "place_image", text: "Put a local image or SVG into the file." },
@@ -211,8 +228,8 @@ export default function Home() {
             </Reveal>
             <Reveal delay={160}>
               <p className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-pretty text-muted sm:text-xl">
-                A local MCP server that puts the Figma file you have open into your coding agent. Turn frames into Flutter
-                and React code, or let the agent design on the canvas. No Figma API calls, no rate limits.
+                A local MCP server that puts the Figma file you have open into your coding agent. Turn frames into Flutter,
+                SwiftUI and React code, or let the agent design on the canvas. No Figma API calls, no rate limits.
               </p>
             </Reveal>
             <Reveal delay={240} className="mx-auto mt-10 flex max-w-xl flex-col items-center gap-4">
@@ -297,6 +314,7 @@ export default function Home() {
             <ul className="mt-8 space-y-3 text-sm text-muted">
               {[
                 "Flutter widgets when the project has a pubspec.yaml",
+                "SwiftUI views for Swift packages and Xcode projects",
                 "React + Tailwind for everything else",
                 "SVGs and images saved into the folders your project declares",
                 "Your own components named, through Code Connect",
@@ -312,6 +330,7 @@ export default function Home() {
             <OutputTabs
               tabs={[
                 { label: "Flutter", file: "onboarding_screen.dart", body: <Code code={flutterSample} lang="dart" bare /> },
+                { label: "SwiftUI", file: "OnboardingScreen.swift", body: <Code code={swiftSample} lang="swift" bare /> },
                 { label: "React", file: "Onboarding.tsx", body: <Code code={reactSample} lang="tsx" bare /> },
               ]}
             />

@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { CopyButton } from "./copy-command";
 
-export type Lang = "bash" | "json" | "dart" | "tsx" | "js" | "text";
+export type Lang = "bash" | "json" | "dart" | "swift" | "tsx" | "js" | "text";
 
 const KEYWORDS: Record<string, string[]> = {
   dart: ["import", "class", "extends", "final", "const", "return", "override", "Widget", "build", "void", "new", "required", "this", "super", "static"],
+  swift: ["import", "struct", "var", "let", "some", "View", "body", "return", "private", "func", "enum", "case"],
   tsx: ["import", "from", "export", "default", "function", "return", "const", "let", "await", "async", "new", "type"],
   js: ["import", "from", "export", "default", "function", "return", "const", "let", "await", "async", "new", "for", "of", "if"],
   json: ["true", "false", "null"],

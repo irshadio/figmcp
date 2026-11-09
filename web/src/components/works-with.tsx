@@ -14,7 +14,7 @@ const clients: Item[] = [
 const outputs: Item[] = [
   { label: "Flutter", href: "/docs/design-to-code#flutter", icon: "flutter", color: "#54C5F8" },
   { label: "React + Tailwind", href: "/docs/design-to-code#react", icon: "react", color: "#61DAFB" },
-  { label: "SwiftUI", icon: "swift", color: "#F05138", soon: true },
+  { label: "SwiftUI", href: "/docs/design-to-code#swiftui", icon: "swift", color: "#F05138" },
   { label: "Android XML", icon: "android", color: "#3DDC84", soon: true },
   { label: "Jetpack Compose", icon: "compose", color: "#4285F4", soon: true },
   { label: "Laravel", icon: "laravel", color: "#FF2D20", soon: true },
