@@ -421,19 +421,23 @@ export function registerVerifyTools(server, bridge, source) {
 /** The keyboard findings worth acting on: problems first, then the Tab order. */
 function keyboardSummary(k) {
   if (!k) return {};
-  if (k.error) return { keyboard: { error: k.error } };
   const label = (e) => `${e.name || '(no name)'} <${e.tag}${e.role ? ` role=${e.role}` : ''}>`;
   const pick = (f) => brief(k.elements.filter(f).map(label), 10);
   const problems = {
     notReachable: pick((e) => e.tabIndex < 0 && !e.disabled),
     noFocusIndicator: pick((e) => e.tabIndex >= 0 && e.focusVisible === false),
     notActivatedByKeyboard: pick((e) => e.activates === false),
-    noAccessibleName: pick((e) => !e.name),
+    hungWhenActivated: pick((e) => e.hung),
+    noAccessibleName: pick((e) => !e.name && !e.scroller),
   };
   return {
     keyboard: {
       tabOrder: brief(k.tabOrder, 30),
       ...Object.fromEntries(Object.entries(problems).filter(([, v]) => v.length)),
+      ...(k.capped ? { stoppedAfterTabStops: k.capped } : {}),
+      ...(k.dialogs ? { dialogsDismissed: k.dialogs.length } : {}),
+      ...(k.navigationsBlocked ? { navigationsBlocked: k.navigationsBlocked } : {}),
+      ...(k.error ? { error: k.error } : {}),
     },
   };
 }

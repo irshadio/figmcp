@@ -211,7 +211,8 @@ export default function Page() {
       <p>
         React and HTML checks also press Tab through the page and report the Tab order, controls with no visible focus
         indicator, buttons Enter or Space does not activate, controls without an accessible name and clickable elements
-        the keyboard cannot reach. The agent hands the not-checked list back with its implementation, so the next
+        the keyboard cannot reach. A control the design has but the code draws as a plain element is called out, since
+        keyboard and screen-reader users cannot use it. The agent hands the not-checked list back with its implementation, so the next
         reviewer knows what is left.
       </p>
       <Code

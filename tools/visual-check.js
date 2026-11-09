@@ -258,7 +258,50 @@ const INTERACTIVE = 'a[href], button, input, select, textarea, summary, [role=bu
  * elements a click handler makes clickable that the keyboard cannot reach.
  * Runs after the screenshots, since it moves focus and may change state.
  */
+const PROBE_TIMEOUT = 45000;
+const MAX_TAB_STOPS = 120;
+const PRESS_TIMEOUT = 3000;
+
+/** [task] or a rejection after [ms]. */
+function within(task, ms, what) {
+  let timer;
+  return Promise.race([task, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(what)), ms); })])
+    .finally(() => clearTimeout(timer));
+}
+
 export async function keyboardProbe(tab) {
+  // Dialogs from handlers would block the page; navigation away would end it.
+  const dialogs = [];
+  const onDialog = (d) => { dialogs.push(d.type()); d.dismiss().catch(() => {}); };
+  tab.on('dialog', onDialog);
+  const navigations = [];
+  const onRequest = (req) => {
+    if (req.isNavigationRequest() && req.frame() === tab.mainFrame()) {
+      navigations.push(req.url());
+      req.abort('aborted').catch(() => {});
+    } else req.continue().catch(() => {});
+  };
+  await tab.setRequestInterception(true);
+  tab.on('request', onRequest);
+  const st = { found: [], order: [], focusShown: {}, extra: [], activates: {}, rendered: [], pressing: null, hung: null, phase: 'tab' };
+  let error = null;
+  try {
+    await within(probe(tab, st), PROBE_TIMEOUT, `the keyboard check did not finish within ${PROBE_TIMEOUT / 1000} seconds`);
+  } catch (e) {
+    // A handler that never returns blocks the page: what came before it still stands.
+    if (st.pressing != null) st.hung = st.pressing;
+    else error = String(e.message || e);
+  }
+  try {
+    return { ...probeResult(st), ...(error ? { error } : {}), ...(dialogs.length ? { dialogs } : {}),
+      ...(navigations.length ? { navigationsBlocked: navigations.slice(0, 5) } : {}) };
+  } finally {
+    tab.off('dialog', onDialog);
+    tab.off('request', onRequest);
+  }
+}
+
+async function probe(tab, st) {
   const found = await tab.evaluate((selector) => {
     const root = document.querySelector('#root') || document.body;
     const visible = (el) => {
@@ -272,15 +315,21 @@ export async function keyboardProbe(tab) {
       const label = el.id ? [...document.querySelectorAll('label')].find((l) => l.htmlFor === el.id) : el.closest('label');
       const alt = [...el.querySelectorAll('img[alt], svg[aria-label]')].map((i) => i.getAttribute('alt') || i.getAttribute('aria-label')).join(' ');
       return (el.getAttribute('aria-label') || labelled || (label && label.textContent) || el.innerText || alt ||
-        el.getAttribute('title') || el.getAttribute('placeholder') || el.value || '').replace(/\s+/g, ' ').trim();
+        el.getAttribute('title') || el.getAttribute('placeholder') || el.value || '').replace(/\s+/g, ' ').trim().slice(0, 80);
     };
     const reactProps = (el) => {
       const key = Object.keys(el).find((k) => k.startsWith('__reactProps$'));
       return key ? el[key] : null;
     };
+    // What shows of a focus indicator: an outline or shadow drawn in no colour, or not at all, shows nothing.
+    const clear = (c) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c);
     const styleKey = (el) => {
       const cs = getComputedStyle(el);
-      return [cs.outlineStyle, cs.outlineWidth, cs.outlineColor, cs.boxShadow, cs.borderColor, cs.backgroundColor, cs.textDecorationLine].join('|');
+      const outline = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && !clear(cs.outlineColor)
+        ? `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor} ${cs.outlineOffset}` : 'none';
+      const shadow = cs.boxShadow === 'none' ? 'none'
+        : cs.boxShadow.split(/,(?![^(]*\))/).filter((s) => !/rgba\([^)]*,\s*0\)/.test(s) && !/transparent/.test(s)).join(',') || 'none';
+      return [outline, shadow, cs.borderColor, cs.backgroundColor, cs.color, cs.textDecorationLine].join('|');
     };
     const els = [];
     let i = 0;
@@ -300,12 +349,17 @@ export async function keyboardProbe(tab) {
       });
     }
     window.__styleKey = styleKey;
-    return els;
-  }, INTERACTIVE);
-  if (!found.length) return { tabOrder: [], elements: [] };
+    window.__nameOf = nameOf;
+    const rendered = [...root.querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id'));
+    return { els, rendered };
+  }, INTERACTIVE).then(({ els, rendered }) => { st.rendered = rendered; return els; });
+  st.found = found;
+  if (!found.length) return;
   await tab.evaluate(() => {
     document.activeElement && document.activeElement.blur();
     window.__clicks = [];
+    window.__changes = 0;
+    new MutationObserver((m) => { window.__changes += m.length; }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
     document.addEventListener('click', (e) => {
       const hit = e.target.closest('[data-probe]');
       if (hit) window.__clicks.push(hit.getAttribute('data-probe'));
@@ -314,33 +368,75 @@ export async function keyboardProbe(tab) {
     }, true);
     document.addEventListener('submit', (e) => e.preventDefault(), true);
   });
-  const order = [];
-  const focusShown = {};
-  for (let n = 0; n < found.length + 3 && n < 80; n++) {
+  const { order, focusShown } = st;
+  // Other stops Tab reaches, such as scrolling areas Chrome makes focusable.
+  const { extra } = st;
+  const limit = Math.min(found.length + 20, MAX_TAB_STOPS);
+  let n = 0;
+  for (; n < limit; n++) {
     await tab.keyboard.press('Tab');
-    const now = await tab.evaluate(() => {
+    const now = await tab.evaluate((next) => {
       const el = document.activeElement;
-      const hit = el && el.closest && el.closest('[data-probe]');
-      return hit ? { probe: hit.getAttribute('data-probe'), style: window.__styleKey(hit) } : null;
-    });
-    if (!now) break;
-    if (order.includes(now.probe)) break;
+      if (!el || el === document.body || el === document.documentElement) return null;
+      const hit = el.closest('[data-probe]');
+      if (hit) return { probe: hit.getAttribute('data-probe'), style: window.__styleKey(hit) };
+      el.setAttribute('data-probe', String(next));
+      const cs = getComputedStyle(el);
+      return {
+        probe: String(next), extra: {
+          tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || null, name: window.__nameOf(el),
+          node: (el.closest('[data-node-id]') || el).getAttribute('data-node-id'),
+          scroller: /auto|scroll/.test(cs.overflowX + cs.overflowY) && (el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight),
+        },
+      };
+    }, found.length + extra.length);
+    if (!now || order.includes(now.probe)) break;
     order.push(now.probe);
-    focusShown[now.probe] = now.style;
+    if (now.extra) extra.push({ probe: Number(now.probe), ...now.extra });
+    else focusShown[now.probe] = now.style;
   }
-  const activates = {};
+  if (n === MAX_TAB_STOPS) st.capped = MAX_TAB_STOPS;
+  const all = [...found, ...extra];
+  const { activates } = st;
+  st.phase = 'activation';
   for (const id of order) {
-    const el = found[Number(id)];
+    const el = all[Number(id)];
+    if (el.scroller !== undefined) continue;
     if (el.disabled || ['input', 'textarea', 'select'].includes(el.tag)) continue;
     const key = el.tag === 'a' || el.role === 'link' ? ['Enter'] : ['Enter', 'Space'];
     let ok = false;
     for (const k of key) {
-      await tab.evaluate((p) => { window.__clicks = []; document.querySelector(`[data-probe="${p}"]`).focus(); }, id);
-      await tab.keyboard.press(k);
-      ok = ok || (await tab.evaluate((p) => window.__clicks.includes(p), id));
+      const ready = await tab.evaluate((p) => {
+        const target = document.querySelector(`[data-probe="${p}"]`);
+        if (!target) return false;
+        target.focus();
+        window.__clicks = [];
+        window.__changes = 0;
+        window.__focusBefore = document.activeElement;
+        window.__hash = location.hash;
+        return document.activeElement === target;
+      }, id);
+      if (!ready) break;
+      st.pressing = id;
+      // A page that changes by itself (an animation, a clock) says nothing by changing.
+      await new Promise((r) => setTimeout(r, 60));
+      const busy = await tab.evaluate(() => { const n = window.__changes; window.__changes = 0; return n > 0; });
+      await within(tab.keyboard.press(k), PRESS_TIMEOUT, 'a key press did not return');
+      await new Promise((r) => setTimeout(r, 60));
+      // Activated: a click reached it, or the page answered (it changed, moved focus or its hash).
+      ok = ok || (await within(tab.evaluate((p, quiet) => window.__clicks.includes(p) || (quiet && window.__changes > 0) ||
+        document.activeElement !== window.__focusBefore || location.hash !== window.__hash, id, !busy), PRESS_TIMEOUT, 'the page stopped answering'));
+      if (ok) break;
     }
     activates[id] = ok;
+    st.pressing = null;
   }
+}
+
+/** The probe's findings so far, also when it was cut short. */
+function probeResult(st) {
+  const { found, order, focusShown, extra, activates } = st;
+  const all = [...found, ...extra];
   const elements = found.map((e) => {
     const stop = order.indexOf(String(e.probe));
     return {
@@ -349,9 +445,20 @@ export async function keyboardProbe(tab) {
       tabIndex: stop,
       ...(stop >= 0 ? { focusVisible: focusShown[String(e.probe)] !== e.rest } : {}),
       ...(activates[String(e.probe)] !== undefined ? { activates: activates[String(e.probe)] } : {}),
+      ...(st.hung === String(e.probe) ? { hung: true } : {}),
     };
   });
-  return { tabOrder: order.map((id) => found[Number(id)].name || found[Number(id)].tag), elements };
+  const stops = extra.map((e) => ({
+    tag: e.tag, ...(e.role ? { role: e.role } : {}), ...(e.node ? { node: e.node } : {}), name: e.name,
+    tabIndex: order.indexOf(String(e.probe)), ...(e.scroller ? { scroller: true } : {}),
+  }));
+  return {
+    tabOrder: order.map((id) => {
+      const e = all[Number(id)];
+      return e.scroller ? `scroll area${e.name ? `: ${e.name.slice(0, 40)}…` : ''}` : e.name || e.tag;
+    }),
+    elements: [...elements, ...stops], rendered: st.rendered, ...(st.capped ? { capped: st.capped } : {}),
+  };
 }
 
 export async function reactCheck({
