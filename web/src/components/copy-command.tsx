@@ -25,7 +25,7 @@ export function CopyButton({ text, event = "copy_code", className = "" }: { text
   );
 }
 
-export function CopyCommand({ command, large = false, wrap = false }: { command: string; large?: boolean; wrap?: boolean }) {
+export function CopyCommand({ command, large = false }: { command: string; large?: boolean }) {
   const event = command.includes("setup") ? "copy_install" : "copy_command";
   return (
     <div
@@ -34,7 +34,7 @@ export function CopyCommand({ command, large = false, wrap = false }: { command:
       }`}
     >
       <span className="select-none text-sky">$</span>
-      <code className={`min-w-0 flex-1 break-all text-fg ${wrap ? "" : "sm:break-normal sm:whitespace-nowrap"}`}>{command}</code>
+      <code className="min-w-0 flex-1 break-all text-fg sm:break-normal sm:whitespace-nowrap">{command}</code>
       <CopyButton text={command} event={event} />
     </div>
   );
