@@ -2,6 +2,12 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.8.1",
+    notes: [
+      { type: "fixed", text: "Security updates: the MCP SDK, zod, body-parser, qs, fast-uri and ip-address move to patched versions, and the package now requires them, so installs cannot pick a vulnerable release." },
+    ],
+  },
+  {
     version: "1.8.0",
     notes: [
       { type: "new", text: "verify_code says what it did not check: every result has a coverage block listing, for each button, field, toggle or tab row, the states (pressed, disabled, focus, loading, error), keyboard and screen-reader behaviour no check covered, plus dark mode, other widths and text sizes, and right-to-left." },
