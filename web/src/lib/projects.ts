@@ -64,7 +64,10 @@ export const tekvoProject = {
   store: tekvo.store as NamedImage[],
 };
 
-export const projectLinks = [{ href: "/projects/tekvo", name: "Tekvo", kind: "E-commerce platform · 4 products" }];
+export const projectLinks = [
+  { href: "/showcase", name: "Showcase", kind: "Everything made with figmcp" },
+  { href: "/projects/tekvo", name: "Tekvo", kind: "E-commerce platform · 4 products" },
+];
 
 export type JourneyActor = "customer" | "office" | "hub" | "rider";
 export type JourneyStep = { actor: JourneyActor; title: string; text: string; phones?: string[]; screen?: string };

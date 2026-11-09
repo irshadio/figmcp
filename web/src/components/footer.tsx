@@ -14,6 +14,7 @@ const cols = [
       { href: "/#compare", label: "Compare" },
       { href: "/#faq", label: "FAQ" },
       { href: "/showcase", label: "Showcase" },
+      { href: "/stack", label: "Stack" },
       { href: "/docs/changelog", label: "Changelog" },
     ],
   },
