@@ -249,6 +249,111 @@ export function pageMarkup(html, assets = {}) {
  * the design: React, or HTML with [html]. Returns the report; files go to
  * [out].
  */
+const INTERACTIVE = 'a[href], button, input, select, textarea, summary, [role=button], [role=link], [role=tab], [role=switch], ' +
+  '[role=checkbox], [role=radio], [role=menuitem], [role=option], [tabindex]';
+
+/**
+ * What the keyboard reaches on the page: the Tab order, whether focus shows,
+ * whether Enter or Space activates each control, accessible names, and
+ * elements a click handler makes clickable that the keyboard cannot reach.
+ * Runs after the screenshots, since it moves focus and may change state.
+ */
+export async function keyboardProbe(tab) {
+  const found = await tab.evaluate((selector) => {
+    const root = document.querySelector('#root') || document.body;
+    const visible = (el) => {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+    };
+    const nameOf = (el) => {
+      const by = el.getAttribute('aria-labelledby');
+      const labelled = by ? by.split(/\s+/).map((id) => document.getElementById(id)).filter(Boolean).map((n) => n.textContent).join(' ') : '';
+      const label = el.id ? [...document.querySelectorAll('label')].find((l) => l.htmlFor === el.id) : el.closest('label');
+      const alt = [...el.querySelectorAll('img[alt], svg[aria-label]')].map((i) => i.getAttribute('alt') || i.getAttribute('aria-label')).join(' ');
+      return (el.getAttribute('aria-label') || labelled || (label && label.textContent) || el.innerText || alt ||
+        el.getAttribute('title') || el.getAttribute('placeholder') || el.value || '').replace(/\s+/g, ' ').trim();
+    };
+    const reactProps = (el) => {
+      const key = Object.keys(el).find((k) => k.startsWith('__reactProps$'));
+      return key ? el[key] : null;
+    };
+    const styleKey = (el) => {
+      const cs = getComputedStyle(el);
+      return [cs.outlineStyle, cs.outlineWidth, cs.outlineColor, cs.boxShadow, cs.borderColor, cs.backgroundColor, cs.textDecorationLine].join('|');
+    };
+    const els = [];
+    let i = 0;
+    for (const el of root.querySelectorAll('*')) {
+      if (!visible(el)) continue;
+      const interactive = el.matches(selector);
+      const props = reactProps(el);
+      const clickable = !interactive && ((props && typeof props.onClick === 'function') || el.hasAttribute('onclick'));
+      if (!interactive && !clickable) continue;
+      if (clickable && el.closest(selector)) continue;
+      el.setAttribute('data-probe', String(i));
+      els.push({
+        probe: i++, tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || null,
+        node: (el.closest('[data-node-id]') || el).getAttribute('data-node-id'),
+        name: nameOf(el), disabled: el.disabled === true || el.getAttribute('aria-disabled') === 'true',
+        clickableOnly: clickable, rest: styleKey(el),
+      });
+    }
+    window.__styleKey = styleKey;
+    return els;
+  }, INTERACTIVE);
+  if (!found.length) return { tabOrder: [], elements: [] };
+  await tab.evaluate(() => {
+    document.activeElement && document.activeElement.blur();
+    window.__clicks = [];
+    document.addEventListener('click', (e) => {
+      const hit = e.target.closest('[data-probe]');
+      if (hit) window.__clicks.push(hit.getAttribute('data-probe'));
+      // Links and forms stay on the page.
+      e.preventDefault();
+    }, true);
+    document.addEventListener('submit', (e) => e.preventDefault(), true);
+  });
+  const order = [];
+  const focusShown = {};
+  for (let n = 0; n < found.length + 3 && n < 80; n++) {
+    await tab.keyboard.press('Tab');
+    const now = await tab.evaluate(() => {
+      const el = document.activeElement;
+      const hit = el && el.closest && el.closest('[data-probe]');
+      return hit ? { probe: hit.getAttribute('data-probe'), style: window.__styleKey(hit) } : null;
+    });
+    if (!now) break;
+    if (order.includes(now.probe)) break;
+    order.push(now.probe);
+    focusShown[now.probe] = now.style;
+  }
+  const activates = {};
+  for (const id of order) {
+    const el = found[Number(id)];
+    if (el.disabled || ['input', 'textarea', 'select'].includes(el.tag)) continue;
+    const key = el.tag === 'a' || el.role === 'link' ? ['Enter'] : ['Enter', 'Space'];
+    let ok = false;
+    for (const k of key) {
+      await tab.evaluate((p) => { window.__clicks = []; document.querySelector(`[data-probe="${p}"]`).focus(); }, id);
+      await tab.keyboard.press(k);
+      ok = ok || (await tab.evaluate((p) => window.__clicks.includes(p), id));
+    }
+    activates[id] = ok;
+  }
+  const elements = found.map((e) => {
+    const stop = order.indexOf(String(e.probe));
+    return {
+      tag: e.tag, ...(e.role ? { role: e.role } : {}), ...(e.node ? { node: e.node } : {}), name: e.name,
+      ...(e.disabled ? { disabled: true } : {}), ...(e.clickableOnly ? { clickableOnly: true } : {}),
+      tabIndex: stop,
+      ...(stop >= 0 ? { focusVisible: focusShown[String(e.probe)] !== e.rest } : {}),
+      ...(activates[String(e.probe)] !== undefined ? { activates: activates[String(e.probe)] } : {}),
+    };
+  });
+  return { tabOrder: order.map((id) => found[Number(id)].name || found[Number(id)].tag), elements };
+}
+
 export async function reactCheck({
   design, out, fonts: fontDirs = [], fetchFonts = false, tailwind = 4, chrome, code = null, assets = null, css = '',
   viewport = null, html = false,
@@ -386,6 +491,7 @@ export async function reactCheck({
         },
       };
     }
+    report.keyboard = await keyboardProbe(tab).catch((e) => ({ error: String(e.message || e), tabOrder: [], elements: [] }));
   } finally {
     await browser.close();
   }

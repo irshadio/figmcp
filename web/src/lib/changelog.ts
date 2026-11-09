@@ -2,6 +2,15 @@ export type Release = { version: string | null; title?: string; notes: { type: "
 
 export const releases: Release[] = [
   {
+    version: "1.8.0",
+    notes: [
+      { type: "new", text: "verify_code says what it did not check: every result has a coverage block listing, for each button, field, toggle or tab row, the states (pressed, disabled, focus, loading, error), keyboard and screen-reader behaviour no check covered, plus dark mode, other widths and text sizes, and right-to-left." },
+      { type: "new", text: "Coverage tells states the design draws apart from states it never drew: a Disabled variant that exists but was not rendered, or a loading state missing from the design for the designer to add." },
+      { type: "new", text: "React and HTML checks press Tab through the page: the Tab order, controls without a visible focus indicator, buttons Enter or Space does not activate, controls without an accessible name, and clickable elements the keyboard cannot reach." },
+      { type: "improved", text: "Agents are told to hand the not-verified list back with the implementation, so a reviewer knows what is left to check. The plugin now exports every variant a component offers; reload it to get this." },
+    ],
+  },
+  {
     version: "1.7.0",
     notes: [
       { type: "new", text: "SwiftUI output: projects with a Package.swift, .xcodeproj or .xcworkspace get SwiftUI views built the way a production screen is: press-style Buttons, selection with a sliding indicator, snapping carousels, LazyVGrid, pinned bars, Toggles, ProgressViews, calendars and loading placeholders." },
