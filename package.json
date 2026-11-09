@@ -1,6 +1,6 @@
 {
   "name": "@irshad.io/figma-local-mcp",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "mcpName": "io.github.irshadio/figmcp",
   "description": "Local MCP server for Figma: a development plugin streams the open file over a localhost WebSocket, so design reads never touch the Figma API. Writes Flutter, SwiftUI, React or HTML reference code.",
   "keywords": [
@@ -50,10 +50,10 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.31.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "pngjs": "^7.0.0",
     "ws": "^8.22.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "optionalDependencies": {
     "puppeteer-core": "^25.12.0"
